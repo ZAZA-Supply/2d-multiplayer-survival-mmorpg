@@ -80,12 +80,14 @@ import { renderStash } from '../utils/renderers/stashRenderingUtils';
 import { renderPlayerTorchLight, renderCampfireLight, renderLanternLight, renderFurnaceLight } from '../utils/renderers/lightRenderingUtils';
 import { renderTree } from '../utils/renderers/treeRenderingUtils';
 import { renderCloudsDirectly } from '../utils/renderers/cloudRenderingUtils';
+import { useFallingTreeAnimations } from '../hooks/useFallingTreeAnimations';
+import { updateTreeParticles, renderTreeParticles, createTreeImpactParticles } from '../utils/effects/treeFallParticles';
 import { renderProjectile } from '../utils/renderers/projectileRenderingUtils';
 import { renderShelter } from '../utils/renderers/shelterRenderingUtils';
 import { setShelterClippingData } from '../utils/renderers/shadowUtils';
 import { renderRain } from '../utils/renderers/rainRenderingUtils';
 import { renderWaterOverlay } from '../utils/renderers/waterOverlayUtils';
-import { renderPlayer, isPlayerHovered } from '../utils/renderers/playerRenderingUtils';
+import { renderPlayer, isPlayerHovered, getSpriteCoordinates } from '../utils/renderers/playerRenderingUtils';
 import { renderSeaStackSingle } from '../utils/renderers/seaStackRenderingUtils';
 import { renderWaterPatches } from '../utils/renderers/waterPatchRenderingUtils';
 import { drawUnderwaterShadowOnly } from '../utils/renderers/swimmingEffectsUtils';
@@ -396,6 +398,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   const animationFrame = useWalkingAnimationCycle(); // Faster, smoother walking animation
   const sprintAnimationFrame = useSprintAnimationCycle(); // Even faster animation for sprinting
   const idleAnimationFrame = useIdleAnimationCycle(); // Slower, relaxed animation for idle state
+  
+  // Track falling tree animations
+  const { isTreeFalling, getFallProgress, TREE_FALL_DURATION_MS } = useFallingTreeAnimations(trees);
 
   // Use ref instead of state to avoid re-renders every frame
   const deltaTimeRef = useRef<number>(0);
@@ -467,6 +472,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     animalCorpses,
     barrels,
     seaStacks,
+    isTreeFalling, // NEW: Pass falling tree checker so falling trees stay visible
   );
 
   // --- UI State ---
@@ -1173,6 +1179,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         shelterClippingData,
         localFacingDirection, // ADD: Pass local facing direction for instant client-authoritative direction changes
         treeShadowsEnabled, // NEW: Pass visual cortex module setting for tree shadows
+        // NEW: Pass falling tree animation state
+        isTreeFalling,
+        getFallProgress,
+        onTreeImpact: (treeId: string, tree: any) => {
+          // Create impact particles when tree hits the ground
+          createTreeImpactParticles(treeId, tree.posX, tree.posY, 480); // 480 is approx tree width
+        },
       });
     }
 
@@ -1214,12 +1227,38 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         const spriteBaseX = playerForRendering.positionX - drawWidth / 2;
         const spriteBaseY = playerForRendering.positionY - drawHeight / 2;
 
-        // Call the underwater shadow function (imported at top of file)
+        // Calculate if player is moving (same logic as main rendering)
+        let isPlayerMoving = false;
+        const lastPos = lastPositionsRef.current?.get(playerId);
+        if (lastPos) {
+          const positionThreshold = 0.1;
+          const dx = Math.abs(playerForRendering.positionX - lastPos.x);
+          const dy = Math.abs(playerForRendering.positionY - lastPos.y);
+          isPlayerMoving = dx > positionThreshold || dy > positionThreshold;
+        }
+
+        // Calculate animated sprite coordinates for swimming
+        // IMPORTANT: Swimming uses idleAnimationFrame, NOT animationFrame (matches main rendering logic)
+        const totalSwimmingFrames = 24; // Swimming animation has 24 frames
+        const { sx, sy } = getSpriteCoordinates(
+          playerForRendering,
+          isPlayerMoving,
+          idleAnimationFrame, // Swimming uses idle animation frames, same as main player rendering!
+          false, // isUsingItem
+          totalSwimmingFrames,
+          false, // isIdle
+          false, // isCrouching
+          true,  // isSwimming - IMPORTANT: This tells it to use swimming animation
+          false, // isDodgeRolling
+          0      // dodgeRollProgress
+        );
+
+        // Call the underwater shadow function with animated sprite coordinates
         drawUnderwaterShadowOnly(
           ctx,
           heroImg,
-          0, // sx - simplified, use first frame for shadow
-          0, // sy - simplified, use first frame for shadow  
+          sx, // Use calculated sprite x coordinate
+          sy, // Use calculated sprite y coordinate
           spriteBaseX,
           spriteBaseY,
           drawWidth,
@@ -1502,6 +1541,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           shelterClippingData,
           localFacingDirection, // ADD: Pass local facing direction for instant client-authoritative direction changes
           treeShadowsEnabled, // NEW: Pass visual cortex module setting for tree shadows
+          // NEW: Pass falling tree animation state
+          isTreeFalling,
+          getFallProgress,
+          onTreeImpact: (treeId: string, tree: any) => {
+            // Create impact particles when tree hits the ground
+            createTreeImpactParticles(treeId, tree.posX, tree.posY, 480); // 480 is approx tree width
+          },
         });
       }
     });
@@ -1531,6 +1577,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
       // Render arrow break effects
       renderArrowBreakEffects(ctx, now_ms);
+
+      // Render tree fall particles (grass/dirt puffing up)
+      renderTreeParticles(ctx, cameraOffsetX, cameraOffsetY);
 
       // Render other players' fishing lines and bobbers
       if (typeof window !== 'undefined' && (window as any).renderOtherPlayersFishing) {
@@ -1825,6 +1874,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       // Use fallback deltaTime for extreme cases (pause/resume, tab switching, etc.)
       deltaTimeRef.current = 16.667; // 60fps fallback
     }
+
+    // Update tree fall particles
+    updateTreeParticles(deltaTimeRef.current / 1000); // Convert ms to seconds
 
     renderGame();
   }, [renderGame]);

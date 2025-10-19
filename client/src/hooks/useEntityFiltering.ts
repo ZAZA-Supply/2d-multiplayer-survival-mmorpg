@@ -364,7 +364,8 @@ export function useEntityFiltering(
   viperSpittles: Map<string, SpacetimeDBViperSpittle>, // ADDED viperSpittles argument
   animalCorpses: Map<string, SpacetimeDBAnimalCorpse>, // ADDED animalCorpses argument
   barrels: Map<string, SpacetimeDBBarrel>, // ADDED barrels argument
-  seaStacks: Map<string, any> // ADDED sea stacks argument
+  seaStacks: Map<string, any>, // ADDED sea stacks argument
+  isTreeFalling?: (treeId: string) => boolean // NEW: Check if tree is falling
 ): EntityFilteringResult {
   // Increment frame counter for throttling
   frameCounter++;
@@ -549,9 +550,13 @@ export function useEntityFiltering(
       PERFORMANCE_MODE.TREE_CULL_DISTANCE_SQ,
       PERFORMANCE_MODE.MAX_TREES_PER_FRAME,
       playerPos,
-      (tree) => tree.health > 0 && isEntityInView(tree, viewBounds, stableTimestamp)
+      (tree) => {
+        // Include tree if it has health OR if it's currently falling
+        const isFalling = isTreeFalling ? isTreeFalling(tree.id.toString()) : false;
+        return (tree.health > 0 || isFalling) && isEntityInView(tree, viewBounds, stableTimestamp);
+      }
     );
-  }, [trees, playerPos, viewBounds, stableTimestamp, frameCounter]);
+  }, [trees, playerPos, viewBounds, stableTimestamp, frameCounter, isTreeFalling]);
 
   let cachedVisibleStones = useMemo(() => {
     if (!playerPos) return [];

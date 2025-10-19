@@ -4,6 +4,12 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      // Map the import name used by spacetime CLI 1.6.0+ to the actual package
+      'spacetimedb': '@clockworklabs/spacetimedb-sdk',
+    },
+  },
   server: {
     port: 3008,
   },

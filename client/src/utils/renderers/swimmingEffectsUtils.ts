@@ -394,9 +394,9 @@ function drawUnderwaterShadow(
     0, 0, gameConfig.spriteWidth, gameConfig.spriteHeight    // Destination: full temporary canvas
   );
   
-  // Shadow offset: closer to player and more to the left
-  const shadowOffsetX = spriteWidth * 0.2; // 40% to the right (closer and more left)
-  const shadowOffsetY = spriteHeight * 1.0; // 60% down (closer to player)
+  // Shadow offset: adjusted to center under player after transformations
+  const shadowOffsetX = spriteWidth * 0.5; // Shift right to center under player (accounting for flip/rotation)
+  const shadowOffsetY = spriteHeight * 1.0; // Same vertical distance (directly below player)
   
   // Shadow position
   const shadowX = centerX + shadowOffsetX;
@@ -404,8 +404,11 @@ function drawUnderwaterShadow(
   
   ctx.save();
   
-  // Translate to shadow position for rotation
+  // Translate to shadow position for rotation and flip
   ctx.translate(shadowX, shadowY);
+  
+  // Flip vertically for realistic mirror reflection
+  ctx.scale(-1, 1);
   
   // Rotate 45 degrees to the right (PI/4 radians)
   ctx.rotate(Math.PI / 4);
@@ -426,7 +429,7 @@ function drawUnderwaterShadow(
     maxShadowAlpha: 0.75, // Slightly more transparent (deeper underwater)
     maxStretchFactor: 1.0, // Minimal stretch (water diffuses light)
     minStretchFactor: 0.9, // Keep shadow compact
-    shadowBlur: 6, // More blur for deep water diffusion effect
+    shadowBlur: 2, // Reduced blur for sharper shadow (was 6)
     pivotYOffset: 0,
   });
   

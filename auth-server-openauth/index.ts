@@ -201,7 +201,7 @@ async function success(ctx: any, value: any): Promise<Response> {
     try {
       const imagePath = path.join(process.cwd(), 'logo.png');
       const imageBuffer = fs.readFileSync(imagePath);
-      return new Response(imageBuffer, { headers: { 'Content-Type': 'image/png' } });
+      return new Response(new Uint8Array(imageBuffer), { headers: { 'Content-Type': 'image/png' } });
     } catch (error) {
       console.error('[Static] Failed to serve logo.png:', error);
       return new Response('Image not found', { status: 404 });
@@ -212,7 +212,7 @@ async function success(ctx: any, value: any): Promise<Response> {
     try {
       const imagePath = path.join(process.cwd(), 'logo.png');
       const imageBuffer = fs.readFileSync(imagePath);
-      return new Response(imageBuffer, { headers: { 'Content-Type': 'image/png' } });
+      return new Response(new Uint8Array(imageBuffer), { headers: { 'Content-Type': 'image/png' } });
     } catch (error) {
       console.error('[Static] Failed to serve logo.png:', error);
       return new Response('Image not found', { status: 404 });
@@ -620,7 +620,7 @@ async function success(ctx: any, value: any): Promise<Response> {
                      <input type="hidden" name="code_challenge_method" value="${code_challenge_method}">
                      <input type="hidden" name="client_id" value="${client_id}">
                      <div><label for="email">Email:</label><input id="email" name="email" type="email" value="${email || ''}" required></div>
-                     <div><label for="password">Password:</label><input id="password" name="password" type="password" required></div>
+                     <div><label for="password">Password:</label><input id="password" name="password" type="password" autocomplete="new-password" required></div>
                      <button type="submit">Register</button>
                 </form>
             </div>
@@ -1110,7 +1110,7 @@ async function success(ctx: any, value: any): Promise<Response> {
                         </div>
                         <div class="form-group">
                             <label for="password">Password</label>
-                            <input id="password" name="password" type="password" required placeholder="Enter your password">
+                            <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Enter your password">
                         </div>
                         <button type="submit" class="submit-button">Sign In</button>
                     </form>
