@@ -158,7 +158,8 @@ export const getSpriteCoordinates = (
   }
 
   // Handle idle animation (4x4 grid layout)
-  if (isIdle && !isMoving && !isUsingItem) {
+  // Allow idle animation even when using items (e.g., bandaging)
+  if (isIdle && !isMoving) {
     const idleFrame = currentAnimationFrame % totalFrames; // Ensure frame is within bounds
     const spriteCol = idleFrame % 4; // Cycle through 4 columns (frames) on the row
     
@@ -196,8 +197,9 @@ export const getSpriteCoordinates = (
   }
 
   // Calculate sprite column
+  // Allow walking animation even when using items (e.g., bandaging while moving)
   let spriteCol: number;
-  if (isMoving && !isUsingItem) {
+  if (isMoving) {
     // Use the current animation frame for walking/sprinting (0 to totalFrames-1)
     spriteCol = currentAnimationFrame % totalFrames;
   } else {
