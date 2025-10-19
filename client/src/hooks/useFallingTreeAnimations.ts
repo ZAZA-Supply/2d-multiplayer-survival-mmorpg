@@ -41,33 +41,58 @@ export function useFallingTreeAnimations(trees: Map<string, Tree>) {
         const treeId = tree.id.toString();
         const prevState = previousTreeStatesRef.current.get(treeId);
         
-        // Detect when a tree is newly destroyed (respawnAt just got set and health is 0)
-        const isNewlyDestroyed = tree.health === 0 && 
-                                 tree.respawnAt !== undefined && 
-                                 tree.respawnAt !== null &&
-                                 (!prevState || prevState.health > 0 || prevState.respawnAt === undefined);
-
-        if (isNewlyDestroyed && !newFallingTrees.has(treeId)) {
-          // Start falling animation for this tree
-          console.log(`[FallingTree] Tree ${treeId} destroyed, starting fall animation`);
-          
-          newFallingTrees.set(treeId, {
-            treeId,
-            startTime: now,
-            posX: tree.posX,
-            posY: tree.posY,
-            treeType: tree.treeType,
-            imageSource: '', // Will be populated by renderer
-            targetWidth: 0, // Will be populated by renderer
-          });
+        // Check if tree has respawned (was destroyed, now has health again)
+        if (newFallingTrees.has(treeId) && tree.health > 0) {
+          console.log(`[FallingTree] Tree ${treeId} respawned, removing animation`);
+          newFallingTrees.delete(treeId);
           hasChanges = true;
+          // DON'T delete from previousTreeStatesRef - we need to track the tree's new healthy state
+          // Otherwise it will be detected as "newly destroyed" on the next render
+        }
+        
+        // Only check for newly destroyed trees if they're not already animating
+        if (!newFallingTrees.has(treeId)) {
+          // Detect when a tree is newly destroyed (respawnAt just got set and health is 0)
+          // IMPORTANT: Only animate if we SAW the tree healthy before (prevState exists and health > 0)
+          // Don't animate trees that are already destroyed when we first load them
+          const isNewlyDestroyed = tree.health === 0 && 
+                                   tree.respawnAt !== undefined && 
+                                   tree.respawnAt !== null &&
+                                   prevState !== undefined && // We must have seen this tree before
+                                   prevState.health > 0; // And it was healthy last time we saw it
+
+          if (isNewlyDestroyed) {
+            // Start falling animation for this tree
+            console.log(`[FallingTree] Tree ${treeId} destroyed, starting fall animation`);
+            
+            newFallingTrees.set(treeId, {
+              treeId,
+              startTime: now,
+              posX: tree.posX,
+              posY: tree.posY,
+              treeType: tree.treeType,
+              imageSource: '', // Will be populated by renderer
+              targetWidth: 0, // Will be populated by renderer
+            });
+            hasChanges = true;
+          }
         }
 
-        // Update previous state
+        // Always update previous state to track current tree state
         previousTreeStatesRef.current.set(treeId, {
           health: tree.health,
           respawnAt: tree.respawnAt ? Number(tree.respawnAt.microsSinceUnixEpoch / 1000n) : undefined,
         });
+      });
+
+      // Clean up animations for trees that no longer exist in the trees map (unloaded from view)
+      newFallingTrees.forEach((fallingTree, treeId) => {
+        if (!trees.has(treeId)) {
+          console.log(`[FallingTree] Tree ${treeId} no longer in view, removing animation`);
+          newFallingTrees.delete(treeId);
+          previousTreeStatesRef.current.delete(treeId);
+          hasChanges = true;
+        }
       });
 
       // Clean up old falling animations that have completed
@@ -76,6 +101,7 @@ export function useFallingTreeAnimations(trees: Map<string, Tree>) {
         if (fallingTree.startTime < animationEndTime) {
           console.log(`[FallingTree] Cleaning up completed animation for tree ${treeId}`);
           newFallingTrees.delete(treeId);
+          previousTreeStatesRef.current.delete(treeId);
           hasChanges = true;
         }
       });

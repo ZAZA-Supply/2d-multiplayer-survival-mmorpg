@@ -391,11 +391,10 @@ interface RenderYSortedEntitiesProps {
     // ADD: Local facing direction for instant client-authoritative direction changes
     localFacingDirection?: string;
     // NEW: Visual cortex module setting for tree shadows
-    treeShadowsEnabled?: boolean;
-    // NEW: Falling tree animation state
-    isTreeFalling?: (treeId: string) => boolean;
-    getFallProgress?: (treeId: string) => number;
-    onTreeImpact?: (treeId: string, tree: SpacetimeDBTree) => void;
+  treeShadowsEnabled?: boolean;
+  // NEW: Falling tree animation state
+  isTreeFalling?: (treeId: string) => boolean;
+  getFallProgress?: (treeId: string) => number;
 }
 
 
@@ -454,7 +453,6 @@ export const renderYSortedEntities = ({
     // NEW: Falling tree animation state
     isTreeFalling,
     getFallProgress,
-    onTreeImpact,
 }: RenderYSortedEntitiesProps) => {
     // PERFORMANCE: Clean up memory caches periodically
     cleanupCaches();
@@ -796,9 +794,8 @@ export const renderYSortedEntities = ({
             const treeId = tree.id.toString();
             const isFalling = isTreeFalling ? isTreeFalling(treeId) : false;
             const fallProgress = isFalling && getFallProgress ? getFallProgress(treeId) : undefined;
-            const impactCallback = isFalling && onTreeImpact ? () => onTreeImpact(treeId, tree) : undefined;
             
-            renderTree(ctx, tree, nowMs, cycleProgress, false, false, localPlayerPosition, treeShadowsEnabled, isFalling, fallProgress, impactCallback);
+            renderTree(ctx, tree, nowMs, cycleProgress, false, false, localPlayerPosition, treeShadowsEnabled, isFalling, fallProgress);
         } else if (type === 'stone') {
             // Render stone with its shadow in the normal order (shadow first, then stone)
             renderStone(ctx, entity as SpacetimeDBStone, nowMs, cycleProgress, false, false);

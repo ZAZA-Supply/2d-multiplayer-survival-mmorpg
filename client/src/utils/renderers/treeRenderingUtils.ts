@@ -178,15 +178,14 @@ export function renderTree(
     localPlayerPosition?: { x: number; y: number } | null, // Player position (unused but kept for compatibility)
     treeShadowsEnabled: boolean = true, // NEW: Visual cortex module setting
     isFalling?: boolean, // NEW: Tree is currently falling
-    fallProgress?: number, // NEW: Progress of fall animation (0.0 to 1.0)
-    onImpact?: () => void // NEW: Callback when tree hits ground
+    fallProgress?: number // NEW: Progress of fall animation (0.0 to 1.0)
 ) {
     // PERFORMANCE: Skip shadow rendering entirely if disabled in visual settings
     const shouldSkipShadows = !treeShadowsEnabled || skipDrawingShadow;
     
     // Handle falling animation
     if (isFalling && fallProgress !== undefined && fallProgress !== null) {
-        renderFallingTree(ctx, tree, fallProgress, cycleProgress, shouldSkipShadows || false, onImpact);
+        renderFallingTree(ctx, tree, fallProgress, cycleProgress, shouldSkipShadows || false);
     } else {
         // Normal upright tree rendering
         renderConfiguredGroundEntity({
@@ -211,8 +210,7 @@ function renderFallingTree(
     tree: Tree,
     fallProgress: number,
     cycleProgress: number,
-    skipShadow: boolean,
-    onImpact?: () => void
+    skipShadow: boolean
 ) {
     const { imageSource, targetWidth } = getCachedTreeTypeInfo(tree);
     const img = imageManager.getImage(imageSource);
@@ -226,14 +224,9 @@ function renderFallingTree(
     // Calculate fall rotation (0 to 90 degrees, falling to the right)
     const fallAngle = fallProgress * (Math.PI / 2); // 0 to 90 degrees
     
-    // Trigger impact callback at ~75% progress (when tree hits ground)
-    const IMPACT_THRESHOLD = 0.75;
-    if (fallProgress >= IMPACT_THRESHOLD && fallProgress < IMPACT_THRESHOLD + 0.05 && onImpact) {
-        onImpact();
-    }
-    
     // Draw realistic collapsing shadow BEFORE rotation (using actual tree shadow)
-    if (!skipShadow) {
+    // Skip shadow entirely when tree is nearly flat (>90% fallen)
+    if (!skipShadow && fallProgress < 0.9) {
         ctx.save();
         
         // Shadow stays at tree base (doesn't rotate with tree)
@@ -241,7 +234,7 @@ function renderFallingTree(
         
         // Shadow scale factors change as tree falls:
         // - Height: Starts at full height, collapses to almost flat
-        const shadowHeightScale = 1 - (fallProgress * 0.92); // Collapses to 8% height when flat
+        const shadowHeightScale = 1 - (fallProgress * 0.95); // Collapses to 5% height when near flat
         
         // Shadow position (stays at base, shifts slightly as tree falls)
         const shadowOffsetX = drawWidth * 0.1 * fallProgress; // Shifts right as tree falls
@@ -249,6 +242,11 @@ function renderFallingTree(
         // Translate to tree base and apply vertical squash
         ctx.translate(tree.posX + shadowOffsetX, tree.posY);
         ctx.scale(1.0, shadowHeightScale); // Only squash vertically
+        
+        // Calculate aggressive fade-out: fades to 0 at 90% progress
+        // At 0%: alpha = 1.0, At 50%: alpha = 0.5, At 90%: alpha = 0
+        const shadowFadeProgress = Math.min(fallProgress / 0.9, 1.0); // Normalize to 0-1 by 90%
+        const shadowAlpha = 0.35 * (1 - Math.pow(shadowFadeProgress, 1.5)); // Exponential fade-out
         
         // Use the actual tree shadow rendering (same as upright trees)
         drawDynamicGroundShadow({
@@ -263,9 +261,9 @@ function renderFallingTree(
             minStretchFactor: 0.15,
             shadowBlur: 2,
             pivotYOffset: 15,
-            // Additional fade-out as tree falls
+            // Aggressive fade-out - disappears completely by 90%
             baseShadowColor: '0, 0, 0', // Standard shadow color
-            maxShadowAlpha: 0.35 * (1 - fallProgress * 0.6) // Fade out as tree falls
+            maxShadowAlpha: shadowAlpha
         });
         
         ctx.restore();

@@ -81,7 +81,6 @@ import { renderPlayerTorchLight, renderCampfireLight, renderLanternLight, render
 import { renderTree } from '../utils/renderers/treeRenderingUtils';
 import { renderCloudsDirectly } from '../utils/renderers/cloudRenderingUtils';
 import { useFallingTreeAnimations } from '../hooks/useFallingTreeAnimations';
-import { updateTreeParticles, renderTreeParticles, createTreeImpactParticles } from '../utils/effects/treeFallParticles';
 import { renderProjectile } from '../utils/renderers/projectileRenderingUtils';
 import { renderShelter } from '../utils/renderers/shelterRenderingUtils';
 import { setShelterClippingData } from '../utils/renderers/shadowUtils';
@@ -1182,10 +1181,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         // NEW: Pass falling tree animation state
         isTreeFalling,
         getFallProgress,
-        onTreeImpact: (treeId: string, tree: any) => {
-          // Create impact particles when tree hits the ground
-          createTreeImpactParticles(treeId, tree.posX, tree.posY, 480); // 480 is approx tree width
-        },
       });
     }
 
@@ -1544,10 +1539,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           // NEW: Pass falling tree animation state
           isTreeFalling,
           getFallProgress,
-          onTreeImpact: (treeId: string, tree: any) => {
-            // Create impact particles when tree hits the ground
-            createTreeImpactParticles(treeId, tree.posX, tree.posY, 480); // 480 is approx tree width
-          },
         });
       }
     });
@@ -1577,9 +1568,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
       // Render arrow break effects
       renderArrowBreakEffects(ctx, now_ms);
-
-      // Render tree fall particles (grass/dirt puffing up)
-      renderTreeParticles(ctx, cameraOffsetX, cameraOffsetY);
 
       // Render other players' fishing lines and bobbers
       if (typeof window !== 'undefined' && (window as any).renderOtherPlayersFishing) {
@@ -1874,9 +1862,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       // Use fallback deltaTime for extreme cases (pause/resume, tab switching, etc.)
       deltaTimeRef.current = 16.667; // 60fps fallback
     }
-
-    // Update tree fall particles
-    updateTreeParticles(deltaTimeRef.current / 1000); // Convert ms to seconds
 
     renderGame();
   }, [renderGame]);
