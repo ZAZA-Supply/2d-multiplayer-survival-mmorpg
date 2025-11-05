@@ -455,6 +455,14 @@ class KokoroService {
       return { voices: [] };
     }
   }
+
+  /**
+   * Clear all performance data
+   */
+  clearPerformanceData() {
+    this.performanceData = [];
+    console.log('[KokoroService] Performance data cleared');
+  }
 }
 
 // Export singleton instance
