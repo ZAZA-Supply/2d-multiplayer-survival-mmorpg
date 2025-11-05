@@ -320,7 +320,7 @@ class WhisperService {
       const proxyBody = {
         audio: audioBase64,
         filename: `audio.${extension}`,
-        contentType: audioBlob.type,
+        contentType: audioBlob.type.split(';')[0], // Normalize: remove codecs part (e.g., 'audio/webm;codecs=opus' -> 'audio/webm')
         model: 'whisper-1', // Currently only model available via API
         language: 'en',
         response_format: 'verbose_json',
@@ -494,11 +494,18 @@ class WhisperService {
    * Get appropriate file extension for the blob type
    */
   private getFileExtension(mimeType: string): string {
-    if (mimeType.includes('webm')) return 'webm';
-    if (mimeType.includes('ogg')) return 'ogg';
-    if (mimeType.includes('mp4')) return 'mp4';
-    if (mimeType.includes('wav')) return 'wav';
-    return 'webm'; // default
+    // Normalize MIME type (remove codecs part if present)
+    const normalizedType = mimeType.split(';')[0].toLowerCase();
+    
+    if (normalizedType.includes('webm')) return 'webm';
+    if (normalizedType.includes('ogg')) return 'ogg';
+    if (normalizedType.includes('mp4') || normalizedType.includes('m4a')) return 'mp4';
+    if (normalizedType.includes('wav')) return 'wav';
+    if (normalizedType.includes('flac')) return 'flac';
+    
+    // Default to webm (most browsers support this)
+    console.warn(`[Whisper] Unknown MIME type: ${mimeType}, defaulting to webm`);
+    return 'webm';
   }
 
   /**

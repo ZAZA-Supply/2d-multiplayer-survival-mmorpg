@@ -73,9 +73,39 @@ app.post('/api/whisper/transcribe', async (req, res) => {
     if (req.body && typeof req.body === 'object' && req.body.audio) {
       // Base64 encoded audio
       const audioBuffer = Buffer.from(req.body.audio, 'base64');
+      
+      // CRITICAL FIX: Ensure filename extension matches the actual audio format
+      // OpenAI Whisper API detects format from filename extension, so it must be correct
+      let filename = req.body.filename || 'audio.webm';
+      let contentType = req.body.contentType || 'audio/webm';
+      
+      // Validate and normalize the filename extension based on contentType
+      // This ensures OpenAI can properly detect the format
+      if (contentType.includes('webm')) {
+        filename = filename.replace(/\.[^.]+$/, '') + '.webm';
+        contentType = 'audio/webm';
+      } else if (contentType.includes('ogg') || contentType.includes('opus')) {
+        filename = filename.replace(/\.[^.]+$/, '') + '.ogg';
+        contentType = 'audio/ogg';
+      } else if (contentType.includes('mp4') || contentType.includes('m4a')) {
+        filename = filename.replace(/\.[^.]+$/, '') + '.mp4';
+        contentType = 'audio/mp4';
+      } else if (contentType.includes('wav')) {
+        filename = filename.replace(/\.[^.]+$/, '') + '.wav';
+        contentType = 'audio/wav';
+      } else {
+        // Default to webm if unknown (most browsers support this)
+        filename = filename.replace(/\.[^.]+$/, '') + '.webm';
+        contentType = 'audio/webm';
+      }
+      
+      console.log(`[Proxy] Processing audio: ${filename}, Content-Type: ${contentType}, Size: ${audioBuffer.length} bytes`);
+      
+      // Append file with proper filename and content type
+      // OpenAI detects format from filename extension, so this is critical
       formData.append('file', audioBuffer, {
-        filename: req.body.filename || 'audio.webm',
-        contentType: req.body.contentType || 'audio/webm'
+        filename: filename,
+        contentType: contentType
       });
     } else if (req.is('multipart/form-data')) {
       // Multipart form data
@@ -98,11 +128,19 @@ app.post('/api/whisper/transcribe', async (req, res) => {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        // Don't set Content-Type - FormData will set it with boundary
       },
       body: formData,
     });
 
     const data = await response.json();
+    
+    // Forward the exact error from OpenAI if transcription failed
+    if (!response.ok) {
+      console.error(`[Proxy] Whisper API error (${response.status}):`, data);
+      return res.status(response.status).json(data);
+    }
+    
     res.status(response.status).json(data);
 
   } catch (error: any) {
