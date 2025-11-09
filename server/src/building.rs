@@ -117,10 +117,17 @@ pub fn is_foundation_position_valid(
 ) -> bool {
     let foundations = ctx.db.foundation_cell();
     
+    // IMPORTANT: Check ALL foundations at this cell - there might be two complementary triangles already
+    let mut found_complementary = false;
+    let mut found_overlap = false;
+    let mut foundation_count = 0;
+    
     // Check if there's already a foundation at this cell
     for foundation in foundations.idx_cell_coords().filter((cell_x, cell_y)) {
         // If there's an existing foundation and it's not destroyed
         if !foundation.is_destroyed {
+            foundation_count += 1;
+            
             // Convert stored u8 shape to FoundationShape enum for comparison
             let existing_shape = match foundation.shape {
                 0 => FoundationShape::Empty,
@@ -139,12 +146,34 @@ pub fn is_foundation_position_valid(
                 (FoundationShape::TriNE, FoundationShape::TriNE) => return false, // Overlap
                 (FoundationShape::TriSE, FoundationShape::TriSE) => return false, // Overlap
                 (FoundationShape::TriSW, FoundationShape::TriSW) => return false, // Overlap
-                // Triangles can merge into Full - this will be handled in placement logic
-                _ => return false, // Different shapes overlap
+                // Complementary triangles can be placed together to form a full square
+                (FoundationShape::TriNW, FoundationShape::TriSE) => found_complementary = true, // Compatible
+                (FoundationShape::TriSE, FoundationShape::TriNW) => found_complementary = true, // Compatible
+                (FoundationShape::TriNE, FoundationShape::TriSW) => found_complementary = true, // Compatible
+                (FoundationShape::TriSW, FoundationShape::TriNE) => found_complementary = true, // Compatible
+                // Full foundation overlaps with any triangle
+                (FoundationShape::Full, _) => return false, // Full overlaps with anything
+                (_, FoundationShape::Full) => return false, // Full overlaps with anything
+                // Non-complementary triangles overlap
+                _ => found_overlap = true, // Different shapes overlap
             }
         }
     }
     
+    // If we found an overlap, block placement
+    if found_overlap {
+        return false;
+    }
+    
+    // If there are already 2 foundations at this cell (two complementary triangles forming a full square),
+    // block any further placement
+    if foundation_count >= 2 {
+        return false; // Already have two triangles forming a full square
+    }
+    
+    // If we found a complementary triangle and no overlaps, allow placement
+    // (This handles the case where we're adding the second triangle to form a full square)
+    // If no foundations found at all, allow placement
     true
 }
 
@@ -336,4 +365,6 @@ pub fn place_foundation(
     
     Ok(())
 }
+
+
 

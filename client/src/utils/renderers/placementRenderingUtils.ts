@@ -305,12 +305,58 @@ function isFoundationPlacementValid(
         return false;
     }
 
-    // Check if position is already occupied
+    // Check if position is already occupied (but allow complementary triangles)
+    // IMPORTANT: Check ALL foundations at this cell - there might be two complementary triangles already
+    let foundComplementary = false;
+    let foundOverlap = false;
+    let foundationCount = 0;
+    
     for (const foundation of connection.db.foundationCell.iter()) {
         if (foundation.cellX === cellX && foundation.cellY === cellY && !foundation.isDestroyed) {
-            return false; // Position occupied
+            foundationCount++;
+            const existingShape = foundation.shape as number;
+            
+            // Same shape = overlap
+            if (existingShape === shape) {
+                return false; // Position occupied
+            }
+            
+            // Full foundation overlaps with anything
+            if (existingShape === 1 || shape === 1) { // 1 = Full
+                return false; // Position occupied
+            }
+            
+            // Check if shapes are complementary triangles
+            const isComplementary = (
+                (existingShape === 2 && shape === 4) || // TriNW + TriSE
+                (existingShape === 4 && shape === 2) || // TriSE + TriNW
+                (existingShape === 3 && shape === 5) || // TriNE + TriSW
+                (existingShape === 5 && shape === 3)    // TriSW + TriNE
+            );
+            
+            if (isComplementary) {
+                foundComplementary = true; // Mark that we found a complementary triangle
+            } else {
+                // Non-complementary shapes overlap
+                foundOverlap = true; // Mark that we found an overlap
+            }
         }
     }
+    
+    // If we found an overlap, block placement
+    if (foundOverlap) {
+        return false;
+    }
+    
+    // If there are already 2 foundations at this cell (two complementary triangles forming a full square),
+    // block any further placement
+    if (foundationCount >= 2) {
+        return false; // Already have two triangles forming a full square
+    }
+    
+    // If we found a complementary triangle and no overlaps, allow placement
+    // (This handles the case where we're adding the second triangle to form a full square)
+    // If no foundations found at all, allow placement
 
     // Check if player has enough resources (cost depends on shape)
     if (inventoryItems && itemDefinitions) {

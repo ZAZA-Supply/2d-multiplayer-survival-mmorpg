@@ -151,10 +151,12 @@ export function renderFoundation({
 
   ctx.restore();
 
-  // Draw triangle border for triangle shapes
+  // Draw border for all foundation shapes
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1;
+  
   if (isTriangle) {
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1;
+    // Draw triangle border for triangle shapes
     ctx.beginPath();
     switch (foundation.shape) {
       case 2: // TriNW
@@ -183,6 +185,9 @@ export function renderFoundation({
         break;
     }
     ctx.stroke();
+  } else {
+    // Draw rectangle border for full foundations
+    ctx.strokeRect(screenX, screenY, screenSize, screenSize);
   }
 
   // Draw health bar if damaged (optional)
@@ -263,7 +268,7 @@ export function renderFoundationPreview({
 
   ctx.restore();
 
-  // Draw border (cyberpunk neon theme)
+  // Draw border (cyberpunk neon theme for preview)
   ctx.strokeStyle = isValid ? '#00FFFF' : '#FF00FF'; // Neon cyan or neon magenta
   ctx.lineWidth = 2;
   
