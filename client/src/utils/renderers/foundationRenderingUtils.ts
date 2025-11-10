@@ -453,7 +453,9 @@ export function renderWall({
   const screenSize = FOUNDATION_TILE_SIZE * worldScale;
   
   // Wall thickness (thin rectangle)
-  const WALL_THICKNESS = 4 * worldScale; // 4 pixels thick
+  const WALL_THICKNESS = 4 * worldScale; // 4 pixels thick (for north/south walls)
+  const EAST_WEST_WALL_THICKNESS = 12 * worldScale; // 12 pixels thick for east/west walls (more visible)
+  const DIAGONAL_WALL_THICKNESS = 12 * worldScale; // 12 pixels thick for diagonal walls (more visible)
   
   // Get wall image based on tier (use wall-specific images)
   const wallFilename = getWallTileFilename(wall.tier);
@@ -479,8 +481,8 @@ export function renderWall({
     ctx.clip();
   }
   
-  // For north/south walls in isometric view, make them taller (2 tiles tall) to render above players
-  const NORTH_SOUTH_WALL_HEIGHT = screenSize * 2; // 2 tiles tall for isometric depth
+  // For north/south walls in isometric view, make them taller (1 tile tall) to render above players
+  const NORTH_SOUTH_WALL_HEIGHT = screenSize; // 1 tile tall for isometric depth
   
   switch (wall.edge) {
     case 0: // North (top edge) - extend upward for isometric depth
@@ -490,9 +492,9 @@ export function renderWall({
       wallHeight = NORTH_SOUTH_WALL_HEIGHT;
       break;
     case 1: // East (right edge) - center on edge (half inside, half outside)
-      wallX = screenX + screenSize - WALL_THICKNESS / 2;
+      wallX = screenX + screenSize - EAST_WEST_WALL_THICKNESS / 2;
       wallY = screenY;
-      wallWidth = WALL_THICKNESS;
+      wallWidth = EAST_WEST_WALL_THICKNESS;
       wallHeight = screenSize;
       break;
     case 2: // South (bottom edge) - extend upward from bottom edge for isometric depth
@@ -503,9 +505,9 @@ export function renderWall({
       wallHeight = NORTH_SOUTH_WALL_HEIGHT;
       break;
     case 3: // West (left edge) - center on edge (half inside, half outside)
-      wallX = screenX - WALL_THICKNESS / 2;
+      wallX = screenX - EAST_WEST_WALL_THICKNESS / 2;
       wallY = screenY;
-      wallWidth = WALL_THICKNESS;
+      wallWidth = EAST_WEST_WALL_THICKNESS;
       wallHeight = screenSize;
       break;
     case 4: // DiagNE_SW (diagonal from NE to SW)
@@ -629,10 +631,10 @@ export function renderWall({
       
       // Draw a strip along the diagonal
       const stripWidth = Math.sqrt((hypEndX - hypStartX) ** 2 + (hypEndY - hypStartY) ** 2);
-      const stripHeight = WALL_THICKNESS;
+      const stripHeight = DIAGONAL_WALL_THICKNESS;
       ctx.drawImage(
         wallImage,
-        0, 0, wallImage.width, WALL_THICKNESS / worldScale, // Source
+        0, 0, wallImage.width, DIAGONAL_WALL_THICKNESS / worldScale, // Source
         centerX - stripWidth / 2, centerY - stripHeight / 2, stripWidth, stripHeight // Destination
       );
       ctx.restore();
@@ -649,7 +651,7 @@ export function renderWall({
       const centerY = (hypStartY + hypEndY) / 2;
       const angle = Math.atan2(hypEndY - hypStartY, hypEndX - hypStartX);
       const stripWidth = Math.sqrt((hypEndX - hypStartX) ** 2 + (hypEndY - hypStartY) ** 2);
-      const stripHeight = WALL_THICKNESS;
+      const stripHeight = DIAGONAL_WALL_THICKNESS;
       
       ctx.translate(centerX, centerY);
       ctx.rotate(angle);
@@ -683,10 +685,10 @@ export function renderWall({
         );
       } else {
         // Vertical wall - draw vertical strip from tile
-        const sourceX = wall.edge === 3 ? 0 : wallImage.width - WALL_THICKNESS / worldScale;
+        const sourceX = wall.edge === 3 ? 0 : wallImage.width - EAST_WEST_WALL_THICKNESS / worldScale;
         ctx.drawImage(
           wallImage,
-          sourceX, 0, WALL_THICKNESS / worldScale, wallImage.height, // Source
+          sourceX, 0, EAST_WEST_WALL_THICKNESS / worldScale, wallImage.height, // Source
           wallX, wallY, wallWidth, wallHeight // Destination
         );
       }
@@ -850,7 +852,9 @@ export function renderWallPreview({
   }
   
   // Wall thickness (thin rectangle)
-  const WALL_THICKNESS = 4 * worldScale; // 4 pixels thick
+  const WALL_THICKNESS = 4 * worldScale; // 4 pixels thick (for north/south walls)
+  const EAST_WEST_WALL_THICKNESS = 12 * worldScale; // 12 pixels thick for east/west walls (more visible)
+  const DIAGONAL_WALL_THICKNESS = 12 * worldScale; // 12 pixels thick for diagonal walls (more visible)
   
   // Determine wall rectangle position and size based on edge
   let wallX = screenX;
@@ -859,32 +863,33 @@ export function renderWallPreview({
   let wallHeight = WALL_THICKNESS;
   let isDiagonal = edge === 4 || edge === 5;
   
+  // For north/south walls in isometric view, make them taller (1 tile tall) to render above players
+  const PREVIEW_NORTH_SOUTH_WALL_HEIGHT = screenSize; // 1 tile tall for isometric depth
+  
   switch (edge) {
-    case 0: // North (top edge) - center on edge (half above, half below)
+    case 0: // North (top edge) - extend upward for isometric depth
       wallX = screenX;
-      wallY = screenY - WALL_THICKNESS / 2;
+      wallY = screenY - PREVIEW_NORTH_SOUTH_WALL_HEIGHT + WALL_THICKNESS / 2; // Extend upward
       wallWidth = screenSize;
-      wallHeight = WALL_THICKNESS;
+      wallHeight = PREVIEW_NORTH_SOUTH_WALL_HEIGHT;
       break;
     case 1: // East (right edge) - center on edge (half inside, half outside)
-      wallX = screenX + screenSize - WALL_THICKNESS / 2;
+      wallX = screenX + screenSize - EAST_WEST_WALL_THICKNESS / 2;
       wallY = screenY;
-      wallWidth = WALL_THICKNESS;
+      wallWidth = EAST_WEST_WALL_THICKNESS;
       wallHeight = screenSize;
       break;
     case 2: // South (bottom edge) - extend upward from bottom edge for isometric depth
       wallX = screenX;
       // Start at bottom edge and extend UPWARD (negative Y direction for isometric depth)
-      // For preview, use same logic as actual wall rendering
-      const previewNorthSouthHeight = screenSize * 2; // 2 foundation cells tall
-      wallY = screenY + screenSize - previewNorthSouthHeight; // Bottom edge minus wall height
+      wallY = screenY + screenSize - PREVIEW_NORTH_SOUTH_WALL_HEIGHT; // Bottom edge minus wall height
       wallWidth = screenSize;
-      wallHeight = previewNorthSouthHeight;
+      wallHeight = PREVIEW_NORTH_SOUTH_WALL_HEIGHT;
       break;
     case 3: // West (left edge) - center on edge (half inside, half outside)
-      wallX = screenX - WALL_THICKNESS / 2;
+      wallX = screenX - EAST_WEST_WALL_THICKNESS / 2;
       wallY = screenY;
-      wallWidth = WALL_THICKNESS;
+      wallWidth = EAST_WEST_WALL_THICKNESS;
       wallHeight = screenSize;
       break;
     case 4: // DiagNE_SW (diagonal from NE to SW)
@@ -922,7 +927,7 @@ export function renderWallPreview({
   if (isDiagonal) {
     // Draw diagonal wall preview as a thick line aligned with the hypotenuse
     ctx.strokeStyle = isValid ? '#00FFFF' : '#FF00FF'; // Neon cyan or neon magenta
-    ctx.lineWidth = WALL_THICKNESS * 2; // Make preview more visible
+    ctx.lineWidth = DIAGONAL_WALL_THICKNESS * 2; // Make preview more visible
     ctx.lineCap = 'square';
     ctx.beginPath();
     
@@ -951,7 +956,7 @@ export function renderWallPreview({
     ctx.translate(-centerX, -centerY);
     
     const stripWidth = Math.sqrt(screenSize * screenSize * 2); // Diagonal length
-    const stripHeight = WALL_THICKNESS * 2;
+    const stripHeight = DIAGONAL_WALL_THICKNESS * 2;
     ctx.fillStyle = isValid ? 'rgba(0, 255, 255, 0.3)' : 'rgba(255, 0, 255, 0.3)';
     ctx.fillRect(centerX - stripWidth / 2, centerY - stripHeight / 2, stripWidth, stripHeight);
     ctx.restore();
@@ -969,10 +974,10 @@ export function renderWallPreview({
         );
       } else {
         // Vertical wall - draw vertical strip from tile
-        const sourceX = edge === 3 ? 0 : wallImage.width - WALL_THICKNESS / worldScale;
+        const sourceX = edge === 3 ? 0 : wallImage.width - EAST_WEST_WALL_THICKNESS / worldScale;
         ctx.drawImage(
           wallImage,
-          sourceX, 0, WALL_THICKNESS / worldScale, wallImage.height, // Source
+          sourceX, 0, EAST_WEST_WALL_THICKNESS / worldScale, wallImage.height, // Source
           wallX, wallY, wallWidth, wallHeight // Destination
         );
       }
