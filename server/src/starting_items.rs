@@ -24,7 +24,7 @@ pub(crate) fn grant_starting_items(ctx: &ReducerContext, player_id: Identity, us
     // Format: (item_name: &str, quantity: u32, hotbar_slot: Option<u8>, inventory_slot: Option<u16>)
     let starting_inv_items = [
         // Hotbar (Slots 0-5)
-        ("Combat Ladle", 1, Some(0u8), None), 
+        ("Combat Ladle", 1, Some(0u8), None),
         ("Torch", 10, Some(1u8), None),
         ("Blueprint", 1, Some(2u8), None),
         ("Repair Hammer", 1, Some(3u8), None),

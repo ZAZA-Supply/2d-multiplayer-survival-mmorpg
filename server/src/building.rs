@@ -79,6 +79,36 @@ pub struct FoundationCell {
     pub group_id: Option<i64>,  // For future building groups/clans
 }
 
+// --- Wall Cell Table ---
+#[spacetimedb::table(
+    name = wall_cell,
+    public,
+    index(name = idx_chunk, btree(columns = [chunk_index])),
+    index(name = idx_cell_coords, btree(columns = [cell_x, cell_y]))
+)]
+#[derive(Clone, Debug)]
+pub struct WallCell {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub cell_x: i32,  // Tile X coordinate (wall is on edge of this tile)
+    pub cell_y: i32,  // Tile Y coordinate
+    pub chunk_index: u32,  // For chunk-based spatial subscriptions
+    pub edge: u8,     // BuildingEdge enum (0-3: N, E, S, W)
+    pub facing: u8,   // BuildingFacing enum (0: Interior, 1: Exterior)
+    pub foundation_shape: u8,  // FoundationShape enum (0-5) - which foundation this wall is on
+    pub tier: u8,     // BuildingTier enum (0-3: Twig, Wood, Stone, Metal)
+    pub health: f32,
+    pub max_health: f32,
+    pub owner: Identity,
+    pub placed_at: Timestamp,
+    pub is_destroyed: bool,
+    pub destroyed_at: Option<Timestamp>,
+    pub last_hit_time: Option<Timestamp>,
+    pub last_damaged_by: Option<Identity>,
+    pub group_id: Option<i64>,  // For future building groups/clans
+}
+
 // --- Helper Functions ---
 
 /// Check if player has Blueprint equipped
@@ -161,6 +191,248 @@ pub fn is_valid_foundation_shape(shape: u8) -> bool {
 /// Validate building tier enum value
 pub fn is_valid_building_tier(tier: u8) -> bool {
     matches!(tier, 0..=3) // Twig, Wood, Stone, Metal
+}
+
+/// Validate building edge enum value
+pub fn is_valid_building_edge(edge: u8) -> bool {
+    matches!(edge, 0..=3) // N, E, S, W (diagonals not used for walls)
+}
+
+/// Validate building facing enum value
+pub fn is_valid_building_facing(facing: u8) -> bool {
+    matches!(facing, 0..=1) // Interior, Exterior
+}
+
+/// Determine which edge a wall should be placed on based on mouse position relative to tile center
+/// Returns (edge, facing) where edge is BuildingEdge and facing is BuildingFacing
+/// For triangle foundations, also considers diagonal edges
+pub fn determine_wall_edge_and_facing(
+    world_x: f32,
+    world_y: f32,
+    cell_x: i32,
+    cell_y: i32,
+    player_x: f32,
+    player_y: f32,
+    foundation_shape: FoundationShape,
+) -> (BuildingEdge, BuildingFacing) {
+    // Calculate tile center
+    let tile_center_x = (cell_x as f32 * TILE_SIZE_PX as f32) + (TILE_SIZE_PX as f32 / 2.0);
+    let tile_center_y = (cell_y as f32 * TILE_SIZE_PX as f32) + (TILE_SIZE_PX as f32 / 2.0);
+    
+    // Calculate offset from tile center
+    let dx = world_x - tile_center_x;
+    let dy = world_y - tile_center_y;
+    
+    // Determine which edge is closest (snap to nearest edge)
+    let abs_dx = dx.abs();
+    let abs_dy = dy.abs();
+    
+    // For triangle foundations, also consider diagonal edges
+    let is_triangle = matches!(foundation_shape, FoundationShape::TriNW | FoundationShape::TriNE | FoundationShape::TriSE | FoundationShape::TriSW);
+    
+    let (edge, facing) = if is_triangle {
+        // Calculate distance to diagonal edges
+        let diag_nw_se_dist = (dx - dy).abs(); // Distance to NW-SE diagonal
+        let diag_ne_sw_dist = (dx + dy).abs(); // Distance to NE-SW diagonal
+        
+        // Check if we're closer to a diagonal than to cardinal edges
+        let min_cardinal_dist = abs_dx.min(abs_dy);
+        let min_diag_dist = diag_nw_se_dist.min(diag_ne_sw_dist);
+        
+        if min_diag_dist < min_cardinal_dist {
+            // Closer to diagonal
+            if diag_nw_se_dist < diag_ne_sw_dist {
+                // DiagNW_SE (edge 5)
+                let facing = if player_x < tile_center_x && player_y < tile_center_y {
+                    BuildingFacing::Interior
+                } else {
+                    BuildingFacing::Exterior
+                };
+                (BuildingEdge::DiagNW_SE, facing)
+            } else {
+                // DiagNE_SW (edge 4)
+                let facing = if player_x > tile_center_x && player_y < tile_center_y {
+                    BuildingFacing::Interior
+                } else {
+                    BuildingFacing::Exterior
+                };
+                (BuildingEdge::DiagNE_SW, facing)
+            }
+        } else {
+            // Closer to cardinal edge
+            if abs_dy > abs_dx {
+                if dy < 0.0 {
+                    let facing = if player_y < tile_center_y {
+                        BuildingFacing::Interior
+                    } else {
+                        BuildingFacing::Exterior
+                    };
+                    (BuildingEdge::N, facing)
+                } else {
+                    let facing = if player_y > tile_center_y {
+                        BuildingFacing::Interior
+                    } else {
+                        BuildingFacing::Exterior
+                    };
+                    (BuildingEdge::S, facing)
+                }
+            } else {
+                if dx < 0.0 {
+                    let facing = if player_x < tile_center_x {
+                        BuildingFacing::Interior
+                    } else {
+                        BuildingFacing::Exterior
+                    };
+                    (BuildingEdge::W, facing)
+                } else {
+                    let facing = if player_x > tile_center_x {
+                        BuildingFacing::Interior
+                    } else {
+                        BuildingFacing::Exterior
+                    };
+                    (BuildingEdge::E, facing)
+                }
+            }
+        }
+    } else {
+        // Full foundation - only cardinal edges
+        if abs_dy > abs_dx {
+            if dy < 0.0 {
+                let facing = if player_y < tile_center_y {
+                    BuildingFacing::Interior
+                } else {
+                    BuildingFacing::Exterior
+                };
+                (BuildingEdge::N, facing)
+            } else {
+                let facing = if player_y > tile_center_y {
+                    BuildingFacing::Interior
+                } else {
+                    BuildingFacing::Exterior
+                };
+                (BuildingEdge::S, facing)
+            }
+        } else {
+            if dx < 0.0 {
+                let facing = if player_x < tile_center_x {
+                    BuildingFacing::Interior
+                } else {
+                    BuildingFacing::Exterior
+                };
+                (BuildingEdge::W, facing)
+            } else {
+                let facing = if player_x > tile_center_x {
+                    BuildingFacing::Interior
+                } else {
+                    BuildingFacing::Exterior
+                };
+                (BuildingEdge::E, facing)
+            }
+        }
+    };
+    
+    (edge, facing)
+}
+
+/// Check if a wall position is valid (foundation exists, no overlapping wall)
+pub fn is_wall_position_valid(
+    ctx: &ReducerContext,
+    cell_x: i32,
+    cell_y: i32,
+    edge: BuildingEdge,
+    facing: BuildingFacing,
+) -> Result<(), String> {
+    // 1. Check if there's a foundation at this cell
+    let foundations = ctx.db.foundation_cell();
+    let mut foundation_found = false;
+    let mut foundation_shape = FoundationShape::Full;
+    
+    for foundation in foundations.idx_cell_coords().filter((cell_x, cell_y)) {
+        if !foundation.is_destroyed {
+            foundation_found = true;
+            foundation_shape = match foundation.shape {
+                0 => FoundationShape::Empty,
+                1 => FoundationShape::Full,
+                2 => FoundationShape::TriNW,
+                3 => FoundationShape::TriNE,
+                4 => FoundationShape::TriSE,
+                5 => FoundationShape::TriSW,
+                _ => continue,
+            };
+            break;
+        }
+    }
+    
+    if !foundation_found {
+        return Err("Cannot place wall: no foundation at this location.".to_string());
+    }
+    
+    // 2. For triangle foundations, check if the edge is valid
+    match foundation_shape {
+        FoundationShape::TriNW => {
+            // Valid edges: N, W, DiagNW_SE
+            if !matches!(edge, BuildingEdge::N | BuildingEdge::W | BuildingEdge::DiagNW_SE) {
+                return Err("Invalid edge for triangle foundation (TriNW).".to_string());
+            }
+        }
+        FoundationShape::TriNE => {
+            // Valid edges: N, E, DiagNE_SW
+            if !matches!(edge, BuildingEdge::N | BuildingEdge::E | BuildingEdge::DiagNE_SW) {
+                return Err("Invalid edge for triangle foundation (TriNE).".to_string());
+            }
+        }
+        FoundationShape::TriSE => {
+            // Valid edges: S, E, DiagNW_SE
+            if !matches!(edge, BuildingEdge::S | BuildingEdge::E | BuildingEdge::DiagNW_SE) {
+                return Err("Invalid edge for triangle foundation (TriSE).".to_string());
+            }
+        }
+        FoundationShape::TriSW => {
+            // Valid edges: S, W, DiagNE_SW
+            if !matches!(edge, BuildingEdge::S | BuildingEdge::W | BuildingEdge::DiagNE_SW) {
+                return Err("Invalid edge for triangle foundation (TriSW).".to_string());
+            }
+        }
+        _ => {
+            // Full foundation - all edges valid
+        }
+    }
+    
+    // 3. Check if there's already a wall at this edge/facing combination
+    // Also check adjacent tiles for shared edges
+    let walls = ctx.db.wall_cell();
+    
+    // Check current cell - don't check facing, just edge (walls on same edge block regardless of facing)
+    for wall in walls.idx_cell_coords().filter((cell_x, cell_y)) {
+        if !wall.is_destroyed && wall.edge == edge as u8 {
+            return Err("A wall already exists at this edge.".to_string());
+        }
+    }
+    
+    // Check adjacent tiles for shared edges
+    // North edge of (x, y) = South edge of (x, y-1)
+    // East edge of (x, y) = West edge of (x+1, y)
+    // South edge of (x, y) = North edge of (x, y+1)
+    // West edge of (x, y) = East edge of (x-1, y)
+    let (adjacent_cell_x, adjacent_cell_y, opposite_edge) = match edge {
+        BuildingEdge::N => (cell_x, cell_y - 1, BuildingEdge::S as u8),
+        BuildingEdge::E => (cell_x + 1, cell_y, BuildingEdge::W as u8),
+        BuildingEdge::S => (cell_x, cell_y + 1, BuildingEdge::N as u8),
+        BuildingEdge::W => (cell_x - 1, cell_y, BuildingEdge::E as u8),
+        _ => {
+            // Diagonal edges don't have adjacent tiles (they're internal to the triangle)
+            return Ok(());
+        }
+    };
+    
+    // Check adjacent cell for a wall on the opposite edge (any facing - shared edge is shared)
+    for wall in walls.idx_cell_coords().filter((adjacent_cell_x, adjacent_cell_y)) {
+        if !wall.is_destroyed && wall.edge == opposite_edge {
+            return Err("A wall already exists on the shared edge with the adjacent tile.".to_string());
+        }
+    }
+    
+    Ok(())
 }
 
 /// Check if a foundation cell position is valid (not overlapping with existing foundation)
@@ -803,5 +1075,540 @@ pub fn destroy_foundation(ctx: &ReducerContext, foundation_id: u64) -> Result<()
     Ok(())
 }
 
+/// Place a wall cell on the edge of a foundation tile
+#[spacetimedb::reducer]
+pub fn place_wall(
+    ctx: &ReducerContext,
+    cell_x: i64,
+    cell_y: i64,
+    world_x: f32,
+    world_y: f32,
+    tier: u8,
+) -> Result<(), String> {
+    let sender_id = ctx.sender;
+    let players = ctx.db.player();
+    let walls = ctx.db.wall_cell();
+    let foundations = ctx.db.foundation_cell();
+    
+    log::info!(
+        "[PlaceWall] Player {:?} attempting to place wall at cell ({}, {}), world=({:.1}, {:.1}), tier={}",
+        sender_id, cell_x, cell_y, world_x, world_y, tier
+    );
+    
+    // 1. Validate player
+    let player = players.identity().find(&sender_id)
+        .ok_or_else(|| "Player not found".to_string())?;
+    
+    if player.is_dead {
+        return Err("Cannot place wall while dead.".to_string());
+    }
+    
+    if player.is_knocked_out {
+        return Err("Cannot place wall while knocked out.".to_string());
+    }
+    
+    // 2. Validate Blueprint equipped
+    if !player_has_blueprint(ctx, sender_id) {
+        return Err("Blueprint must be equipped to place building pieces.".to_string());
+    }
+    
+    // 3. Validate tier
+    if !is_valid_building_tier(tier) {
+        return Err(format!("Invalid building tier: {}. Must be 0-3 (Twig, Wood, Stone, Metal).", tier));
+    }
+    
+    let building_tier = match tier {
+        0 => BuildingTier::Twig,
+        1 => BuildingTier::Wood,
+        2 => BuildingTier::Stone,
+        3 => BuildingTier::Metal,
+        _ => return Err("Invalid building tier".to_string()),
+    };
+    
+    // 4. Convert cell coordinates
+    let cell_x_i32 = cell_x as i32;
+    let cell_y_i32 = cell_y as i32;
+    
+    // 5. Get foundation shape FIRST (needed for edge determination)
+    let mut foundation_shape = FoundationShape::Full;
+    for foundation in foundations.idx_cell_coords().filter((cell_x_i32, cell_y_i32)) {
+        if !foundation.is_destroyed {
+            foundation_shape = match foundation.shape {
+                0 => FoundationShape::Empty,
+                1 => FoundationShape::Full,
+                2 => FoundationShape::TriNW,
+                3 => FoundationShape::TriNE,
+                4 => FoundationShape::TriSE,
+                5 => FoundationShape::TriSW,
+                _ => FoundationShape::Full,
+            };
+            break;
+        }
+    }
+    
+    // 6. Determine edge and facing based on world position, player position, and foundation shape
+    let (edge, facing) = determine_wall_edge_and_facing(
+        world_x,
+        world_y,
+        cell_x_i32,
+        cell_y_i32,
+        player.position_x,
+        player.position_y,
+        foundation_shape,
+    );
+    
+    // 7. Validate wall position (foundation exists, no overlapping wall)
+    is_wall_position_valid(ctx, cell_x_i32, cell_y_i32, edge, facing)?;
+    
+    // 8. Check placement distance from player
+    let tile_center_x = (cell_x_i32 as f32 * TILE_SIZE_PX as f32) + (TILE_SIZE_PX as f32 / 2.0);
+    let tile_center_y = (cell_y_i32 as f32 * TILE_SIZE_PX as f32) + (TILE_SIZE_PX as f32 / 2.0);
+    
+    let dx = tile_center_x - player.position_x;
+    let dy = tile_center_y - player.position_y;
+    let dist_sq = dx * dx + dy * dy;
+    
+    if dist_sq > BUILDING_PLACEMENT_MAX_DISTANCE_SQUARED {
+        return Err(format!(
+            "Wall placement too far from player. Distance: {:.1}px, Max: {:.1}px",
+            dist_sq.sqrt(),
+            BUILDING_PLACEMENT_MAX_DISTANCE
+        ));
+    }
+    
+    // 9. Calculate chunk index
+    let chunk_index = calculate_chunk_index(tile_center_x, tile_center_y);
+    
+    // 10. Get max health for this tier
+    let max_health = get_wall_max_health(building_tier);
+    
+    // 11. Check and consume resources (Twig tier uses wood, cost: 15 wood per wall)
+    let required_wood = 15;
+    
+    let inventory = ctx.db.inventory_item();
+    let item_defs = ctx.db.item_definition();
+    
+    // Find "Wood" item definition
+    let wood_item_def = item_defs.iter()
+        .find(|def| def.name == "Wood")
+        .ok_or_else(|| "Wood item definition not found".to_string())?;
+    
+    // Find wood items in player's inventory OR hotbar
+    let mut wood_items: Vec<_> = inventory.iter()
+        .filter(|item| {
+            let is_owned = match &item.location {
+                ItemLocation::Inventory(data) => data.owner_id == sender_id,
+                ItemLocation::Hotbar(data) => data.owner_id == sender_id,
+                _ => false,
+            };
+            is_owned &&
+            item.item_def_id == wood_item_def.id &&
+            item.quantity > 0
+        })
+        .collect();
+    
+    // Calculate total wood available
+    let total_wood: u32 = wood_items.iter().map(|item| item.quantity).sum();
+    
+    if total_wood < required_wood {
+        return Err(format!(
+            "Not enough wood. Required: {}, Available: {}",
+            required_wood, total_wood
+        ));
+    }
+    
+    // Consume wood
+    let mut remaining_to_consume = required_wood;
+    for wood_item in &wood_items {
+        if remaining_to_consume == 0 {
+            break;
+        }
+        
+        let consume_from_this = remaining_to_consume.min(wood_item.quantity);
+        let new_quantity = wood_item.quantity - consume_from_this;
+        remaining_to_consume -= consume_from_this;
+        
+        if new_quantity == 0 {
+            ctx.db.inventory_item().instance_id().delete(wood_item.instance_id);
+        } else {
+            let mut updated_item = wood_item.clone();
+            updated_item.quantity = new_quantity;
+            ctx.db.inventory_item().instance_id().update(updated_item);
+        }
+    }
+    
+    log::info!("[PlaceWall] Consumed {} wood from player {:?}", required_wood, sender_id);
+    
+    // 12. Create and insert wall
+    let new_wall = WallCell {
+        id: 0, // Auto-incremented
+        cell_x: cell_x_i32,
+        cell_y: cell_y_i32,
+        chunk_index,
+        edge: edge as u8,
+        facing: facing as u8,
+        foundation_shape: foundation_shape as u8,
+        tier,
+        health: max_health,
+        max_health,
+        owner: sender_id,
+        placed_at: ctx.timestamp,
+        is_destroyed: false,
+        destroyed_at: None,
+        last_hit_time: None,
+        last_damaged_by: None,
+        group_id: None,
+    };
+    
+    walls.try_insert(new_wall)
+        .map_err(|e| format!("Failed to insert wall: {}", e))?;
+    
+    // 13. Emit foundation construction sound (walls use same sound as foundations)
+    crate::sound_events::emit_foundation_wood_constructed_sound(ctx, tile_center_x, tile_center_y, sender_id);
+    
+    log::info!(
+        "[PlaceWall] Successfully placed wall at cell ({}, {}), edge={:?}, facing={:?}, tier={:?}, health={:.1}",
+        cell_x, cell_y, edge, facing, building_tier, max_health
+    );
+    
+    Ok(())
+}
 
+/// Upgrade a wall to a higher tier
+#[spacetimedb::reducer]
+pub fn upgrade_wall(
+    ctx: &ReducerContext,
+    wall_id: u64,
+    new_tier: u8,
+) -> Result<(), String> {
+    let sender_id = ctx.sender;
+    let players = ctx.db.player();
+    let walls = ctx.db.wall_cell();
+    
+    log::info!(
+        "[UpgradeWall] Player {:?} attempting to upgrade wall {} to tier {}",
+        sender_id, wall_id, new_tier
+    );
+    
+    // 1. Validate player
+    let player = players.identity().find(&sender_id)
+        .ok_or_else(|| "Player not found".to_string())?;
+    
+    if player.is_dead {
+        return Err("Cannot upgrade wall while dead.".to_string());
+    }
+    
+    if player.is_knocked_out {
+        return Err("Cannot upgrade wall while knocked out.".to_string());
+    }
+    
+    // 2. Validate Repair Hammer equipped
+    if !player_has_repair_hammer(ctx, sender_id) {
+        return Err("Repair Hammer must be equipped to upgrade walls.".to_string());
+    }
+    
+    // 3. Find wall
+    let wall = walls.id().find(&wall_id)
+        .ok_or_else(|| "Wall not found".to_string())?;
+    
+    if wall.is_destroyed {
+        return Err("Cannot upgrade destroyed wall.".to_string());
+    }
+    
+    // 4. Validate new tier
+    if !is_valid_building_tier(new_tier) {
+        return Err(format!("Invalid building tier: {}. Must be 0-3 (Twig, Wood, Stone, Metal).", new_tier));
+    }
+    
+    let current_tier = match wall.tier {
+        0 => BuildingTier::Twig,
+        1 => BuildingTier::Wood,
+        2 => BuildingTier::Stone,
+        3 => BuildingTier::Metal,
+        _ => return Err("Invalid current wall tier".to_string()),
+    };
+    
+    let target_tier = match new_tier {
+        0 => BuildingTier::Twig,
+        1 => BuildingTier::Wood,
+        2 => BuildingTier::Stone,
+        3 => BuildingTier::Metal,
+        _ => return Err("Invalid target tier".to_string()),
+    };
+    
+    // 5. Ensure upgrade is to a higher tier
+    if new_tier <= wall.tier {
+        return Err(format!("Cannot downgrade wall. Current tier: {}, Target tier: {}", wall.tier, new_tier));
+    }
+    
+    // 6. Check placement distance from player
+    let world_x = (wall.cell_x as f32 * TILE_SIZE_PX as f32) + (TILE_SIZE_PX as f32 / 2.0);
+    let world_y = (wall.cell_y as f32 * TILE_SIZE_PX as f32) + (TILE_SIZE_PX as f32 / 2.0);
+    
+    let dx = world_x - player.position_x;
+    let dy = world_y - player.position_y;
+    let dist_sq = dx * dx + dy * dy;
+    
+    if dist_sq > BUILDING_PLACEMENT_MAX_DISTANCE_SQUARED {
+        return Err("Wall is too far away.".to_string());
+    }
+    
+    // 7. Calculate resource costs based on target tier
+    let inventory = ctx.db.inventory_item();
+    let item_defs = ctx.db.item_definition();
+    
+    // Wall costs: Wood tier = 20 wood, Stone tier = 20 stone, Metal tier = 20 metal fragments
+    let required_wood = if target_tier == BuildingTier::Wood { 20 } else { 0 };
+    let required_stone = if target_tier == BuildingTier::Stone { 20 } else { 0 };
+    let required_metal = if target_tier == BuildingTier::Metal { 20 } else { 0 };
+    
+    // Check and consume wood
+    if required_wood > 0 {
+        let wood_item_def = item_defs.iter()
+            .find(|def| def.name == "Wood")
+            .ok_or_else(|| "Wood item definition not found".to_string())?;
+        
+        let mut wood_items: Vec<_> = inventory.iter()
+            .filter(|item| {
+                let is_owned = match &item.location {
+                    ItemLocation::Inventory(data) => data.owner_id == sender_id,
+                    ItemLocation::Hotbar(data) => data.owner_id == sender_id,
+                    _ => false,
+                };
+                is_owned &&
+                item.item_def_id == wood_item_def.id &&
+                item.quantity > 0
+            })
+            .collect();
+        
+        let total_wood: u32 = wood_items.iter().map(|item| item.quantity).sum();
+        
+        if total_wood < required_wood {
+            return Err(format!(
+                "Not enough wood. Required: {}, Available: {}",
+                required_wood, total_wood
+            ));
+        }
+        
+        let mut remaining_to_consume = required_wood;
+        for wood_item in &wood_items {
+            if remaining_to_consume == 0 {
+                break;
+            }
+            
+            let consume_from_this = remaining_to_consume.min(wood_item.quantity);
+            let new_quantity = wood_item.quantity - consume_from_this;
+            remaining_to_consume -= consume_from_this;
+            
+            if new_quantity == 0 {
+                ctx.db.inventory_item().instance_id().delete(wood_item.instance_id);
+            } else {
+                let mut updated_item = wood_item.clone();
+                updated_item.quantity = new_quantity;
+                ctx.db.inventory_item().instance_id().update(updated_item);
+            }
+        }
+        
+        log::info!("[UpgradeWall] Consumed {} wood from player {:?}", required_wood, sender_id);
+    }
+    
+    // Check and consume stone
+    if required_stone > 0 {
+        let stone_item_def = item_defs.iter()
+            .find(|def| def.name == "Stone")
+            .ok_or_else(|| "Stone item definition not found".to_string())?;
+        
+        let mut stone_items: Vec<_> = inventory.iter()
+            .filter(|item| {
+                let is_owned = match &item.location {
+                    ItemLocation::Inventory(data) => data.owner_id == sender_id,
+                    ItemLocation::Hotbar(data) => data.owner_id == sender_id,
+                    _ => false,
+                };
+                is_owned &&
+                item.item_def_id == stone_item_def.id &&
+                item.quantity > 0
+            })
+            .collect();
+        
+        let total_stone: u32 = stone_items.iter().map(|item| item.quantity).sum();
+        
+        if total_stone < required_stone {
+            return Err(format!(
+                "Not enough stone. Required: {}, Available: {}",
+                required_stone, total_stone
+            ));
+        }
+        
+        let mut remaining_to_consume = required_stone;
+        for stone_item in &stone_items {
+            if remaining_to_consume == 0 {
+                break;
+            }
+            
+            let consume_from_this = remaining_to_consume.min(stone_item.quantity);
+            let new_quantity = stone_item.quantity - consume_from_this;
+            remaining_to_consume -= consume_from_this;
+            
+            if new_quantity == 0 {
+                ctx.db.inventory_item().instance_id().delete(stone_item.instance_id);
+            } else {
+                let mut updated_item = stone_item.clone();
+                updated_item.quantity = new_quantity;
+                ctx.db.inventory_item().instance_id().update(updated_item);
+            }
+        }
+        
+        log::info!("[UpgradeWall] Consumed {} stone from player {:?}", required_stone, sender_id);
+    }
+    
+    // Check and consume metal fragments
+    if required_metal > 0 {
+        let metal_item_def = item_defs.iter()
+            .find(|def| def.name == "Metal Fragments")
+            .ok_or_else(|| "Metal Fragments item definition not found".to_string())?;
+        
+        let mut metal_items: Vec<_> = inventory.iter()
+            .filter(|item| {
+                let is_owned = match &item.location {
+                    ItemLocation::Inventory(data) => data.owner_id == sender_id,
+                    ItemLocation::Hotbar(data) => data.owner_id == sender_id,
+                    _ => false,
+                };
+                is_owned &&
+                item.item_def_id == metal_item_def.id &&
+                item.quantity > 0
+            })
+            .collect();
+        
+        let total_metal: u32 = metal_items.iter().map(|item| item.quantity).sum();
+        
+        if total_metal < required_metal {
+            return Err(format!(
+                "Not enough metal fragments. Required: {}, Available: {}",
+                required_metal, total_metal
+            ));
+        }
+        
+        let mut remaining_to_consume = required_metal;
+        for metal_item in &metal_items {
+            if remaining_to_consume == 0 {
+                break;
+            }
+            
+            let consume_from_this = remaining_to_consume.min(metal_item.quantity);
+            let new_quantity = metal_item.quantity - consume_from_this;
+            remaining_to_consume -= consume_from_this;
+            
+            if new_quantity == 0 {
+                ctx.db.inventory_item().instance_id().delete(metal_item.instance_id);
+            } else {
+                let mut updated_item = metal_item.clone();
+                updated_item.quantity = new_quantity;
+                ctx.db.inventory_item().instance_id().update(updated_item);
+            }
+        }
+        
+        log::info!("[UpgradeWall] Consumed {} metal fragments from player {:?}", required_metal, sender_id);
+    }
+    
+    // 8. Update wall tier and health
+    let new_max_health = get_wall_max_health(target_tier);
+    let health_ratio = wall.health / wall.max_health;
+    let new_health = new_max_health * health_ratio; // Preserve health percentage
+    
+    let mut updated_wall = wall.clone();
+    updated_wall.tier = new_tier;
+    updated_wall.max_health = new_max_health;
+    updated_wall.health = new_health;
+    
+    walls.id().update(updated_wall);
+    
+    // 9. Emit upgrade sound based on tier
+    match target_tier {
+        BuildingTier::Wood => {
+            crate::sound_events::emit_foundation_wood_upgraded_sound(ctx, world_x, world_y, sender_id);
+        },
+        BuildingTier::Stone => {
+            crate::sound_events::emit_foundation_stone_upgraded_sound(ctx, world_x, world_y, sender_id);
+        },
+        BuildingTier::Metal => {
+            crate::sound_events::emit_foundation_metal_upgraded_sound(ctx, world_x, world_y, sender_id);
+        },
+        BuildingTier::Twig => {
+            // Should not happen, but handle it
+        },
+    }
+    
+    log::info!(
+        "[UpgradeWall] Successfully upgraded wall {} from {:?} to {:?}, health={:.1}/{:.1}",
+        wall_id, current_tier, target_tier, new_health, new_max_health
+    );
+    
+    Ok(())
+}
 
+/// Destroy a twig wall (only twig walls can be destroyed)
+#[spacetimedb::reducer]
+pub fn destroy_wall(ctx: &ReducerContext, wall_id: u64) -> Result<(), String> {
+    use crate::sound_events;
+    
+    let sender_id = ctx.sender;
+    let walls = ctx.db.wall_cell();
+    let players = ctx.db.player();
+    
+    // 1. Validate player exists and is not knocked out
+    let player = players.identity().find(&sender_id)
+        .ok_or_else(|| "Player not found".to_string())?;
+    
+    if player.is_knocked_out {
+        return Err("Cannot destroy wall while knocked out.".to_string());
+    }
+    
+    // 2. Validate Repair Hammer equipped
+    if !player_has_repair_hammer(ctx, sender_id) {
+        return Err("Repair Hammer must be equipped to destroy walls.".to_string());
+    }
+    
+    // 3. Find wall
+    let wall = walls.id().find(&wall_id)
+        .ok_or_else(|| "Wall not found".to_string())?;
+    
+    if wall.is_destroyed {
+        return Err("Wall is already destroyed.".to_string());
+    }
+    
+    // 4. Only twig walls can be destroyed
+    if wall.tier != 0 {
+        return Err("Only twig walls can be destroyed.".to_string());
+    }
+    
+    // 5. Check placement distance from player
+    let world_x = (wall.cell_x as f32 * TILE_SIZE_PX as f32) + (TILE_SIZE_PX as f32 / 2.0);
+    let world_y = (wall.cell_y as f32 * TILE_SIZE_PX as f32) + (TILE_SIZE_PX as f32 / 2.0);
+    
+    let dx = world_x - player.position_x;
+    let dy = world_y - player.position_y;
+    let dist_sq = dx * dx + dy * dy;
+    
+    if dist_sq > BUILDING_PLACEMENT_MAX_DISTANCE_SQUARED {
+        return Err("Wall is too far away.".to_string());
+    }
+    
+    // 6. Mark wall as destroyed
+    let mut updated_wall = wall.clone();
+    updated_wall.is_destroyed = true;
+    updated_wall.destroyed_at = Some(ctx.timestamp);
+    
+    walls.id().update(updated_wall);
+    
+    // 7. Emit destroy sound (using foundation destroy sound for now)
+    sound_events::emit_foundation_twig_destroyed_sound(ctx, world_x, world_y, sender_id);
+    
+    log::info!(
+        "[DestroyWall] Successfully destroyed twig wall {} at ({}, {})",
+        wall_id, wall.cell_x, wall.cell_y
+    );
+    
+    Ok(())
+}

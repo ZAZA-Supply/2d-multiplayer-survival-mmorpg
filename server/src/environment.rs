@@ -1093,8 +1093,9 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
     // Define species distribution (weighted probabilities)
     let species_weights = [
         (AnimalSpecies::CinderFox, 45),      // 45% - Most common
-        (AnimalSpecies::TundraWolf, 30),     // 30% - Moderately common
         (AnimalSpecies::ArcticWalrus, 25),   // 25% - More common (beaches only)
+        // TundraWolf removed - no wolves spawning
+        // (AnimalSpecies::TundraWolf, 30),     // 30% - Moderately common
         // CableViper removed - no snakes spawning
         // (AnimalSpecies::CableViper, 20),     // 20% - Uncommon
 

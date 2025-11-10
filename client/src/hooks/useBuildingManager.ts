@@ -407,10 +407,28 @@ export const useBuildingManager = (
       }
     };
 
+    const handlePlaceWallResult = (ctx: any, cellX: bigint, cellY: bigint, worldX: number, worldY: number, tier: number) => {
+      console.log('[BuildingManager] placeWall reducer result:', ctx.event?.status);
+      if (ctx.event?.status?.tag === 'Failed') {
+        const errorMsg = ctx.event.status.value || 'Failed to place wall';
+        console.error('[BuildingManager] placeWall failed:', errorMsg);
+        console.log('[BuildingManager] Failed wall placement details:', { cellX, cellY, worldX, worldY, tier, errorMsg });
+        setPlacementError(errorMsg);
+        // Play error sound for immediate feedback
+        playImmediateSound('construction_placement_error', 1.0);
+      } else if (ctx.event?.status?.tag === 'Committed') {
+        console.log('[BuildingManager] placeWall succeeded!');
+        setPlacementError(null);
+        // Sound is now played server-side for all players to hear
+      }
+    };
+
     connection.reducers.onPlaceFoundation(handlePlaceFoundationResult);
+    connection.reducers.onPlaceWall(handlePlaceWallResult);
 
     return () => {
       connection.reducers.removeOnPlaceFoundation(handlePlaceFoundationResult);
+      connection.reducers.removeOnPlaceWall(handlePlaceWallResult);
     };
   }, [connection]);
 
@@ -616,6 +634,48 @@ export const useBuildingManager = (
         
         // Note: Don't cancel building mode - allow continuous placement
         // App.tsx callback will handle success/error feedback
+      } else if (mode === BuildingMode.Wall) {
+        // Wall placement logic
+        // Check client-side validation
+        if (isFoundationPlacementTooFar(connection, tileX, tileY, localPlayerX, localPlayerY)) {
+          setPlacementError('Too far away');
+          playImmediateSound('construction_placement_error', 1.0);
+          return;
+        }
+
+        // Check if there's a foundation at this cell (walls require a foundation)
+        let hasFoundation = false;
+        for (const foundation of connection.db.foundationCell.iter()) {
+          if (foundation.cellX === tileX && foundation.cellY === tileY && !foundation.isDestroyed) {
+            hasFoundation = true;
+            break;
+          }
+        }
+
+        if (!hasFoundation) {
+          setPlacementError('Walls require a foundation');
+          playImmediateSound('construction_placement_error', 1.0);
+          return;
+        }
+
+        // Call server reducer - server will determine edge and facing from world coordinates
+        console.log('[BuildingManager] Calling placeWall reducer:', { tileX, tileY, worldX, worldY, tier: buildingTier });
+        try {
+          connection.reducers.placeWall(
+            BigInt(tileX),
+            BigInt(tileY),
+            worldX,
+            worldY,
+            buildingTier as number // BuildingTier enum value (0-3)
+          );
+          console.log('[BuildingManager] placeWall reducer called successfully');
+        } catch (err) {
+          console.error('[BuildingManager] Error calling placeWall reducer:', err);
+          setPlacementError(`Failed to call reducer: ${err}`);
+          playImmediateSound('construction_placement_error', 1.0);
+        }
+        
+        // Note: Don't cancel building mode - allow continuous placement
       } else {
         console.warn(`[BuildingManager] Placement not implemented for mode: ${mode}`);
         setPlacementError(`Placement not implemented for ${mode}`);

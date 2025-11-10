@@ -23,6 +23,7 @@ import {
     ViperSpittle as SpacetimeDBViperSpittle,
     AnimalCorpse as SpacetimeDBAnimalCorpse,
     FoundationCell as SpacetimeDBFoundationCell, // ADDED: Building foundations
+    WallCell as SpacetimeDBWallCell, // ADDED: Building walls
 } from '../../generated';
 import { PlayerCorpse as SpacetimeDBPlayerCorpse } from '../../generated/player_corpse_type';
 import { gameConfig } from '../../config/gameConfig';
@@ -44,6 +45,7 @@ import { renderCampfire } from './campfireRenderingUtils';
 import { renderFurnace } from './furnaceRenderingUtils'; // ADDED: Furnace renderer import
 import { renderLantern } from './lanternRenderingUtils';
 import { renderFoundation } from './foundationRenderingUtils'; // ADDED: Foundation renderer import
+import { renderWall } from './foundationRenderingUtils'; // ADDED: Wall renderer import
 import { renderStash } from './stashRenderingUtils';
 import { renderSleepingBag } from './sleepingBagRenderingUtils';
 // Import shelter renderer
@@ -1029,6 +1031,36 @@ export const renderYSortedEntities = ({
                 viewOffsetY: -cameraOffsetY,
                 foundationTileImagesRef: foundationTileImagesRef,
             });
+        } else if (type === 'wall_cell') {
+            const wall = entity as SpacetimeDBWallCell;
+            // Extract player positions from ySortedEntities for transparency check
+            const playerPositions = ySortedEntities
+                .filter(item => item.type === 'player')
+                .map(item => {
+                    const player = item.entity as SpacetimeDBPlayer;
+                    const playerId = player.identity.toHexString();
+                    const isLocalPlayer = localPlayerId === playerId;
+                    
+                    // Use predicted/interpolated position if available
+                    if (isLocalPlayer && localPlayerPosition) {
+                        return { x: localPlayerPosition.x, y: localPlayerPosition.y };
+                    } else if (!isLocalPlayer && remotePlayerInterpolation) {
+                        const interpolatedPosition = remotePlayerInterpolation.updateAndGetSmoothedPosition(player, localPlayerId);
+                        return { x: interpolatedPosition.x, y: interpolatedPosition.y };
+                    }
+                    return { x: player.positionX, y: player.positionY };
+                });
+            
+            // Walls use cell coordinates directly - renderWall handles conversion
+            renderWall({
+                ctx,
+                wall: wall as any, // Will be properly typed after bindings regeneration
+                worldScale: 1.0,
+                viewOffsetX: -cameraOffsetX, // Convert camera offset to view offset
+                viewOffsetY: -cameraOffsetY,
+                foundationTileImagesRef: foundationTileImagesRef,
+                playerPositions: playerPositions, // ADDED: Pass player positions for transparency check
+            });
         } else if (type === 'shelter') {
             // Shelters are fully rendered in the first pass, including shadows.
             // No action needed in this second (shadow-only) pass.
@@ -1090,6 +1122,9 @@ export const renderYSortedEntities = ({
             // Sea stacks are fully rendered in the first pass - no second pass needed
         } else if (type === 'foundation_cell') {
             // Foundations are fully rendered in the first pass (ground level).
+            // No action needed in this second (shadow-only) pass.
+        } else if (type === 'wall_cell') {
+            // Walls are fully rendered in the first pass (on foundation edges).
             // No action needed in this second (shadow-only) pass.
         } else {
             console.warn('Unhandled entity type for Y-sorting (second pass):', type, entity);

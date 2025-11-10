@@ -121,6 +121,7 @@ interface GameScreenProps {
     barrels: Map<string, SpacetimeDBBarrel>; // ADDED barrels
     seaStacks: Map<string, any>; // ADDED sea stacks
     foundationCells: Map<string, any>; // ADDED: Building foundations
+    wallCells: Map<string, any>; // ADDED: Building walls
     inventoryItems: Map<string, SpacetimeDBInventoryItem>;
     itemDefinitions: Map<string, SpacetimeDBItemDefinition>;
     worldState: SpacetimeDBWorldState | null;
@@ -799,6 +800,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 barrels={props.barrels}
                 seaStacks={props.seaStacks}
                 foundationCells={props.foundationCells}
+                wallCells={props.wallCells}
                 inventoryItems={inventoryItems}
                 itemDefinitions={itemDefinitions}
                 worldState={worldState}

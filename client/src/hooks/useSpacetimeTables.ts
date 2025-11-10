@@ -135,6 +135,7 @@ export interface SpacetimeTableStates {
     barrels: Map<string, SpacetimeDB.Barrel>; // ADDED barrels
     seaStacks: Map<string, SpacetimeDB.SeaStack>; // ADDED sea stacks
     foundationCells: Map<string, SpacetimeDB.FoundationCell>; // ADDED: Building foundations
+    wallCells: Map<string, SpacetimeDB.WallCell>; // ADDED: Building walls
 }   
 
 // Define the props the hook accepts
@@ -199,6 +200,7 @@ export const useSpacetimeTables = ({
     const [barrels, setBarrels] = useState<Map<string, SpacetimeDB.Barrel>>(() => new Map()); // ADDED barrels
     const [seaStacks, setSeaStacks] = useState<Map<string, SpacetimeDB.SeaStack>>(() => new Map()); // ADDED sea stacks
     const [foundationCells, setFoundationCells] = useState<Map<string, SpacetimeDB.FoundationCell>>(() => new Map()); // ADDED: Building foundations
+    const [wallCells, setWallCells] = useState<Map<string, SpacetimeDB.WallCell>>(() => new Map()); // ADDED: Building walls
 
 
 
@@ -416,7 +418,8 @@ export const useSpacetimeTables = ({
                                     `SELECT * FROM barrel WHERE chunk_index = ${chunkIndex}`,
                                     `SELECT * FROM planted_seed WHERE chunk_index = ${chunkIndex}`,
                                     `SELECT * FROM sea_stack WHERE chunk_index = ${chunkIndex}`,
-                                    `SELECT * FROM foundation_cell WHERE chunk_index = ${chunkIndex}`
+                                    `SELECT * FROM foundation_cell WHERE chunk_index = ${chunkIndex}`,
+                                    `SELECT * FROM wall_cell WHERE chunk_index = ${chunkIndex}` // ADDED: Wall spatial subscription
                                 ];
                                 // Removed excessive debug logging to improve performance
                             newHandlesForChunk.push(timedBatchedSubscribe('Resources', resourceQueries));
@@ -482,6 +485,8 @@ export const useSpacetimeTables = ({
                             // REMOVED: WildAnimal - now subscribed globally like players to prevent disappearing
                             newHandlesForChunk.push(timedSubscribe('Barrel', `SELECT * FROM barrel WHERE chunk_index = ${chunkIndex}`));
                             newHandlesForChunk.push(timedSubscribe('SeaStack', `SELECT * FROM sea_stack WHERE chunk_index = ${chunkIndex}`));
+                            newHandlesForChunk.push(timedSubscribe('FoundationCell', `SELECT * FROM foundation_cell WHERE chunk_index = ${chunkIndex}`));
+                            newHandlesForChunk.push(timedSubscribe('WallCell', `SELECT * FROM wall_cell WHERE chunk_index = ${chunkIndex}`));
 
                             if (ENABLE_CLOUDS) {
                                 newHandlesForChunk.push(timedSubscribe('Cloud', `SELECT * FROM cloud WHERE chunk_index = ${chunkIndex}`));
@@ -1183,6 +1188,35 @@ export const useSpacetimeTables = ({
                 setFoundationCells(prev => { const newMap = new Map(prev); newMap.delete(foundation.id.toString()); return newMap; });
             };
 
+            // Wall Cell handlers - SPATIAL
+            const handleWallCellInsert = (ctx: any, wall: SpacetimeDB.WallCell) => {
+                console.log(`[Wall Insert] Wall inserted: id=${wall.id.toString()}, cellX=${wall.cellX}, cellY=${wall.cellY}, edge=${wall.edge}, chunk=${wall.chunkIndex}`);
+                setWallCells(prev => {
+                    const newMap = new Map(prev);
+                    newMap.set(wall.id.toString(), wall);
+                    console.log(`[Wall Insert] Map size changed from ${prev.size} to ${newMap.size}`);
+                    return newMap;
+                });
+            };
+            const handleWallCellUpdate = (ctx: any, oldWall: SpacetimeDB.WallCell, newWall: SpacetimeDB.WallCell) => {
+                // Only update for visually significant changes
+                const visuallySignificant = 
+                    oldWall.cellX !== newWall.cellX ||
+                    oldWall.cellY !== newWall.cellY ||
+                    oldWall.edge !== newWall.edge ||
+                    oldWall.facing !== newWall.facing ||
+                    oldWall.tier !== newWall.tier ||
+                    Math.abs(oldWall.health - newWall.health) > 0.1 ||
+                    oldWall.isDestroyed !== newWall.isDestroyed;
+                
+                if (visuallySignificant) {
+                    setWallCells(prev => new Map(prev).set(newWall.id.toString(), newWall));
+                }
+            };
+            const handleWallCellDelete = (ctx: any, wall: SpacetimeDB.WallCell) => {
+                setWallCells(prev => { const newMap = new Map(prev); newMap.delete(wall.id.toString()); return newMap; });
+            };
+
             // --- Register Callbacks ---
             connection.db.player.onInsert(handlePlayerInsert); connection.db.player.onUpdate(handlePlayerUpdate); connection.db.player.onDelete(handlePlayerDelete);
             connection.db.tree.onInsert(handleTreeInsert); connection.db.tree.onUpdate(handleTreeUpdate); connection.db.tree.onDelete(handleTreeDelete);
@@ -1324,6 +1358,11 @@ export const useSpacetimeTables = ({
             connection.db.foundationCell.onInsert(handleFoundationCellInsert);
             connection.db.foundationCell.onUpdate(handleFoundationCellUpdate);
             connection.db.foundationCell.onDelete(handleFoundationCellDelete);
+
+            // Register WallCell callbacks - SPATIAL
+            connection.db.wallCell.onInsert(handleWallCellInsert);
+            connection.db.wallCell.onUpdate(handleWallCellUpdate);
+            connection.db.wallCell.onDelete(handleWallCellDelete);
 
 
 
@@ -1516,7 +1555,8 @@ export const useSpacetimeTables = ({
                                     // REMOVED: wild_animal - now subscribed globally like players to prevent disappearing
                                     `SELECT * FROM planted_seed WHERE chunk_index = ${chunkIndex}`,
                                     `SELECT * FROM barrel WHERE chunk_index = ${chunkIndex}`, `SELECT * FROM sea_stack WHERE chunk_index = ${chunkIndex}`,
-                                    `SELECT * FROM foundation_cell WHERE chunk_index = ${chunkIndex}` // ADDED: Foundation initial spatial subscription
+                                    `SELECT * FROM foundation_cell WHERE chunk_index = ${chunkIndex}`, // ADDED: Foundation initial spatial subscription
+                                    `SELECT * FROM wall_cell WHERE chunk_index = ${chunkIndex}` // ADDED: Wall initial spatial subscription
                                 ];
                                 // Removed excessive initial chunk debug logging
                                 newHandlesForChunk.push(connection.subscriptionBuilder().onError((err) => console.error(`Resource Batch Sub Error (Chunk ${chunkIndex}):`, err)).subscribe(resourceQueries));
@@ -1700,5 +1740,6 @@ export const useSpacetimeTables = ({
         barrels, // ADDED barrels
         seaStacks, // ADDED sea stacks
         foundationCells, // ADDED: Building foundations
+        wallCells, // ADDED: Building walls
     };
 }; 

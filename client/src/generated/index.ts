@@ -75,6 +75,8 @@ import { DespawnExpiredItems } from "./despawn_expired_items_reducer.ts";
 export { DespawnExpiredItems };
 import { DestroyFoundation } from "./destroy_foundation_reducer.ts";
 export { DestroyFoundation };
+import { DestroyWall } from "./destroy_wall_reducer.ts";
+export { DestroyWall };
 import { DodgeRoll } from "./dodge_roll_reducer.ts";
 export { DodgeRoll };
 import { DrinkWater } from "./drink_water_reducer.ts";
@@ -215,6 +217,8 @@ import { PlaceSleepingBag } from "./place_sleeping_bag_reducer.ts";
 export { PlaceSleepingBag };
 import { PlaceStash } from "./place_stash_reducer.ts";
 export { PlaceStash };
+import { PlaceWall } from "./place_wall_reducer.ts";
+export { PlaceWall };
 import { PlaceWoodenStorageBox } from "./place_wooden_storage_box_reducer.ts";
 export { PlaceWoodenStorageBox };
 import { PlantSeed } from "./plant_seed_reducer.ts";
@@ -391,6 +395,8 @@ import { UpdateViperSpittle } from "./update_viper_spittle_reducer.ts";
 export { UpdateViperSpittle };
 import { UpgradeFoundation } from "./upgrade_foundation_reducer.ts";
 export { UpgradeFoundation };
+import { UpgradeWall } from "./upgrade_wall_reducer.ts";
+export { UpgradeWall };
 import { UseEquippedItem } from "./use_equipped_item_reducer.ts";
 export { UseEquippedItem };
 import { WaterCrops } from "./water_crops_reducer.ts";
@@ -539,6 +545,8 @@ import { ViperSpittleTableHandle } from "./viper_spittle_table.ts";
 export { ViperSpittleTableHandle };
 import { ViperSpittleUpdateScheduleTableHandle } from "./viper_spittle_update_schedule_table.ts";
 export { ViperSpittleUpdateScheduleTableHandle };
+import { WallCellTableHandle } from "./wall_cell_table.ts";
+export { WallCellTableHandle };
 import { WaterPatchTableHandle } from "./water_patch_table.ts";
 export { WaterPatchTableHandle };
 import { WaterPatchCleanupScheduleTableHandle } from "./water_patch_cleanup_schedule_table.ts";
@@ -755,6 +763,8 @@ import { ViperSpittle } from "./viper_spittle_type.ts";
 export { ViperSpittle };
 import { ViperSpittleUpdateSchedule } from "./viper_spittle_update_schedule_type.ts";
 export { ViperSpittleUpdateSchedule };
+import { WallCell } from "./wall_cell_type.ts";
+export { WallCell };
 import { WaterPatch } from "./water_patch_type.ts";
 export { WaterPatch };
 import { WaterPatchCleanupSchedule } from "./water_patch_cleanup_schedule_type.ts";
@@ -1417,6 +1427,15 @@ const REMOTE_MODULE = {
         colType: (ViperSpittleUpdateSchedule.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
       },
     },
+    wall_cell: {
+      tableName: "wall_cell" as const,
+      rowType: WallCell.getTypeScriptAlgebraicType(),
+      primaryKey: "id",
+      primaryKeyInfo: {
+        colName: "id",
+        colType: (WallCell.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
+      },
+    },
     water_patch: {
       tableName: "water_patch" as const,
       rowType: WaterPatch.getTypeScriptAlgebraicType(),
@@ -1578,6 +1597,10 @@ const REMOTE_MODULE = {
     destroy_foundation: {
       reducerName: "destroy_foundation",
       argsType: DestroyFoundation.getTypeScriptAlgebraicType(),
+    },
+    destroy_wall: {
+      reducerName: "destroy_wall",
+      argsType: DestroyWall.getTypeScriptAlgebraicType(),
     },
     dodge_roll: {
       reducerName: "dodge_roll",
@@ -1858,6 +1881,10 @@ const REMOTE_MODULE = {
     place_stash: {
       reducerName: "place_stash",
       argsType: PlaceStash.getTypeScriptAlgebraicType(),
+    },
+    place_wall: {
+      reducerName: "place_wall",
+      argsType: PlaceWall.getTypeScriptAlgebraicType(),
     },
     place_wooden_storage_box: {
       reducerName: "place_wooden_storage_box",
@@ -2211,6 +2238,10 @@ const REMOTE_MODULE = {
       reducerName: "upgrade_foundation",
       argsType: UpgradeFoundation.getTypeScriptAlgebraicType(),
     },
+    upgrade_wall: {
+      reducerName: "upgrade_wall",
+      argsType: UpgradeWall.getTypeScriptAlgebraicType(),
+    },
     use_equipped_item: {
       reducerName: "use_equipped_item",
       argsType: UseEquippedItem.getTypeScriptAlgebraicType(),
@@ -2271,6 +2302,7 @@ export type Reducer = never
 | { name: "DebugUpdateCloudIntensity", args: DebugUpdateCloudIntensity }
 | { name: "DespawnExpiredItems", args: DespawnExpiredItems }
 | { name: "DestroyFoundation", args: DestroyFoundation }
+| { name: "DestroyWall", args: DestroyWall }
 | { name: "DodgeRoll", args: DodgeRoll }
 | { name: "DrinkWater", args: DrinkWater }
 | { name: "DropItem", args: DropItem }
@@ -2341,6 +2373,7 @@ export type Reducer = never
 | { name: "PlaceShelter", args: PlaceShelter }
 | { name: "PlaceSleepingBag", args: PlaceSleepingBag }
 | { name: "PlaceStash", args: PlaceStash }
+| { name: "PlaceWall", args: PlaceWall }
 | { name: "PlaceWoodenStorageBox", args: PlaceWoodenStorageBox }
 | { name: "PlantSeed", args: PlantSeed }
 | { name: "ProcessActiveConsumableEffectsTick", args: ProcessActiveConsumableEffectsTick }
@@ -2429,6 +2462,7 @@ export type Reducer = never
 | { name: "UpdateViewport", args: UpdateViewport }
 | { name: "UpdateViperSpittle", args: UpdateViperSpittle }
 | { name: "UpgradeFoundation", args: UpgradeFoundation }
+| { name: "UpgradeWall", args: UpgradeWall }
 | { name: "UseEquippedItem", args: UseEquippedItem }
 | { name: "WaterCrops", args: WaterCrops }
 ;
@@ -2766,6 +2800,22 @@ export class RemoteReducers {
 
   removeOnDestroyFoundation(callback: (ctx: ReducerEventContext, foundationId: bigint) => void) {
     this.connection.offReducer("destroy_foundation", callback);
+  }
+
+  destroyWall(wallId: bigint) {
+    const __args = { wallId };
+    let __writer = new __BinaryWriter(1024);
+    DestroyWall.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("destroy_wall", __argsBuffer, this.setCallReducerFlags.destroyWallFlags);
+  }
+
+  onDestroyWall(callback: (ctx: ReducerEventContext, wallId: bigint) => void) {
+    this.connection.onReducer("destroy_wall", callback);
+  }
+
+  removeOnDestroyWall(callback: (ctx: ReducerEventContext, wallId: bigint) => void) {
+    this.connection.offReducer("destroy_wall", callback);
   }
 
   dodgeRoll(moveX: number, moveY: number) {
@@ -3838,6 +3888,22 @@ export class RemoteReducers {
 
   removeOnPlaceStash(callback: (ctx: ReducerEventContext, itemInstanceId: bigint, worldX: number, worldY: number) => void) {
     this.connection.offReducer("place_stash", callback);
+  }
+
+  placeWall(cellX: bigint, cellY: bigint, worldX: number, worldY: number, tier: number) {
+    const __args = { cellX, cellY, worldX, worldY, tier };
+    let __writer = new __BinaryWriter(1024);
+    PlaceWall.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("place_wall", __argsBuffer, this.setCallReducerFlags.placeWallFlags);
+  }
+
+  onPlaceWall(callback: (ctx: ReducerEventContext, cellX: bigint, cellY: bigint, worldX: number, worldY: number, tier: number) => void) {
+    this.connection.onReducer("place_wall", callback);
+  }
+
+  removeOnPlaceWall(callback: (ctx: ReducerEventContext, cellX: bigint, cellY: bigint, worldX: number, worldY: number, tier: number) => void) {
+    this.connection.offReducer("place_wall", callback);
   }
 
   placeWoodenStorageBox(itemInstanceId: bigint, worldX: number, worldY: number) {
@@ -5208,6 +5274,22 @@ export class RemoteReducers {
     this.connection.offReducer("upgrade_foundation", callback);
   }
 
+  upgradeWall(wallId: bigint, newTier: number) {
+    const __args = { wallId, newTier };
+    let __writer = new __BinaryWriter(1024);
+    UpgradeWall.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("upgrade_wall", __argsBuffer, this.setCallReducerFlags.upgradeWallFlags);
+  }
+
+  onUpgradeWall(callback: (ctx: ReducerEventContext, wallId: bigint, newTier: number) => void) {
+    this.connection.onReducer("upgrade_wall", callback);
+  }
+
+  removeOnUpgradeWall(callback: (ctx: ReducerEventContext, wallId: bigint, newTier: number) => void) {
+    this.connection.offReducer("upgrade_wall", callback);
+  }
+
   useEquippedItem() {
     this.connection.callReducer("use_equipped_item", new Uint8Array(0), this.setCallReducerFlags.useEquippedItemFlags);
   }
@@ -5347,6 +5429,11 @@ export class SetReducerFlags {
   destroyFoundationFlags: __CallReducerFlags = 'FullUpdate';
   destroyFoundation(flags: __CallReducerFlags) {
     this.destroyFoundationFlags = flags;
+  }
+
+  destroyWallFlags: __CallReducerFlags = 'FullUpdate';
+  destroyWall(flags: __CallReducerFlags) {
+    this.destroyWallFlags = flags;
   }
 
   dodgeRollFlags: __CallReducerFlags = 'FullUpdate';
@@ -5687,6 +5774,11 @@ export class SetReducerFlags {
   placeStashFlags: __CallReducerFlags = 'FullUpdate';
   placeStash(flags: __CallReducerFlags) {
     this.placeStashFlags = flags;
+  }
+
+  placeWallFlags: __CallReducerFlags = 'FullUpdate';
+  placeWall(flags: __CallReducerFlags) {
+    this.placeWallFlags = flags;
   }
 
   placeWoodenStorageBoxFlags: __CallReducerFlags = 'FullUpdate';
@@ -6129,6 +6221,11 @@ export class SetReducerFlags {
     this.upgradeFoundationFlags = flags;
   }
 
+  upgradeWallFlags: __CallReducerFlags = 'FullUpdate';
+  upgradeWall(flags: __CallReducerFlags) {
+    this.upgradeWallFlags = flags;
+  }
+
   useEquippedItemFlags: __CallReducerFlags = 'FullUpdate';
   useEquippedItem(flags: __CallReducerFlags) {
     this.useEquippedItemFlags = flags;
@@ -6497,6 +6594,11 @@ export class RemoteTables {
   get viperSpittleUpdateSchedule(): ViperSpittleUpdateScheduleTableHandle<'viper_spittle_update_schedule'> {
     // clientCache is a private property
     return new ViperSpittleUpdateScheduleTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<ViperSpittleUpdateSchedule>(REMOTE_MODULE.tables.viper_spittle_update_schedule));
+  }
+
+  get wallCell(): WallCellTableHandle<'wall_cell'> {
+    // clientCache is a private property
+    return new WallCellTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<WallCell>(REMOTE_MODULE.tables.wall_cell));
   }
 
   get waterPatch(): WaterPatchTableHandle<'water_patch'> {

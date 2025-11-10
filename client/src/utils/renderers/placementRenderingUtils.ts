@@ -10,7 +10,7 @@ import { SHELTER_RENDER_WIDTH, SHELTER_RENDER_HEIGHT } from './shelterRenderingU
 import { TILE_SIZE } from '../../config/gameConfig';
 import { DbConnection } from '../../generated';
 import { isSeedItemValid, requiresWaterPlacement } from '../plantsUtils';
-import { renderFoundationPreview } from './foundationRenderingUtils';
+import { renderFoundationPreview, renderWallPreview } from './foundationRenderingUtils';
 
 // Import interaction distance constants
 const PLAYER_BOX_INTERACTION_DISTANCE_SQUARED = 80.0 * 80.0; // From useInteractionFinder.ts
@@ -391,6 +391,226 @@ function isFoundationPlacementValid(
 }
 
 /**
+ * Check if wall placement is valid (client-side validation)
+ * Checks: foundation exists, no overlapping wall, distance, resources
+ */
+function isWallPlacementValid(
+    connection: DbConnection | null,
+    cellX: number,
+    cellY: number,
+    worldMouseX: number,
+    worldMouseY: number,
+    playerX: number,
+    playerY: number,
+    inventoryItems?: Map<string, any>,
+    itemDefinitions?: Map<string, any>
+): boolean {
+    if (!connection) return false;
+
+    const BUILDING_PLACEMENT_MAX_DISTANCE = 128.0;
+    const BUILDING_PLACEMENT_MAX_DISTANCE_SQUARED = BUILDING_PLACEMENT_MAX_DISTANCE * BUILDING_PLACEMENT_MAX_DISTANCE;
+    
+    // Wall cost: 15 wood for Twig tier
+    const REQUIRED_WOOD = 15;
+
+    // Convert cell coordinates to world pixel coordinates (center of tile)
+    const worldX = (cellX * TILE_SIZE) + (TILE_SIZE / 2);
+    const worldY = (cellY * TILE_SIZE) + (TILE_SIZE / 2);
+
+    // Check distance
+    const dx = worldX - playerX;
+    const dy = worldY - playerY;
+    const distSq = dx * dx + dy * dy;
+    if (distSq > BUILDING_PLACEMENT_MAX_DISTANCE_SQUARED) {
+        return false;
+    }
+
+    // Check if there's a foundation at this cell (walls require a foundation)
+    let hasFoundation = false;
+    let foundationShape = 1; // Default to Full (1)
+    for (const foundation of connection.db.foundationCell.iter()) {
+        if (foundation.cellX === cellX && foundation.cellY === cellY && !foundation.isDestroyed) {
+            hasFoundation = true;
+            foundationShape = foundation.shape as number;
+            break;
+        }
+    }
+
+    if (!hasFoundation) {
+        return false; // No foundation at this location
+    }
+
+    // Check if foundation is a triangle (needed for edge detection)
+    const isTriangle = foundationShape >= 2 && foundationShape <= 5;
+
+    // Determine edge based on mouse position (same logic as server)
+    const tileCenterX = worldX;
+    const tileCenterY = worldY;
+    const dxFromCenter = worldMouseX - tileCenterX;
+    const dyFromCenter = worldMouseY - tileCenterY;
+    const absDx = Math.abs(dxFromCenter);
+    const absDy = Math.abs(dyFromCenter);
+    
+    // For triangle foundations, also consider diagonal edges
+    let edge: number;
+    if (isTriangle) {
+        // Calculate distance to diagonal edges
+        // Use same logic as preview rendering
+        const diagNW_SE_dist = Math.abs(dxFromCenter - dyFromCenter); // Distance to NW-SE diagonal
+        const diagNE_SW_dist = Math.abs(dxFromCenter + dyFromCenter); // Distance to NE-SW diagonal
+        
+        // Check if we're closer to a diagonal than to cardinal edges
+        // Use a threshold to prefer diagonals when close
+        const minCardinalDist = Math.min(absDx, absDy);
+        const minDiagDist = Math.min(diagNW_SE_dist, diagNE_SW_dist);
+        
+        // Prefer diagonal if it's significantly closer, or if we're very close to diagonal
+        if (minDiagDist < minCardinalDist * 1.2 || minDiagDist < 10) {
+            // Closer to diagonal
+            if (diagNW_SE_dist < diagNE_SW_dist) {
+                edge = 5; // DiagNW_SE
+            } else {
+                edge = 4; // DiagNE_SW
+            }
+        } else {
+            // Closer to cardinal edge
+            if (absDy > absDx) {
+                edge = dyFromCenter < 0 ? 0 : 2; // North (0) or South (2)
+            } else {
+                edge = dxFromCenter < 0 ? 3 : 1; // West (3) or East (1)
+            }
+        }
+    } else {
+        // Full foundation - only cardinal edges
+        if (absDy > absDx) {
+            edge = dyFromCenter < 0 ? 0 : 2; // North (0) or South (2)
+        } else {
+            edge = dxFromCenter < 0 ? 3 : 1; // West (3) or East (1)
+        }
+    }
+
+    // Check if edge is valid for triangle foundations
+    if (isTriangle) {
+        // Triangle shapes: 2=TriNW, 3=TriNE, 4=TriSE, 5=TriSW
+        // Valid edges for each triangle:
+        // TriNW (2): N, W, DiagNW_SE edges (0, 3, 5)
+        // TriNE (3): N, E, DiagNE_SW edges (0, 1, 4)
+        // TriSE (4): S, E, DiagNW_SE edges (2, 1, 5)
+        // TriSW (5): S, W, DiagNE_SW edges (2, 3, 4)
+        let isValidEdge = false;
+        switch (foundationShape) {
+            case 2: // TriNW
+                isValidEdge = edge === 0 || edge === 3 || edge === 5; // N, W, or DiagNW_SE
+                break;
+            case 3: // TriNE
+                isValidEdge = edge === 0 || edge === 1 || edge === 4; // N, E, or DiagNE_SW
+                break;
+            case 4: // TriSE
+                isValidEdge = edge === 2 || edge === 1 || edge === 5; // S, E, or DiagNW_SE
+                break;
+            case 5: // TriSW
+                isValidEdge = edge === 2 || edge === 3 || edge === 4; // S, W, or DiagNE_SW
+                break;
+        }
+        if (!isValidEdge) {
+            return false; // Invalid edge for triangle foundation
+        }
+    }
+
+    // Check if a wall already exists at this cell, edge, and facing
+    // Also check adjacent tiles for shared edges
+    // Note: We don't check facing - walls on same edge block regardless of facing
+    // IMPORTANT: Check ALL walls at this cell, not just the detected edge
+    // This handles cases where edge detection might be slightly off
+    for (const wall of connection.db.wallCell.iter()) {
+        if (wall.cellX === cellX && wall.cellY === cellY && !wall.isDestroyed) {
+            // Check if this wall is on the same edge OR a very close edge
+            // For diagonal edges, also check if there's a wall on the other diagonal
+            if (wall.edge === edge) {
+                return false; // Wall already exists at this exact edge
+            }
+            // For triangle foundations, if we detected a diagonal edge but there's a wall
+            // on the other diagonal, that's also invalid (can't have two diagonals)
+            if (isTriangle && (edge === 4 || edge === 5) && (wall.edge === 4 || wall.edge === 5)) {
+                return false; // Diagonal wall already exists
+            }
+        }
+    }
+    
+    // Check adjacent tiles for shared edges
+    // North edge of (x, y) = South edge of (x, y-1)
+    // East edge of (x, y) = West edge of (x+1, y)
+    // South edge of (x, y) = North edge of (x, y+1)
+    // West edge of (x, y) = East edge of (x-1, y)
+    let adjacentCellX: number = 0;
+    let adjacentCellY: number = 0;
+    let oppositeEdge: number = 0;
+    let hasAdjacentTile = false;
+    
+    if (edge === 0) { // North
+        adjacentCellX = cellX;
+        adjacentCellY = cellY - 1;
+        oppositeEdge = 2; // South
+        hasAdjacentTile = true;
+    } else if (edge === 1) { // East
+        adjacentCellX = cellX + 1;
+        adjacentCellY = cellY;
+        oppositeEdge = 3; // West
+        hasAdjacentTile = true;
+    } else if (edge === 2) { // South
+        adjacentCellX = cellX;
+        adjacentCellY = cellY + 1;
+        oppositeEdge = 0; // North
+        hasAdjacentTile = true;
+    } else if (edge === 3) { // West
+        adjacentCellX = cellX - 1;
+        adjacentCellY = cellY;
+        oppositeEdge = 1; // East
+        hasAdjacentTile = true;
+    }
+    // Diagonal edges (4, 5) don't have adjacent tiles (they're internal to the triangle)
+    
+    // Check adjacent cell for a wall on the opposite edge (only for cardinal edges)
+    if (hasAdjacentTile) {
+        for (const wall of connection.db.wallCell.iter()) {
+            if (wall.cellX === adjacentCellX && wall.cellY === adjacentCellY && wall.edge === oppositeEdge && !wall.isDestroyed) {
+                return false; // Wall already exists on the shared edge with the adjacent tile
+            }
+        }
+    }
+
+    // Check if player has enough resources
+    if (inventoryItems && itemDefinitions) {
+        // Find Wood item definition
+        let woodDefId: bigint | null = null;
+        for (const def of itemDefinitions.values()) {
+            if (def.name === 'Wood') {
+                woodDefId = def.id;
+                break;
+            }
+        }
+
+        if (!woodDefId) {
+            return false; // Wood item definition not found
+        }
+
+        // Sum up all wood items (inventory + hotbar)
+        let totalWood = 0;
+        for (const item of inventoryItems.values()) {
+            if (item.itemDefId === woodDefId) {
+                totalWood += item.quantity;
+            }
+        }
+
+        if (totalWood < REQUIRED_WOOD) {
+            return false; // Not enough wood
+        }
+    }
+
+    return true;
+}
+
+/**
  * Renders the placement preview item/structure following the mouse.
  */
 export function renderPlacementPreview({
@@ -441,6 +661,33 @@ export function renderPlacementPreview({
                 viewOffsetX,
                 viewOffsetY,
                 foundationTileImagesRef,
+            });
+        } else if (buildingState.mode === BuildingMode.Wall) {
+            const isValid = isWallPlacementValid(
+                connection,
+                tileX,
+                tileY,
+                worldMouseX,
+                worldMouseY,
+                localPlayerX,
+                localPlayerY,
+                inventoryItems,
+                itemDefinitions
+            );
+
+            renderWallPreview({
+                ctx,
+                cellX: tileX,
+                cellY: tileY,
+                worldMouseX,
+                worldMouseY,
+                tier: buildingState.buildingTier,
+                isValid,
+                worldScale,
+                viewOffsetX,
+                viewOffsetY,
+                foundationTileImagesRef,
+                connection, // ADDED: Pass connection to check foundation shape
             });
         }
         return; // Building preview rendered, exit early

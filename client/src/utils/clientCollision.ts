@@ -1,5 +1,5 @@
 // AAA-Quality Client-side Collision Detection System
-import { Player, Tree, Stone, WoodenStorageBox, Shelter, RainCollector, WildAnimal, Barrel, Furnace } from '../generated';
+import { Player, Tree, Stone, WoodenStorageBox, Shelter, RainCollector, WildAnimal, Barrel, Furnace, WallCell } from '../generated';
 import { gameConfig } from '../config/gameConfig';
 
 // Add at top after imports:
@@ -306,6 +306,71 @@ function getCollisionCandidates(
     });
   }
   
+  // Filter wall cells - create thin collision edges along wall boundaries
+  const TILE_SIZE = 48; // Tile size in pixels
+  const WALL_COLLISION_THICKNESS = 6; // Thin collision thickness (slightly thicker than visual 4px to prevent walking through)
+  
+  if (entities.wallCells && entities.wallCells.size > 0) {
+    // Check walls within reasonable distance
+    for (const wall of entities.wallCells.values()) {
+      if (wall.isDestroyed) continue; // Skip destroyed walls
+      
+      // Calculate tile center position
+      const tileCenterX = wall.cellX * TILE_SIZE + TILE_SIZE / 2;
+      const tileCenterY = wall.cellY * TILE_SIZE + TILE_SIZE / 2;
+      
+      // Check distance to player
+      const dx = tileCenterX - playerX;
+      const dy = tileCenterY - playerY;
+      const distanceSq = dx * dx + dy * dy;
+      const maxDistanceSq = 150 * 150; // Check walls within 150px
+      
+      if (distanceSq > maxDistanceSq) continue;
+      
+      // Create thin AABB collision shape based on wall edge
+      // Edge 0 = North (top), 1 = East (right), 2 = South (bottom), 3 = West (left)
+      let wallX: number, wallY: number, wallWidth: number, wallHeight: number;
+      
+      switch (wall.edge) {
+        case 0: // North (top edge) - horizontal line
+          wallX = tileCenterX;
+          wallY = wall.cellY * TILE_SIZE; // Top edge of tile
+          wallWidth = TILE_SIZE; // Full tile width
+          wallHeight = WALL_COLLISION_THICKNESS; // Thin thickness
+          break;
+        case 1: // East (right edge) - vertical line
+          wallX = wall.cellX * TILE_SIZE + TILE_SIZE; // Right edge of tile
+          wallY = tileCenterY;
+          wallWidth = WALL_COLLISION_THICKNESS; // Thin thickness
+          wallHeight = TILE_SIZE; // Full tile height
+          break;
+        case 2: // South (bottom edge) - horizontal line
+          wallX = tileCenterX;
+          wallY = wall.cellY * TILE_SIZE + TILE_SIZE; // Bottom edge of tile
+          wallWidth = TILE_SIZE; // Full tile width
+          wallHeight = WALL_COLLISION_THICKNESS; // Thin thickness
+          break;
+        case 3: // West (left edge) - vertical line
+          wallX = wall.cellX * TILE_SIZE; // Left edge of tile
+          wallY = tileCenterY;
+          wallWidth = WALL_COLLISION_THICKNESS; // Thin thickness
+          wallHeight = TILE_SIZE; // Full tile height
+          break;
+        default:
+          continue; // Skip diagonal or invalid edges
+      }
+      
+      shapes.push({
+        id: `wall-${wall.id.toString()}`,
+        type: `wall-${wall.id.toString()}`,
+        x: wallX,
+        y: wallY,
+        width: wallWidth,
+        height: wallHeight
+      });
+    }
+  }
+  
   return shapes;
 }
 
@@ -363,6 +428,7 @@ export interface GameEntities {
   wildAnimals: Map<string, WildAnimal>; // Add wild animals
   barrels: Map<string, Barrel>; // Add barrels
   seaStacks: Map<string, any>; // Sea stacks from SpacetimeDB
+  wallCells: Map<string, WallCell>; // Add wall cells for collision
 }
 
 interface CollisionShape {

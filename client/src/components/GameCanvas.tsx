@@ -181,6 +181,7 @@ interface GameCanvasProps {
   barrels: Map<string, SpacetimeDBBarrel>; // Add barrels
   seaStacks: Map<string, any>; // Add sea stacks
   foundationCells: Map<string, any>; // ADDED: Building foundations
+  wallCells: Map<string, any>; // ADDED: Building walls
   setMusicPanelVisible: React.Dispatch<React.SetStateAction<boolean>>;
   // Add ambient sound volume control
   environmentalVolume?: number; // 0-1 scale for ambient/environmental sounds
@@ -253,6 +254,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   barrels,
   seaStacks,
   foundationCells, // ADDED: Building foundations
+  wallCells, // ADDED: Building walls
   setMusicPanelVisible,
   environmentalVolume,
   movementDirection,
@@ -505,6 +507,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     barrels,
     seaStacks,
     foundationCells, // ADDED: Building foundations
+    wallCells, // ADDED: Building walls
     isTreeFalling, // NEW: Pass falling tree checker so falling trees stay visible
   );
 
@@ -881,6 +884,43 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         foundationTileImagesRef.current.set('foundation_metal.png', img);
       };
       img.onerror = () => console.error('Failed to load foundation_metal.png');
+      img.src = module.default;
+    });
+
+    // Load wall tile images
+    import('../assets/tiles/wall_twig.png').then((module) => {
+      const img = new Image();
+      img.onload = () => {
+        foundationTileImagesRef.current.set('wall_twig.png', img);
+      };
+      img.onerror = () => console.error('Failed to load wall_twig.png');
+      img.src = module.default;
+    });
+
+    import('../assets/tiles/wall_wood.png').then((module) => {
+      const img = new Image();
+      img.onload = () => {
+        foundationTileImagesRef.current.set('wall_wood.png', img);
+      };
+      img.onerror = () => console.error('Failed to load wall_wood.png');
+      img.src = module.default;
+    });
+
+    import('../assets/tiles/wall_stone.png').then((module) => {
+      const img = new Image();
+      img.onload = () => {
+        foundationTileImagesRef.current.set('wall_stone.png', img);
+      };
+      img.onerror = () => console.error('Failed to load wall_stone.png');
+      img.src = module.default;
+    });
+
+    import('../assets/tiles/wall_metal.png').then((module) => {
+      const img = new Image();
+      img.onload = () => {
+        foundationTileImagesRef.current.set('wall_metal.png', img);
+      };
+      img.onerror = () => console.error('Failed to load wall_metal.png');
       img.src = module.default;
     });
   }, []);
@@ -2384,7 +2424,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           connection={connection}
           inventoryItems={inventoryItems}
           itemDefinitions={itemDefinitions}
-          foundation={upgradeMenuFoundationRef.current}
+          tile={upgradeMenuFoundationRef.current}
+          tileType="foundation"
           onSelect={(tier: BuildingTier) => {
             if (connection && upgradeMenuFoundationRef.current) {
               console.log('[UpgradeRadialMenu] Upgrading foundation', upgradeMenuFoundationRef.current.id, 'to tier', tier);

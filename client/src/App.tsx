@@ -210,6 +210,7 @@ function AppContent() {
       barrels, // <<< ADD barrels HERE
       seaStacks, // <<< ADD sea stacks HERE
       foundationCells, // ADDED: Building foundations
+      wallCells, // ADDED: Building walls
       playerDodgeRollStates,
     } = useSpacetimeTables({ 
         connection, 
@@ -252,7 +253,8 @@ function AppContent() {
             players,
             wildAnimals, // Add wild animals to collision system
             barrels, // Add barrels to collision system
-            seaStacks // Add sea stacks to collision system
+            seaStacks, // Add sea stacks to collision system
+            wallCells // Add wall cells for collision detection
         }
     });
 
@@ -829,6 +831,7 @@ function AppContent() {
                             barrels={barrels}
                             seaStacks={seaStacks}
                             foundationCells={foundationCells}
+                            wallCells={wallCells}
                             inventoryItems={inventoryItems}
                             itemDefinitions={itemDefinitions}
                             worldState={worldState}

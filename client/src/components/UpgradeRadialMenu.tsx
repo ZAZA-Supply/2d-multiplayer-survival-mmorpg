@@ -1,16 +1,36 @@
 /**
  * Upgrade Radial Menu Component
  * 
- * Shows a radial menu when right-clicking with Repair Hammer equipped on a foundation.
+ * Generic upgrade menu for any building tile type (foundations, walls, doorframes, etc.).
+ * Shows a radial menu when right-clicking with Repair Hammer equipped on a building tile.
  * Allows selection of upgrade tiers (Wood, Stone, Metal) based on available resources.
  * Shows resource requirements and greys out unavailable options.
  * 
- * Styled similar to BuildingRadialMenu - pie slice sectors with full sector highlighting.
+ * Styled with cyberpunk theme - cyan/blue colors, gradients, glows.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
 import { BuildingTier } from '../hooks/useBuildingManager';
-import { DbConnection, InventoryItem, ItemDefinition, FoundationCell } from '../generated';
+import { DbConnection, InventoryItem, ItemDefinition } from '../generated';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faTree, 
+  faMountain, 
+  faCog, 
+  faTrash,
+  IconDefinition 
+} from '@fortawesome/free-solid-svg-icons';
+
+/**
+ * Generic interface for any upgradable building tile
+ */
+export interface UpgradableBuildingTile {
+  id: bigint;
+  tier: number; // BuildingTier enum (0-3: Twig, Wood, Stone, Metal)
+  isDestroyed?: boolean;
+  // Optional: shape for cost multiplier (foundations have shape, walls don't)
+  shape?: number; // FoundationShape enum (0-5)
+}
 
 interface UpgradeRadialMenuProps {
   isVisible: boolean;
@@ -19,16 +39,18 @@ interface UpgradeRadialMenuProps {
   connection: DbConnection | null;
   inventoryItems: Map<string, InventoryItem>;
   itemDefinitions: Map<string, ItemDefinition>;
-  foundation: FoundationCell | null; // The foundation being upgraded
+  tile: UpgradableBuildingTile | null; // Generic building tile
+  tileType: 'foundation' | 'wall' | 'doorframe' | 'door'; // Tile type for cost calculation
   onSelect: (tier: BuildingTier) => void;
   onCancel: () => void;
-  onDestroy?: () => void; // ADDED: Destroy callback
+  onDestroy?: () => void; // Destroy callback (only shown for Twig tier)
 }
 
 interface UpgradeOption {
   tier: BuildingTier;
   name: string;
-  icon: string;
+  icon: IconDefinition;
+  description: string;
   requirements: {
     wood?: number;
     stone?: number;
@@ -38,9 +60,56 @@ interface UpgradeOption {
   reason?: string;
 }
 
-const RADIUS = 144;
-const INNER_RADIUS = 25;
+const RADIUS = 260; // Outer radius of the radial menu (increased for better visibility)
+const INNER_RADIUS = 160; // Inner radius (center area - increased to accommodate text)
 const MENU_SIZE = RADIUS * 2;
+
+/**
+ * Calculate cost multiplier based on tile type and shape
+ */
+function getCostMultiplier(tileType: string, shape?: number): number {
+  if (tileType === 'foundation') {
+    // Foundations: full = 1.0, triangle = 0.5
+    const isTriangle = shape !== undefined && shape >= 2 && shape <= 5;
+    return isTriangle ? 0.5 : 1.0;
+  }
+  // Walls, doorframes, doors: always 1.0 (no shape multiplier)
+  return 1.0;
+}
+
+/**
+ * Get upgrade costs for a specific tier and tile type
+ */
+function getUpgradeCosts(tier: BuildingTier, tileType: string, multiplier: number): { wood?: number; stone?: number; metal?: number } {
+  switch (tier) {
+    case BuildingTier.Wood:
+      // Wood tier costs depend on tile type
+      if (tileType === 'wall') {
+        return { wood: Math.ceil(20 * multiplier) };
+      }
+      // Foundation, doorframe, door: 50 wood
+      return { wood: Math.ceil(50 * multiplier) };
+    
+    case BuildingTier.Stone:
+      // Stone tier costs depend on tile type
+      if (tileType === 'wall') {
+        return { stone: Math.ceil(20 * multiplier) };
+      }
+      // Foundation, doorframe, door: 100 stone
+      return { stone: Math.ceil(100 * multiplier) };
+    
+    case BuildingTier.Metal:
+      // Metal tier costs depend on tile type
+      if (tileType === 'wall') {
+        return { metal: Math.ceil(20 * multiplier) };
+      }
+      // Foundation, doorframe, door: 50 metal fragments
+      return { metal: Math.ceil(50 * multiplier) };
+    
+    default:
+      return {};
+  }
+}
 
 export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
   isVisible,
@@ -49,10 +118,11 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
   connection,
   inventoryItems,
   itemDefinitions,
-  foundation,
+  tile,
+  tileType,
   onSelect,
   onCancel,
-  onDestroy, // ADDED: Destroy callback
+  onDestroy,
 }) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -89,23 +159,24 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
   const metalCount = getResourceCount('Metal Fragments');
 
   // Determine current tier
-  const currentTier = foundation ? (foundation.tier as BuildingTier) : BuildingTier.Twig;
+  const currentTier = tile ? (tile.tier as BuildingTier) : BuildingTier.Twig;
   
-  // Determine shape multiplier (full = 1.0, triangle = 0.5)
-  const isTriangle = foundation && foundation.shape >= 2 && foundation.shape <= 5;
-  const shapeMultiplier = isTriangle ? 0.5 : 1.0;
+  // Calculate cost multiplier based on tile type and shape
+  const costMultiplier = getCostMultiplier(tileType, tile?.shape);
 
   // Define upgrade options (always show all 3 tiers, grey out unavailable ones)
   const upgradeOptions: UpgradeOption[] = [];
 
   // Wood upgrade (Twig -> Wood)
-  const requiredWood = Math.ceil(50 * shapeMultiplier);
+  const woodCosts = getUpgradeCosts(BuildingTier.Wood, tileType, costMultiplier);
+  const requiredWood = woodCosts.wood || 0;
   const canUpgradeToWood = currentTier < BuildingTier.Wood && woodCount >= requiredWood;
   upgradeOptions.push({
     tier: BuildingTier.Wood,
-    name: 'Upgrade to Wood',
-    icon: '🪵',
-    requirements: { wood: requiredWood },
+    name: 'Wood',
+    icon: faTree,
+    description: 'Upgrade to wood tier',
+    requirements: woodCosts,
     available: canUpgradeToWood,
     reason: currentTier >= BuildingTier.Wood 
       ? 'Already at or above this tier' 
@@ -115,13 +186,15 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
   });
 
   // Stone upgrade (-> Stone)
-  const requiredStone = Math.ceil(100 * shapeMultiplier);
+  const stoneCosts = getUpgradeCosts(BuildingTier.Stone, tileType, costMultiplier);
+  const requiredStone = stoneCosts.stone || 0;
   const canUpgradeToStone = currentTier < BuildingTier.Stone && stoneCount >= requiredStone;
   upgradeOptions.push({
     tier: BuildingTier.Stone,
-    name: 'Upgrade to Stone',
-    icon: '🪨',
-    requirements: { stone: requiredStone },
+    name: 'Stone',
+    icon: faMountain,
+    description: 'Upgrade to stone tier',
+    requirements: stoneCosts,
     available: canUpgradeToStone,
     reason: currentTier >= BuildingTier.Stone 
       ? 'Already at or above this tier' 
@@ -131,13 +204,15 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
   });
 
   // Metal upgrade (-> Metal)
-  const requiredMetal = Math.ceil(50 * shapeMultiplier);
+  const metalCosts = getUpgradeCosts(BuildingTier.Metal, tileType, costMultiplier);
+  const requiredMetal = metalCosts.metal || 0;
   const canUpgradeToMetal = currentTier < BuildingTier.Metal && metalCount >= requiredMetal;
   upgradeOptions.push({
     tier: BuildingTier.Metal,
-    name: 'Upgrade to Metal',
-    icon: '⚙️',
-    requirements: { metal: requiredMetal },
+    name: 'Metal',
+    icon: faCog,
+    description: 'Upgrade to metal tier',
+    requirements: metalCosts,
     available: canUpgradeToMetal,
     reason: currentTier >= BuildingTier.Metal 
       ? 'Already at or above this tier' 
@@ -146,15 +221,15 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
         : undefined,
   });
 
-  // Destroy option (only for Twig foundations)
-  if (currentTier === BuildingTier.Twig) {
+  // Destroy option (only for Twig tier)
+  if (currentTier === BuildingTier.Twig && onDestroy) {
     upgradeOptions.push({
-      tier: BuildingTier.Twig, // Use Twig as placeholder, but name indicates destroy
-      name: 'Destroy Foundation',
-      icon: '🗑️',
+      tier: BuildingTier.Twig, // Not used for destroy
+      name: 'Destroy',
+      icon: faTrash,
+      description: 'Destroy this building piece',
       requirements: {},
-      available: true, // Always available for twig foundations
-      reason: undefined,
+      available: true,
     });
   }
 
@@ -207,10 +282,8 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
     const clickY = clientY - centerY;
     const distance = Math.sqrt(clickX * clickX + clickY * clickY);
 
-    if (distance < INNER_RADIUS) {
-      return -1; // Center/cancel
-    }
-
+    // Center area is no longer clickable for cancel
+    // Check if clicked within the radial menu area
     if (distance >= INNER_RADIUS && distance <= RADIUS) {
       const angle = Math.atan2(clickY, clickX);
       let normalizedAngle = angle + Math.PI / 2;
@@ -255,18 +328,15 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
 
       const sectorIndex = getSectorFromMousePosition(e.clientX, e.clientY);
 
-      if (sectorIndex === -1) {
-        // Clicked on center (cancel)
-        onCancel();
-        isSelectingRef.current = false;
-      } else if (sectorIndex !== null && sectorIndex < upgradeOptions.length) { // Use dynamic total
+      // Center click no longer cancels - only clicking outside does
+      if (sectorIndex !== null && sectorIndex >= 0 && sectorIndex < upgradeOptions.length) {
         const option = upgradeOptions[sectorIndex];
         setSelectedIndex(sectorIndex);
         
         if (option.available) {
           setTimeout(() => {
-            // Check if this is the destroy option (Twig tier with destroy name)
-            if (option.name === 'Destroy Foundation' && onDestroy) {
+            // Check if this is the destroy option
+            if (option.name === 'Destroy' && onDestroy) {
               onDestroy();
             } else {
               onSelect(option.tier);
@@ -337,12 +407,24 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
         }}
       >
         <defs>
-          <radialGradient id="upgradeOuterGlow">
-            <stop offset="0%" stopColor="rgba(150, 100, 200, 0.4)" />
-            <stop offset="70%" stopColor="rgba(150, 100, 200, 0.1)" />
+          <radialGradient id="upgradeCyberpunkGlow">
+            <stop offset="0%" stopColor="rgba(0, 221, 255, 0.4)" />
+            <stop offset="70%" stopColor="rgba(0, 150, 255, 0.1)" />
             <stop offset="100%" stopColor="transparent" />
           </radialGradient>
-          <filter id="upgradeGlow">
+          <linearGradient id="upgradeSectorHoverGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="rgba(0, 170, 255, 0.85)" />
+            <stop offset="100%" stopColor="rgba(0, 100, 200, 0.9)" />
+          </linearGradient>
+          <linearGradient id="upgradeSectorNormalGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="rgba(20, 40, 80, 0.8)" />
+            <stop offset="100%" stopColor="rgba(10, 30, 70, 0.9)" />
+          </linearGradient>
+          <linearGradient id="upgradeCenterGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="rgba(30, 15, 50, 0.95)" />
+            <stop offset="100%" stopColor="rgba(20, 10, 40, 0.98)" />
+          </linearGradient>
+          <filter id="upgradeCyberpunkGlowFilter">
             <feGaussianBlur stdDeviation="4" result="coloredBlur" />
             <feMerge>
               <feMergeNode in="coloredBlur" />
@@ -355,7 +437,7 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
           cx={MENU_SIZE / 2}
           cy={MENU_SIZE / 2}
           r={RADIUS}
-          fill="url(#upgradeOuterGlow)"
+          fill="url(#upgradeCyberpunkGlow)"
           opacity="0.3"
         />
 
@@ -374,21 +456,21 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
                 fill={
                   isAvailable
                     ? isHovered || isSelected
-                      ? 'rgba(100, 150, 200, 0.85)'
-                      : 'rgba(30, 35, 40, 0.9)'
-                    : 'rgba(20, 20, 25, 0.7)'
+                      ? 'url(#upgradeSectorHoverGradient)'
+                      : 'url(#upgradeSectorNormalGradient)'
+                    : 'rgba(20, 20, 25, 0.5)'
                 }
                 stroke={
                   isAvailable
                     ? isHovered || isSelected
-                      ? 'rgba(150, 200, 255, 0.8)'
-                      : 'rgba(80, 90, 100, 0.5)'
-                    : 'rgba(50, 50, 50, 0.4)'
+                      ? '#00ffff'
+                      : 'rgba(0, 170, 255, 0.5)'
+                    : 'rgba(50, 50, 50, 0.3)'
                 }
                 strokeWidth={isHovered || isSelected ? 3 : 2}
                 style={{
                   transition: 'all 0.15s ease',
-                  filter: isHovered || isSelected ? 'url(#upgradeGlow)' : 'none',
+                  filter: isHovered || isSelected ? 'url(#upgradeCyberpunkGlowFilter)' : 'none',
                   cursor: isAvailable ? 'pointer' : 'not-allowed',
                   pointerEvents: 'auto',
                 }}
@@ -398,26 +480,17 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
           );
         })}
 
+        {/* Center circle - no cancel, just background */}
         <circle
           cx={MENU_SIZE / 2}
           cy={MENU_SIZE / 2}
           r={INNER_RADIUS}
-          fill={
-            hoveredIndex === -1
-              ? 'rgba(200, 80, 80, 0.9)'
-              : 'rgba(60, 65, 70, 0.9)'
-          }
-          stroke={
-            hoveredIndex === -1
-              ? 'rgba(255, 150, 150, 0.8)'
-              : 'rgba(120, 130, 140, 0.6)'
-          }
-          strokeWidth={hoveredIndex === -1 ? 3 : 2}
+          fill="url(#upgradeCenterGradient)"
+          stroke="#00ffff"
+          strokeWidth={2}
           style={{
             transition: 'all 0.15s ease',
-            cursor: 'pointer',
-            pointerEvents: 'auto',
-            filter: hoveredIndex === -1 ? 'url(#upgradeGlow)' : 'none',
+            pointerEvents: 'none',
           }}
         />
       </svg>
@@ -432,21 +505,98 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
           pointerEvents: 'none',
         }}
       >
-        <div
-          style={{
-            position: 'absolute',
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
-            fontSize: '28px',
-            color: hoveredIndex === -1 ? '#fff' : '#aaa',
-            fontWeight: 'bold',
-            textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          ✕
-        </div>
+        {/* Center text - show selected option info */}
+        {hoveredIndex !== null && hoveredIndex >= 0 && hoveredIndex < upgradeOptions.length && (
+          <div
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              textAlign: 'center',
+              pointerEvents: 'none',
+              width: INNER_RADIUS * 2.2, // Increased width for better text display
+            }}
+          >
+            {/* Large icon */}
+            <div style={{ marginBottom: '12px' }}>
+              <FontAwesomeIcon
+                icon={upgradeOptions[hoveredIndex].icon}
+                style={{
+                  fontSize: '48px',
+                  color: upgradeOptions[hoveredIndex].available ? '#00ffff' : '#666',
+                  filter: upgradeOptions[hoveredIndex].available 
+                    ? 'drop-shadow(0 0 12px rgba(0, 255, 255, 0.8))' 
+                    : 'none',
+                }}
+              />
+            </div>
+            {/* Name */}
+            <div
+              style={{
+                fontSize: '18px',
+                fontFamily: '"Press Start 2P", cursive',
+                color: '#ffffff',
+                fontWeight: 'bold',
+                textShadow: '0 0 10px rgba(0, 255, 255, 0.8), 0 0 20px rgba(0, 255, 255, 0.4)',
+                marginBottom: '6px',
+                lineHeight: '1.3',
+              }}
+            >
+              {upgradeOptions[hoveredIndex].name}
+            </div>
+            {/* Description */}
+            <div
+              style={{
+                fontSize: '12px',
+                fontFamily: '"Press Start 2P", cursive',
+                color: '#6699cc',
+                textShadow: '0 0 5px rgba(102, 153, 204, 0.6)',
+                lineHeight: '1.4',
+                marginBottom: '8px',
+              }}
+            >
+              {upgradeOptions[hoveredIndex].description}
+            </div>
+            {/* Cost */}
+            {upgradeOptions[hoveredIndex].requirements.wood && (
+              <div
+                style={{
+                  fontSize: '11px',
+                  fontFamily: '"Press Start 2P", cursive',
+                  color: '#ffffff',
+                  textShadow: '0 0 5px rgba(255, 255, 255, 0.6)',
+                }}
+              >
+                {upgradeOptions[hoveredIndex].requirements.wood} x Wood ({woodCount})
+              </div>
+            )}
+            {upgradeOptions[hoveredIndex].requirements.stone && (
+              <div
+                style={{
+                  fontSize: '11px',
+                  fontFamily: '"Press Start 2P", cursive',
+                  color: '#ffffff',
+                  textShadow: '0 0 5px rgba(255, 255, 255, 0.6)',
+                }}
+              >
+                {upgradeOptions[hoveredIndex].requirements.stone} x Stone ({stoneCount})
+              </div>
+            )}
+            {upgradeOptions[hoveredIndex].requirements.metal && (
+              <div
+                style={{
+                  fontSize: '11px',
+                  fontFamily: '"Press Start 2P", cursive',
+                  color: '#ffffff',
+                  textShadow: '0 0 5px rgba(255, 255, 255, 0.6)',
+                }}
+              >
+                {upgradeOptions[hoveredIndex].requirements.metal} x Metal ({metalCount})
+              </div>
+            )}
+          </div>
+        )}
 
         {upgradeOptions.map((option, index) => {
           const pos = getSectorCenterPosition(index, upgradeOptions.length); // Use dynamic total
@@ -469,80 +619,29 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
                 pointerEvents: 'none',
               }}
             >
+              {/* Icon only - no text */}
               <div
                 style={{
-                  fontSize: '36px',
-                  marginBottom: '4px',
-                  filter: isAvailable ? 'none' : 'grayscale(100%) brightness(0.4)',
-                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)',
+                  filter: isAvailable 
+                    ? isHovered 
+                      ? 'drop-shadow(0 0 12px rgba(0, 255, 255, 1))' 
+                      : 'drop-shadow(0 0 6px rgba(0, 170, 255, 0.6))'
+                    : 'grayscale(100%) brightness(0.3)',
+                  transition: 'all 0.15s ease',
                 }}
               >
-                {option.icon}
-              </div>
-
-              <div
-                style={{
-                  fontSize: '12px',
-                  color: isAvailable ? (isHovered ? '#fff' : '#ccc') : '#666',
-                  textAlign: 'center',
-                  fontWeight: 'bold',
-                  textShadow: '0 1px 3px rgba(0, 0, 0, 0.9)',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {option.name}
-              </div>
-
-              {isHovered && (
-                <div
+                <FontAwesomeIcon
+                  icon={option.icon}
                   style={{
-                    position: 'absolute',
-                    bottom: '100%',
-                    marginBottom: '12px',
-                    padding: '10px 14px',
-                    background: 'linear-gradient(135deg, rgba(10, 10, 15, 0.98) 0%, rgba(20, 20, 25, 0.95) 100%)',
-                    color: '#fff',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    whiteSpace: 'nowrap',
-                    pointerEvents: 'none',
-                    zIndex: 10001,
-                    border: '2px solid rgba(150, 150, 150, 0.5)',
-                    boxShadow: '0 0 20px rgba(0, 0, 0, 0.9)',
-                    minWidth: '150px',
+                    fontSize: '32px',
+                    color: isAvailable 
+                      ? isHovered 
+                        ? '#00ffff' 
+                        : '#00aaff'
+                      : '#444',
                   }}
-                >
-                  {option.requirements.wood !== undefined && (
-                    <div style={{ marginBottom: '4px' }}>
-                      <span style={{ color: '#8B4513', fontWeight: 'bold' }}>Wood:</span>{' '}
-                      <span style={{ color: woodCount >= option.requirements.wood ? '#90EE90' : '#FF6B6B' }}>
-                        {option.requirements.wood} ({woodCount} available)
-                      </span>
-                    </div>
-                  )}
-                  {option.requirements.stone !== undefined && (
-                    <div style={{ marginBottom: '4px' }}>
-                      <span style={{ color: '#808080', fontWeight: 'bold' }}>Stone:</span>{' '}
-                      <span style={{ color: stoneCount >= option.requirements.stone ? '#90EE90' : '#FF6B6B' }}>
-                        {option.requirements.stone} ({stoneCount} available)
-                      </span>
-                    </div>
-                  )}
-                  {option.requirements.metal !== undefined && (
-                    <div style={{ marginBottom: '4px' }}>
-                      <span style={{ color: '#C0C0C0', fontWeight: 'bold' }}>Metal:</span>{' '}
-                      <span style={{ color: metalCount >= option.requirements.metal ? '#90EE90' : '#FF6B6B' }}>
-                        {option.requirements.metal} ({metalCount} available)
-                      </span>
-                    </div>
-                  )}
-                  {option.reason && (
-                    <div style={{ color: '#ff6666', marginTop: '6px', fontWeight: 'bold', borderTop: '1px solid rgba(255, 255, 255, 0.2)', paddingTop: '6px' }}>
-                      {option.reason}
-                    </div>
-                  )}
-                </div>
-              )}
+                />
+              </div>
             </div>
           );
         })}

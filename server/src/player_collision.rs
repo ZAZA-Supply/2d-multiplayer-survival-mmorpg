@@ -22,6 +22,9 @@ use crate::rain_collector::rain_collector as RainCollectorTableTrait;
 // Import furnace types for collision detection
 use crate::furnace::{Furnace, FURNACE_COLLISION_RADIUS, FURNACE_COLLISION_Y_OFFSET};
 use crate::furnace::furnace as FurnaceTableTrait;
+// Import wall cell table trait for collision detection
+use crate::building::wall_cell as WallCellTableTrait;
+use crate::TILE_SIZE_PX;
 
 /// Calculates initial collision and applies sliding.
 /// Returns the new (x, y) position after potential sliding.
@@ -66,6 +69,7 @@ pub fn calculate_slide_collision_with_grid(
     let shelters = ctx.db.shelter(); // Access shelter table
     let rain_collectors = ctx.db.rain_collector(); // Access rain collector table
     let furnaces = ctx.db.furnace(); // Access furnace table
+    let wall_cells = ctx.db.wall_cell(); // Access wall cell table
     
     // GET: Current player's crouching state for effective radius calculation
     let current_player = players.identity().find(&sender_id);
@@ -508,6 +512,105 @@ pub fn calculate_slide_collision_with_grid(
             _ => {} // Campfire, etc. - no slide collision
         }
     }
+    
+    // Check wall collisions - walls are static and positioned on tile edges
+    // Check walls in nearby tiles (within 2 tiles of player position)
+    const WALL_COLLISION_THICKNESS: f32 = 6.0; // Thin collision thickness (slightly thicker than visual 4px)
+    const CHECK_RADIUS_TILES: i32 = 2; // Check walls within 2 tiles
+    
+    let player_tile_x = (final_x / TILE_SIZE_PX as f32).floor() as i32;
+    let player_tile_y = (final_y / TILE_SIZE_PX as f32).floor() as i32;
+    
+    for tile_offset_x in -CHECK_RADIUS_TILES..=CHECK_RADIUS_TILES {
+        for tile_offset_y in -CHECK_RADIUS_TILES..=CHECK_RADIUS_TILES {
+            let check_tile_x = player_tile_x + tile_offset_x;
+            let check_tile_y = player_tile_y + tile_offset_y;
+            
+            // Find walls on this tile
+            for wall in wall_cells.idx_cell_coords().filter((check_tile_x, check_tile_y)) {
+                if wall.is_destroyed { continue; }
+                
+                // Calculate wall edge collision bounds
+                let tile_left = check_tile_x as f32 * TILE_SIZE_PX as f32;
+                let tile_top = check_tile_y as f32 * TILE_SIZE_PX as f32;
+                let tile_right = tile_left + TILE_SIZE_PX as f32;
+                let tile_bottom = tile_top + TILE_SIZE_PX as f32;
+                
+                // Determine wall edge bounds based on edge direction
+                // Edge 0 = North (top), 1 = East (right), 2 = South (bottom), 3 = West (left)
+                let (wall_min_x, wall_max_x, wall_min_y, wall_max_y) = match wall.edge {
+                    0 => { // North (top edge) - horizontal line
+                        (tile_left, tile_right, tile_top - WALL_COLLISION_THICKNESS / 2.0, tile_top + WALL_COLLISION_THICKNESS / 2.0)
+                    },
+                    1 => { // East (right edge) - vertical line
+                        (tile_right - WALL_COLLISION_THICKNESS / 2.0, tile_right + WALL_COLLISION_THICKNESS / 2.0, tile_top, tile_bottom)
+                    },
+                    2 => { // South (bottom edge) - horizontal line
+                        (tile_left, tile_right, tile_bottom - WALL_COLLISION_THICKNESS / 2.0, tile_bottom + WALL_COLLISION_THICKNESS / 2.0)
+                    },
+                    3 => { // West (left edge) - vertical line
+                        (tile_left - WALL_COLLISION_THICKNESS / 2.0, tile_left + WALL_COLLISION_THICKNESS / 2.0, tile_top, tile_bottom)
+                    },
+                    _ => continue, // Skip diagonal or invalid edges
+                };
+                
+                // Check if player circle intersects wall AABB
+                let closest_x = final_x.max(wall_min_x).min(wall_max_x);
+                let closest_y = final_y.max(wall_min_y).min(wall_max_y);
+                let dx = final_x - closest_x;
+                let dy = final_y - closest_y;
+                let dist_sq = dx * dx + dy * dy;
+                
+                if dist_sq < current_player_radius * current_player_radius {
+                    // Collision detected - calculate slide response
+                    let dist = dist_sq.sqrt();
+                    if dist > 0.001 {
+                        let norm_x = dx / dist;
+                        let norm_y = dy / dist;
+                        let dot_product = server_dx * norm_x + server_dy * norm_y;
+                        
+                        // Only slide if moving toward the wall (dot_product < 0)
+                        if dot_product < 0.0 {
+                            let projection_x = dot_product * norm_x;
+                            let projection_y = dot_product * norm_y;
+                            let slide_dx = server_dx - projection_x;
+                            let slide_dy = server_dy - projection_y;
+                            final_x = current_player_pos_x + slide_dx;
+                            final_y = current_player_pos_y + slide_dy;
+                            
+                            // Ensure minimum separation
+                            let final_dx = final_x - closest_x;
+                            let final_dy = final_y - closest_y;
+                            let final_dist = (final_dx * final_dx + final_dy * final_dy).sqrt();
+                            let min_dist = current_player_radius + SLIDE_SEPARATION_DISTANCE;
+                            if final_dist < min_dist {
+                                let separation_direction = if final_dist > 0.001 {
+                                    (final_dx / final_dist, final_dy / final_dist)
+                                } else {
+                                    // Push away from wall center
+                                    let wall_center_x = (wall_min_x + wall_max_x) / 2.0;
+                                    let wall_center_y = (wall_min_y + wall_max_y) / 2.0;
+                                    let center_dx = final_x - wall_center_x;
+                                    let center_dy = final_y - wall_center_y;
+                                    let center_dist = (center_dx * center_dx + center_dy * center_dy).sqrt();
+                                    if center_dist > 0.001 {
+                                        (center_dx / center_dist, center_dy / center_dist)
+                                    } else {
+                                        (1.0, 0.0) // Default direction
+                                    }
+                                };
+                                final_x = closest_x + separation_direction.0 * min_dist;
+                                final_y = closest_y + separation_direction.1 * min_dist;
+                            }
+                        }
+                    }
+                    final_x = final_x.max(current_player_radius).min(WORLD_WIDTH_PX - current_player_radius);
+                    final_y = final_y.max(current_player_radius).min(WORLD_HEIGHT_PX - current_player_radius);
+                }
+            }
+        }
+    }
+    
     (final_x, final_y)
 }
 
@@ -548,6 +651,7 @@ pub fn resolve_push_out_collision_with_grid(
     let shelters = ctx.db.shelter(); // Access shelter table
     let rain_collectors = ctx.db.rain_collector(); // Access rain collector table
     let furnaces = ctx.db.furnace(); // Access furnace table
+    let wall_cells = ctx.db.wall_cell(); // Access wall cell table
     
     // GET: Current player's crouching state for effective radius calculation
     let current_player = players.identity().find(&sender_id);

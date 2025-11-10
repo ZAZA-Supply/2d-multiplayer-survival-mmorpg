@@ -5,12 +5,20 @@
  * Allows selection of building pieces (foundations, walls, doors, etc.)
  * Shows resource requirements and greys out unavailable options.
  * 
- * Styled similar to Rust's building menu - pie slice sectors with full sector highlighting.
+ * Styled with cyberpunk theme - cyan/blue colors, gradients, glows.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
 import { BuildingMode, BuildingTier, FoundationShape } from '../hooks/useBuildingManager';
 import { DbConnection, InventoryItem, ItemDefinition } from '../generated';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faCube, 
+  faShapes, 
+  faGripLinesVertical, 
+  faDoorOpen,
+  IconDefinition 
+} from '@fortawesome/free-solid-svg-icons';
 
 interface BuildingRadialMenuProps {
   isVisible: boolean;
@@ -26,7 +34,8 @@ interface BuildingRadialMenuProps {
 interface BuildingOption {
   mode: BuildingMode;
   name: string;
-  icon: string; // For now, just a colored square
+  icon: IconDefinition;
+  description: string;
   requirements: {
     wood?: number;
     stone?: number;
@@ -37,8 +46,8 @@ interface BuildingOption {
   isTriangle?: boolean; // ADDED: Flag to indicate triangle foundation
 }
 
-const RADIUS = 144; // Outer radius of the radial menu (20% larger: 120 * 1.2)
-const INNER_RADIUS = 25; // Inner radius (center cancel area) (20% larger: 50 * 1.2)
+const RADIUS = 260; // Outer radius of the radial menu (increased for better visibility)
+const INNER_RADIUS = 160; // Inner radius (center area - increased to accommodate text)
 const MENU_SIZE = RADIUS * 2;
 
 export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
@@ -90,7 +99,8 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
     {
       mode: BuildingMode.Foundation,
       name: 'Foundation',
-      icon: '🟫', // Brown square emoji for now
+      icon: faCube,
+      description: 'Every house needs a foundation',
       requirements: { wood: 50 },
       available: woodCount >= 50,
       reason: woodCount < 50 ? `Need 50 wood (have ${woodCount})` : undefined,
@@ -98,7 +108,8 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
     {
       mode: BuildingMode.Foundation,
       name: 'Triangle Foundation',
-      icon: '🔺', // Triangle emoji
+      icon: faShapes,
+      description: 'Triangular foundation piece',
       requirements: { wood: 25 },
       available: woodCount >= 25,
       reason: woodCount < 25 ? `Need 25 wood (have ${woodCount})` : undefined,
@@ -107,15 +118,17 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
     {
       mode: BuildingMode.Wall,
       name: 'Wall',
-      icon: '⬛', // Black square
-      requirements: { wood: 0 }, // Not implemented yet
-      available: false,
-      reason: 'Not implemented',
+      icon: faGripLinesVertical,
+      description: 'Build walls between foundations',
+      requirements: { wood: 15 }, // Wall cost: 15 wood
+      available: woodCount >= 15,
+      reason: woodCount < 15 ? `Need 15 wood (have ${woodCount})` : undefined,
     },
     {
       mode: BuildingMode.DoorFrame,
       name: 'Door Frame',
-      icon: '🚪', // Door emoji
+      icon: faDoorOpen,
+      description: 'Frame for door placement',
       requirements: { wood: 0 },
       available: false,
       reason: 'Not implemented',
@@ -123,7 +136,8 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
     {
       mode: BuildingMode.Door,
       name: 'Door',
-      icon: '🚪',
+      icon: faDoorOpen,
+      description: 'Doorway entrance',
       requirements: { wood: 0 },
       available: false,
       reason: 'Not implemented',
@@ -178,11 +192,7 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
     const clickY = clientY - centerY;
     const distance = Math.sqrt(clickX * clickX + clickY * clickY);
 
-    // Check if clicked on center (cancel)
-    if (distance < INNER_RADIUS) {
-      return -1; // Center/cancel
-    }
-
+    // Center area is no longer clickable for cancel
     // Check if clicked within the radial menu area
     if (distance >= INNER_RADIUS && distance <= RADIUS) {
       // Calculate angle
@@ -230,11 +240,8 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
 
       const sectorIndex = getSectorFromMousePosition(e.clientX, e.clientY);
 
-      if (sectorIndex === -1) {
-        // Clicked on center (cancel) - clear building selection
-        onCancel();
-        isSelectingRef.current = false;
-      } else if (sectorIndex !== null) {
+      // Center click no longer cancels - only clicking outside does
+      if (sectorIndex !== null && sectorIndex >= 0) {
         // Clicked on a sector
         const option = buildingOptions[sectorIndex];
         setSelectedIndex(sectorIndex);
@@ -315,14 +322,26 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
           pointerEvents: 'none',
         }}
       >
-        {/* Outer glow effect */}
+        {/* Cyberpunk glow effects */}
         <defs>
-          <radialGradient id="outerGlow">
-            <stop offset="0%" stopColor="rgba(100, 150, 200, 0.4)" />
-            <stop offset="70%" stopColor="rgba(100, 150, 200, 0.1)" />
+          <radialGradient id="cyberpunkGlow">
+            <stop offset="0%" stopColor="rgba(0, 221, 255, 0.4)" />
+            <stop offset="70%" stopColor="rgba(0, 150, 255, 0.1)" />
             <stop offset="100%" stopColor="transparent" />
           </radialGradient>
-          <filter id="glow">
+          <linearGradient id="sectorHoverGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="rgba(0, 170, 255, 0.85)" />
+            <stop offset="100%" stopColor="rgba(0, 100, 200, 0.9)" />
+          </linearGradient>
+          <linearGradient id="sectorNormalGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="rgba(20, 40, 80, 0.8)" />
+            <stop offset="100%" stopColor="rgba(10, 30, 70, 0.9)" />
+          </linearGradient>
+          <linearGradient id="centerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="rgba(30, 15, 50, 0.95)" />
+            <stop offset="100%" stopColor="rgba(20, 10, 40, 0.98)" />
+          </linearGradient>
+          <filter id="cyberpunkGlowFilter">
             <feGaussianBlur stdDeviation="4" result="coloredBlur" />
             <feMerge>
               <feMergeNode in="coloredBlur" />
@@ -331,12 +350,12 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
           </filter>
         </defs>
 
-        {/* Background circle */}
+        {/* Background circle with cyberpunk glow */}
         <circle
           cx={MENU_SIZE / 2}
           cy={MENU_SIZE / 2}
           r={RADIUS}
-          fill="url(#outerGlow)"
+          fill="url(#cyberpunkGlow)"
           opacity="0.3"
         />
 
@@ -357,21 +376,21 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
                 fill={
                   isAvailable
                     ? isHovered || isSelected
-                      ? 'rgba(80, 150, 100, 0.85)'
-                      : 'rgba(30, 35, 40, 0.9)'
-                    : 'rgba(20, 20, 25, 0.7)'
+                      ? 'url(#sectorHoverGradient)'
+                      : 'url(#sectorNormalGradient)'
+                    : 'rgba(20, 20, 25, 0.5)'
                 }
                 stroke={
                   isAvailable
                     ? isHovered || isSelected
-                      ? 'rgba(150, 255, 180, 0.8)'
-                      : 'rgba(80, 90, 100, 0.5)'
-                    : 'rgba(50, 50, 50, 0.4)'
+                      ? '#00ffff'
+                      : 'rgba(0, 170, 255, 0.5)'
+                    : 'rgba(50, 50, 50, 0.3)'
                 }
                 strokeWidth={isHovered || isSelected ? 3 : 2}
                 style={{
                   transition: 'all 0.15s ease',
-                  filter: isHovered || isSelected ? 'url(#glow)' : 'none',
+                  filter: isHovered || isSelected ? 'url(#cyberpunkGlowFilter)' : 'none',
                   cursor: isAvailable ? 'pointer' : 'not-allowed',
                   pointerEvents: 'auto',
                 }}
@@ -381,27 +400,17 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
           );
         })}
 
-        {/* Center cancel circle */}
+        {/* Center circle - no cancel, just background */}
         <circle
           cx={MENU_SIZE / 2}
           cy={MENU_SIZE / 2}
           r={INNER_RADIUS}
-          fill={
-            hoveredIndex === -1
-              ? 'rgba(200, 80, 80, 0.9)'
-              : 'rgba(60, 65, 70, 0.9)'
-          }
-          stroke={
-            hoveredIndex === -1
-              ? 'rgba(255, 150, 150, 0.8)'
-              : 'rgba(120, 130, 140, 0.6)'
-          }
-          strokeWidth={hoveredIndex === -1 ? 3 : 2}
+          fill="url(#centerGradient)"
+          stroke="#00ffff"
+          strokeWidth={2}
           style={{
             transition: 'all 0.15s ease',
-            cursor: 'pointer',
-            pointerEvents: 'auto',
-            filter: hoveredIndex === -1 ? 'url(#glow)' : 'none',
+            pointerEvents: 'none',
           }}
         />
       </svg>
@@ -417,22 +426,74 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
           pointerEvents: 'none',
         }}
       >
-        {/* Center cancel X */}
-        <div
-          style={{
-            position: 'absolute',
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
-            fontSize: '28px',
-            color: hoveredIndex === -1 ? '#fff' : '#aaa',
-            fontWeight: 'bold',
-            textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          ✕
-        </div>
+        {/* Center text - show selected option info */}
+        {hoveredIndex !== null && hoveredIndex >= 0 && hoveredIndex < buildingOptions.length && (
+          <div
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              textAlign: 'center',
+              pointerEvents: 'none',
+              width: INNER_RADIUS * 2.2, // Increased width for better text display
+            }}
+          >
+            {/* Large icon */}
+            <div style={{ marginBottom: '12px' }}>
+              <FontAwesomeIcon
+                icon={buildingOptions[hoveredIndex].icon}
+                style={{
+                  fontSize: '48px',
+                  color: buildingOptions[hoveredIndex].available ? '#00ffff' : '#666',
+                  filter: buildingOptions[hoveredIndex].available 
+                    ? 'drop-shadow(0 0 12px rgba(0, 255, 255, 0.8))' 
+                    : 'none',
+                }}
+              />
+            </div>
+            {/* Name */}
+            <div
+              style={{
+                fontSize: '18px',
+                fontFamily: '"Press Start 2P", cursive',
+                color: '#ffffff',
+                fontWeight: 'bold',
+                textShadow: '0 0 10px rgba(0, 255, 255, 0.8), 0 0 20px rgba(0, 255, 255, 0.4)',
+                marginBottom: '6px',
+                lineHeight: '1.3',
+              }}
+            >
+              {buildingOptions[hoveredIndex].name}
+            </div>
+            {/* Description */}
+            <div
+              style={{
+                fontSize: '12px',
+                fontFamily: '"Press Start 2P", cursive',
+                color: '#6699cc',
+                textShadow: '0 0 5px rgba(102, 153, 204, 0.6)',
+                lineHeight: '1.4',
+                marginBottom: '8px',
+              }}
+            >
+              {buildingOptions[hoveredIndex].description}
+            </div>
+            {/* Cost */}
+            {buildingOptions[hoveredIndex].requirements.wood && (
+              <div
+                style={{
+                  fontSize: '11px',
+                  fontFamily: '"Press Start 2P", cursive',
+                  color: '#ffffff',
+                  textShadow: '0 0 5px rgba(255, 255, 255, 0.6)',
+                }}
+              >
+                {buildingOptions[hoveredIndex].requirements.wood} x Wood ({woodCount})
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Sector labels and icons */}
         {buildingOptions.map((option, index) => {
@@ -456,79 +517,29 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
                 pointerEvents: 'none',
               }}
             >
-              {/* Icon */}
+              {/* Icon only - no text */}
               <div
                 style={{
-                  fontSize: '36px',
-                  marginBottom: '4px',
-                  filter: isAvailable ? 'none' : 'grayscale(100%) brightness(0.4)',
-                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)',
+                  filter: isAvailable 
+                    ? isHovered 
+                      ? 'drop-shadow(0 0 12px rgba(0, 255, 255, 1))' 
+                      : 'drop-shadow(0 0 6px rgba(0, 170, 255, 0.6))'
+                    : 'grayscale(100%) brightness(0.3)',
+                  transition: 'all 0.15s ease',
                 }}
               >
-                {option.icon}
-              </div>
-
-              {/* Name */}
-              <div
-                style={{
-                  fontSize: '12px',
-                  color: isAvailable ? (isHovered ? '#fff' : '#ccc') : '#666',
-                  textAlign: 'center',
-                  fontWeight: 'bold',
-                  textShadow: '0 1px 3px rgba(0, 0, 0, 0.9)',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {option.name}
-              </div>
-
-              {/* Requirements tooltip on hover */}
-              {isHovered && (
-                <div
+                <FontAwesomeIcon
+                  icon={option.icon}
                   style={{
-                    position: 'absolute',
-                    bottom: '100%',
-                    marginBottom: '12px',
-                    padding: '10px 14px',
-                    background: 'linear-gradient(135deg, rgba(10, 10, 15, 0.98) 0%, rgba(20, 20, 25, 0.95) 100%)',
-                    color: '#fff',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    whiteSpace: 'nowrap',
-                    pointerEvents: 'none',
-                    zIndex: 10001,
-                    border: '2px solid rgba(150, 150, 150, 0.5)',
-                    boxShadow: '0 0 20px rgba(0, 0, 0, 0.9)',
-                    minWidth: '150px',
+                    fontSize: '32px',
+                    color: isAvailable 
+                      ? isHovered 
+                        ? '#00ffff' 
+                        : '#00aaff'
+                      : '#444',
                   }}
-                >
-                  {option.requirements.wood && (
-                    <div style={{ marginBottom: '4px' }}>
-                      <span style={{ color: '#8B4513', fontWeight: 'bold' }}>Wood:</span>{' '}
-                      <span style={{ color: woodCount >= (option.requirements.wood || 0) ? '#90EE90' : '#FF6B6B' }}>
-                        {option.requirements.wood} ({woodCount} available)
-                      </span>
-                    </div>
-                  )}
-                  {option.requirements.stone && (
-                    <div style={{ marginBottom: '4px' }}>
-                      <span style={{ color: '#808080', fontWeight: 'bold' }}>Stone:</span>{' '}
-                      {option.requirements.stone}
-                    </div>
-                  )}
-                  {option.requirements.metal && (
-                    <div style={{ marginBottom: '4px' }}>
-                      <span style={{ color: '#C0C0C0', fontWeight: 'bold' }}>Metal:</span>{' '}
-                      {option.requirements.metal}
-                    </div>
-                  )}
-                  {option.reason && (
-                    <div style={{ color: '#ff6666', marginTop: '6px', fontWeight: 'bold', borderTop: '1px solid rgba(255, 255, 255, 0.2)', paddingTop: '6px' }}>
-                      {option.reason}
-                    </div>
-                  )}
-                </div>
-              )}
+                />
+              </div>
             </div>
           );
         })}

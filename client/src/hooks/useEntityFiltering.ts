@@ -23,6 +23,7 @@ import {
   AnimalCorpse as SpacetimeDBAnimalCorpse,
   Barrel as SpacetimeDBBarrel, // ADDED Barrel type
   FoundationCell as SpacetimeDBFoundationCell, // ADDED: Building foundations
+  WallCell as SpacetimeDBWallCell, // ADDED: Building walls
   // Grass as SpacetimeDBGrass // Will use InterpolatedGrassData instead
 } from '../generated';
 import {
@@ -96,6 +97,8 @@ interface EntityFilteringResult {
   visibleSeaStacksMap: Map<string, any>; // ADDED
   visibleFoundationCells: SpacetimeDBFoundationCell[]; // ADDED: Building foundations
   visibleFoundationCellsMap: Map<string, SpacetimeDBFoundationCell>; // ADDED: Building foundations map
+  visibleWallCells: SpacetimeDBWallCell[]; // ADDED: Building walls
+  visibleWallCellsMap: Map<string, SpacetimeDBWallCell>; // ADDED: Building walls map
 }
 
 // Define a unified entity type for sorting
@@ -121,14 +124,19 @@ export type YSortedEntityType =
   | { type: 'animal_corpse'; entity: SpacetimeDBAnimalCorpse }
   | { type: 'barrel'; entity: SpacetimeDBBarrel }
   | { type: 'sea_stack'; entity: any } // Server-provided sea stack entities
-  | { type: 'foundation_cell'; entity: SpacetimeDBFoundationCell }; // ADDED: Building foundations
+  | { type: 'foundation_cell'; entity: SpacetimeDBFoundationCell } // ADDED: Building foundations
+  | { type: 'wall_cell'; entity: SpacetimeDBWallCell }; // ADDED: Building walls
 
 // ===== HELPER FUNCTIONS FOR Y-SORTING =====
 const getEntityY = (item: YSortedEntityType, timestamp: number): number => {
   const { entity, type } = item;
   switch (type) {
     case 'player':
-      return entity.positionY + 48;
+      // Player Y position: use positionY (foot position) + 48 to get head/center
+      // This ensures players always render above foundations and walls on the same tile
+      // Add a larger offset to ensure players on foundations render above them, even with rounding issues
+      // Increased from 0.5 to 2.0 to handle edge cases where player positionY might be slightly below tile edge
+      return entity.positionY + 48 + 2.0;
     case 'tree':
     case 'stone':
     case 'wooden_storage_box':
@@ -147,10 +155,31 @@ const getEntityY = (item: YSortedEntityType, timestamp: number): number => {
       return entity.posY;
     case 'foundation_cell': {
       // Foundation cells use cell coordinates - convert to world pixel Y
-      // Use top edge of tile (cellY * 48) to ensure foundations always render below players
-      // This ensures ground tiles are always sorted below entities that stand on them
+      // Use top edge of tile (cellY * 48) to ensure foundations render below players
+      // Players standing on foundations will have positionY at or near the top edge
       const foundation = entity as SpacetimeDBFoundationCell;
-      return foundation.cellY * 48; // TILE_SIZE = 48, use top edge for Y-sorting (lower Y = renders first/below)
+      return foundation.cellY * 48; // TILE_SIZE = 48, use top edge for Y-sorting
+    }
+    case 'wall_cell': {
+      // Walls use cell coordinates - convert to world pixel Y
+      // Match foundation approach: use cellY * TILE_SIZE (top edge)
+      // CRITICAL FIX: Add increment based on cellY to ensure walls further south
+      // (higher cellY) have higher Y values and render last (in front)
+      const wall = entity as SpacetimeDBWallCell;
+      const TILE_SIZE = 48;
+      const baseY = wall.cellY * TILE_SIZE; // Same as foundations
+      // Add increment: higher cellY = higher Y = renders last (in front)
+      // Use larger increment to ensure walls on adjacent rows always sort correctly
+      const cellYIncrement = wall.cellY * 0.1; // Increment per row (ensures >0.1 difference)
+      
+      if (wall.edge === 0 || wall.edge === 2) {
+        // North/south walls: add offset to render above players
+        // Include cellY increment to ensure proper wall-to-wall ordering
+        return baseY + 50 + cellYIncrement;
+      } else {
+        // East/west walls: render slightly above foundations
+        return baseY + 0.5 + cellYIncrement;
+      }
     }
     case 'grass':
       return entity.serverPosY;
@@ -191,6 +220,15 @@ const getEntityPriority = (item: YSortedEntityType): number => {
     case 'barrel': return 15;
     case 'rain_collector': return 18;
     case 'foundation_cell': return 0.5; // ADDED: Foundations render early (ground level)
+    case 'wall_cell': {
+      // North/south walls render above players, east/west walls render at foundation level
+      const wall = item.entity as SpacetimeDBWallCell;
+      if (wall.edge === 0 || wall.edge === 2) {
+        return 22; // North/south walls render after players (higher priority)
+      } else {
+        return 0.6; // East/west walls render after foundations
+      }
+    }
     case 'projectile': return 19;
     case 'viper_spittle': return 19;
     case 'animal_corpse': return 20;
@@ -199,6 +237,27 @@ const getEntityPriority = (item: YSortedEntityType): number => {
     case 'shelter': return 25;
     default: return 0;
   }
+};
+
+// Helper function to check if a player is on the same tile as a foundation/wall
+const isPlayerOnSameTileAsBuilding = (
+  player: SpacetimeDBPlayer,
+  building: SpacetimeDBFoundationCell | SpacetimeDBWallCell
+): boolean => {
+  const TILE_SIZE = 48;
+  // Convert player position to tile coordinates (using floor to match server-side logic)
+  const playerTileX = Math.floor(player.positionX / TILE_SIZE);
+  const playerTileY = Math.floor(player.positionY / TILE_SIZE);
+  // Building cells use cell coordinates directly (they're already tile coordinates)
+  // Use strict equality check
+  const isOnSameTile = playerTileX === building.cellX && playerTileY === building.cellY;
+  
+  // Debug logging (can be removed later)
+  if (isOnSameTile) {
+    // console.log(`[Y-SORT DEBUG] Player at tile (${playerTileX}, ${playerTileY}) matches building at (${building.cellX}, ${building.cellY})`);
+  }
+  
+  return isOnSameTile;
 };
 
 
@@ -378,6 +437,7 @@ export function useEntityFiltering(
   barrels: Map<string, SpacetimeDBBarrel>, // ADDED barrels argument
   seaStacks: Map<string, any>, // ADDED sea stacks argument
   foundationCells: Map<string, SpacetimeDBFoundationCell>, // ADDED: Building foundations
+  wallCells: Map<string, SpacetimeDBWallCell>, // ADDED: Building walls
   isTreeFalling?: (treeId: string) => boolean // NEW: Check if tree is falling
 ): EntityFilteringResult {
   // Increment frame counter for throttling
@@ -797,6 +857,7 @@ export function useEntityFiltering(
   );
 
   // ADDED: Filter visible foundation cells
+  // CRITICAL FIX: Depend on foundationCells.size to ensure recalculation when subscription data loads
   const visibleFoundationCells = useMemo(() => {
     if (!foundationCells || typeof foundationCells.values !== 'function') return [];
     
@@ -812,7 +873,57 @@ export function useEntityFiltering(
       return worldX >= viewBounds.viewMinX && worldX <= viewBounds.viewMaxX &&
              worldY >= viewBounds.viewMinY && worldY <= viewBounds.viewMaxY;
     });
-  }, [foundationCells, viewBounds, stableTimestamp]);
+  }, [foundationCells, foundationCells?.size, viewBounds, stableTimestamp]);
+
+  // Extract wall map size BEFORE useMemo to ensure React detects changes
+  const wallMapSize = wallCells?.size || 0;
+  
+  // ADDED: Filter visible wall cells
+  // CRITICAL FIX: Depend on wallMapSize to ensure recalculation when subscription data loads
+  const visibleWallCells = useMemo(() => {
+    if (!wallCells || typeof wallCells.values !== 'function') return [];
+    
+    // Wall cells use cell coordinates - need custom viewport check
+    // North/south walls extend beyond tile boundaries (2 tiles tall), so need extra padding
+    const TILE_SIZE = 48;
+    const padding = 50; // Extra padding to catch walls on edges
+    const northSouthWallHeight = TILE_SIZE * 2; // North/south walls are 2 tiles tall
+    
+    return Array.from(wallCells.values()).filter(wall => {
+      if (wall.isDestroyed) return false;
+      
+      // Convert cell coordinates to world pixel coordinates (center of tile)
+      const worldX = (wall.cellX * TILE_SIZE) + 24;
+      const worldY = (wall.cellY * TILE_SIZE) + 24;
+      
+      // North/south walls extend beyond tile boundaries (both extend upward)
+      if (wall.edge === 0 || wall.edge === 2) {
+        // Both north and south walls extend upward for isometric depth
+        // North wall: extends from top edge upward
+        // South wall: extends from bottom edge upward
+        const tileTopY = wall.cellY * TILE_SIZE;
+        const tileBottomY = tileTopY + TILE_SIZE;
+        
+        if (wall.edge === 0) {
+          // North wall - extends upward from top edge
+          const minY = tileTopY - northSouthWallHeight; // Top of wall extends upward
+          const maxY = tileTopY; // Bottom of wall is at tile top
+          return worldX >= viewBounds.viewMinX - padding && worldX <= viewBounds.viewMaxX + padding &&
+                 maxY >= viewBounds.viewMinY - padding && minY <= viewBounds.viewMaxY + padding;
+        } else {
+          // South wall - extends upward from bottom edge
+          const minY = tileBottomY - northSouthWallHeight; // Top of wall (extends upward from bottom)
+          const maxY = tileBottomY; // Bottom of wall is at tile bottom
+          return worldX >= viewBounds.viewMinX - padding && worldX <= viewBounds.viewMaxX + padding &&
+                 maxY >= viewBounds.viewMinY - padding && minY <= viewBounds.viewMaxY + padding;
+        }
+      } else {
+        // East/west walls - standard padding
+      return worldX >= viewBounds.viewMinX - padding && worldX <= viewBounds.viewMaxX + padding &&
+             worldY >= viewBounds.viewMinY - padding && worldY <= viewBounds.viewMaxY + padding;
+      }
+    });
+  }, [wallCells, wallMapSize, viewBounds, stableTimestamp]);
 
   const visibleHarvestableResourcesMap = useMemo(() => 
     new Map(visibleHarvestableResources.map(hr => [hr.id.toString(), hr])), 
@@ -938,12 +1049,20 @@ export function useEntityFiltering(
     [visibleFoundationCells]
   );
 
+  // ADDED: Map for visible wall cells
+  const visibleWallCellsMap = useMemo(() =>
+    new Map(visibleWallCells.map(w => [w.id.toString(), w])),
+    [visibleWallCells]
+  );
+
   // ===== CACHED Y-SORTING WITH DIRTY FLAG SYSTEM =====
   // Cache for Y-sorted entities to avoid recalculating every frame
   const ySortedCache = useMemo(() => ({
     entities: [] as YSortedEntityType[],
     lastUpdateFrame: -1,
     lastEntityCounts: {} as Record<string, number>,
+    lastFoundationMapSize: 0, // Track foundation map size separately
+    lastWallMapSize: 0, // Track wall map size separately
     isDirty: true
   }), []);
   
@@ -959,6 +1078,11 @@ export function useEntityFiltering(
   }, [ySortedCache]);
 
   // Y-sorted entities with PERFORMANCE OPTIMIZED sorting
+  // CRITICAL: Force recalculation when map sizes change (subscription data loads)
+  // Note: wallMapSize is already extracted above
+  const foundationMapSize = foundationCells?.size || 0;
+  const playerMapSize = players?.size || 0;
+  
   const ySortedEntities = useMemo(() => {
     // Calculate current entity counts
     const currentEntityCounts = {
@@ -983,7 +1107,8 @@ export function useEntityFiltering(
       foundationCells: visibleFoundationCells.length,
       harvestableResources: visibleHarvestableResources.length,
       playerCorpses: visiblePlayerCorpses.length,
-      stashes: visibleStashes.length
+      stashes: visibleStashes.length,
+      wallCells: visibleWallCells.length
     };
     
     const totalEntities = Object.values(currentEntityCounts).reduce((sum, count) => sum + count, 0);
@@ -991,11 +1116,64 @@ export function useEntityFiltering(
     // Early exit if no entities
     if (totalEntities === 0) return [];
     
+    // CRITICAL FIX: Force re-sort when foundation/wall data first loads OR when player data loads
+    // This fixes the issue where players render below tiles on initial login
+    // because player data loads before foundation/wall data (or vice versa)
+    const foundationsJustLoaded = visibleFoundationCells.length > 0 && 
+      (!ySortedCache.lastEntityCounts || ySortedCache.lastEntityCounts.foundationCells === 0);
+    const wallsJustLoaded = visibleWallCells.length > 0 && 
+      (!ySortedCache.lastEntityCounts || ySortedCache.lastEntityCounts.wallCells === 0);
+    const playersJustLoaded = visiblePlayers.length > 0 && 
+      (!ySortedCache.lastEntityCounts || ySortedCache.lastEntityCounts.players === 0);
+    
+    // CRITICAL FIX: Also check if player data loaded AFTER foundations/walls were already present
+    // This handles the case where foundations load first, then player loads later
+    const foundationsWerePresent = ySortedCache.lastEntityCounts && 
+      (ySortedCache.lastEntityCounts.foundationCells || 0) > 0;
+    const wallsWerePresent = ySortedCache.lastEntityCounts && 
+      (ySortedCache.lastEntityCounts.wallCells || 0) > 0;
+    const playerJustLoadedWithTilesPresent = playersJustLoaded && (foundationsWerePresent || wallsWerePresent);
+    
+    // CRITICAL FIX: Check if we now have BOTH players AND foundations/walls present,
+    // but the cache was calculated when one was missing. This handles race conditions
+    // where data loads in different orders on login.
+    const hasPlayersNow = visiblePlayers.length > 0;
+    const hasTilesNow = visibleFoundationCells.length > 0 || visibleWallCells.length > 0;
+    const hadPlayersBefore = ySortedCache.lastEntityCounts && (ySortedCache.lastEntityCounts.players || 0) > 0;
+    const hadTilesBefore = ySortedCache.lastEntityCounts && 
+      ((ySortedCache.lastEntityCounts.foundationCells || 0) > 0 || 
+       (ySortedCache.lastEntityCounts.wallCells || 0) > 0);
+    
+    // CRITICAL FIX: Force recalculation when wall count increases (new wall placed)
+    const wallCountIncreased = ySortedCache.lastEntityCounts && 
+      visibleWallCells.length > (ySortedCache.lastEntityCounts.wallCells || 0);
+    
+    // CRITICAL FIX: Force recalculation when foundation count increases (new foundation placed)
+    const foundationCountIncreased = ySortedCache.lastEntityCounts && 
+      visibleFoundationCells.length > (ySortedCache.lastEntityCounts.foundationCells || 0);
+    const bothPresentNowButNotBefore = hasPlayersNow && hasTilesNow && (!hadPlayersBefore || !hadTilesBefore);
+    
+    // CRITICAL FIX: When we have both players and tiles, ALWAYS re-sort every frame
+    // This fixes the subscription timing issue where foundation/wall data loads asynchronously
+    // via chunk subscriptions after the initial sort, causing players to render below tiles
+    // The cache prevents re-sorting when data arrives, so we disable caching in this case
+    const hasBothPlayersAndTiles = hasPlayersNow && hasTilesNow;
+    
     // Check if we need to resort
     const needsResort = ySortedCache.isDirty || 
                        (frameCounter - ySortedCache.lastUpdateFrame) > 10 || // Force resort every 10 frames
-                       hasEntityCountChanged(currentEntityCounts);
+                       hasEntityCountChanged(currentEntityCounts) ||
+                       foundationsJustLoaded || // Force resort when foundations first load
+                       wallsJustLoaded || // Force resort when walls first load
+                       wallCountIncreased || // CRITICAL: Force resort when new wall is placed
+                       foundationCountIncreased || // CRITICAL: Force resort when new foundation is placed
+                       playerJustLoadedWithTilesPresent || // Force resort when player loads with tiles already present
+                       bothPresentNowButNotBefore || // Force resort when both players and tiles are now present but weren't both before
+                       hasBothPlayersAndTiles; // CRITICAL: Always resort when both are present (disables cache)
     
+    // CRITICAL FIX: Disable cache when we have both players and tiles
+    // This ensures correct sorting when subscription data loads asynchronously
+    // Only use cache if we DON'T have both players and tiles AND nothing else requires resorting
     if (!needsResort && ySortedCache.entities.length > 0) {
       // Use cached result - huge performance gain!
       return ySortedCache.entities;
@@ -1028,6 +1206,7 @@ export function useEntityFiltering(
     visibleSeaStacks.forEach(e => allEntities[index++] = { type: 'sea_stack', entity: e });
     visibleShelters.forEach(e => allEntities[index++] = { type: 'shelter', entity: e });
     visibleFoundationCells.forEach(e => allEntities[index++] = { type: 'foundation_cell', entity: e }); // ADDED: Foundations
+    visibleWallCells.forEach(e => allEntities[index++] = { type: 'wall_cell', entity: e }); // ADDED: Walls
 
     // Trim array to actual size in case some entities were filtered out (e.g., stones with 0 health)
     allEntities.length = index;
@@ -1037,6 +1216,48 @@ export function useEntityFiltering(
     // than the old method, but it avoids massive memory allocation, which is the
     // likely cause of the garbage-collection lag spikes.
     allEntities.sort((a, b) => {
+      // CRITICAL FIX: Explicitly check if a player is on the same tile as a foundation/wall
+      // For foundations and east/west walls: player ALWAYS renders after (above)
+      // For north/south walls: wall ALWAYS renders after (above) player (for isometric depth)
+      if (a.type === 'player' && b.type === 'wall_cell') {
+        const player = a.entity as SpacetimeDBPlayer;
+        const wall = b.entity as SpacetimeDBWallCell;
+        if (isPlayerOnSameTileAsBuilding(player, wall)) {
+          // North/south walls render above players
+          if (wall.edge === 0 || wall.edge === 2) {
+            return -1; // Wall renders after (above) player
+          } else {
+            return 1; // Player renders after (above) east/west walls
+          }
+        }
+      }
+      if (b.type === 'player' && a.type === 'wall_cell') {
+        const player = b.entity as SpacetimeDBPlayer;
+        const wall = a.entity as SpacetimeDBWallCell;
+        if (isPlayerOnSameTileAsBuilding(player, wall)) {
+          // North/south walls render above players
+          if (wall.edge === 0 || wall.edge === 2) {
+            return 1; // Wall renders after (above) player
+          } else {
+            return -1; // Player renders after (above) east/west walls
+          }
+        }
+      }
+      if (a.type === 'player' && b.type === 'foundation_cell') {
+        const player = a.entity as SpacetimeDBPlayer;
+        const foundation = b.entity as SpacetimeDBFoundationCell;
+        if (isPlayerOnSameTileAsBuilding(player, foundation)) {
+          return 1; // Player renders after (above) foundation
+        }
+      }
+      if (b.type === 'player' && a.type === 'foundation_cell') {
+        const player = b.entity as SpacetimeDBPlayer;
+        const foundation = a.entity as SpacetimeDBFoundationCell;
+        if (isPlayerOnSameTileAsBuilding(player, foundation)) {
+          return -1; // Player renders after (above) foundation
+        }
+      }
+      
       const yA = getEntityY(a, stableTimestamp);
       const yB = getEntityY(b, stableTimestamp);
       
@@ -1054,6 +1275,8 @@ export function useEntityFiltering(
     ySortedCache.entities = allEntities;
     ySortedCache.lastUpdateFrame = frameCounter;
     ySortedCache.lastEntityCounts = currentEntityCounts;
+    ySortedCache.lastFoundationMapSize = foundationCells?.size || 0;
+    ySortedCache.lastWallMapSize = wallCells?.size || 0;
     ySortedCache.isDirty = false;
     
     return allEntities;
@@ -1073,6 +1296,12 @@ export function useEntityFiltering(
     visibleSeaStacks,
     visibleHarvestableResources,
     visibleFoundationCells, // ADDED: Foundations dependency
+    visibleWallCells, // ADDED: Walls dependency
+    foundationCells, // CRITICAL: Depend on raw map to detect when data loads
+    foundationMapSize, // CRITICAL: Depend on map size to detect when subscription data arrives
+    wallCells, // CRITICAL: Depend on raw map to detect when data loads
+    wallMapSize, // CRITICAL: Depend on map size to detect when subscription data arrives
+    playerMapSize, // CRITICAL: Depend on player map size to detect when player data loads
     stableTimestamp, // Only include stableTimestamp for projectile calculations
     hasEntityCountChanged, // Add callback dependency
     frameCounter // Add frame counter for cache invalidation
@@ -1128,5 +1357,7 @@ export function useEntityFiltering(
     visibleFurnacesMap,
     visibleFoundationCells,
     visibleFoundationCellsMap,
+    visibleWallCells,
+    visibleWallCellsMap,
   };
 } 
