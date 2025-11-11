@@ -1024,7 +1024,7 @@ export function renderWall({
           wallX, wallY, wallWidth, wallHeight // Destination: full wall (SOUTH_WALL_HEIGHT)
         );
       } else {
-        // Vertical wall - draw vertical strip from tile
+        // Vertical wall (East/West) - draw vertical strip from tile
         const sourceX = wall.edge === 3 ? 0 : wallImage.width - EAST_WEST_WALL_THICKNESS / worldScale;
         ctx.drawImage(
           wallImage,
@@ -1078,6 +1078,37 @@ export function renderWall({
         // East/west walls - draw normally
         ctx.fillStyle = tierColors[wall.tier] || '#8B4513';
         ctx.fillRect(wallX, wallY, wallWidth, wallHeight);
+        
+        // Draw interior shadow for east/west walls (fallback)
+        // East walls (edge === 1) cast shadow to the left
+        // West walls (edge === 3) cast shadow to the right
+        // Shadows should be projected onto the foundation tile, not on the wall itself
+        if (wall.edge === 1 || wall.edge === 3) {
+          const shadowWidth = screenSize * 0.3; // Shadow extends horizontally onto the foundation
+          const shadowY = screenY; // Start at the top of the foundation tile (where wall meets ground)
+          const shadowHeight = screenSize; // Shadow covers the full height of the foundation tile
+          let shadowX: number;
+          let shadowGradient: CanvasGradient;
+          
+          if (wall.edge === 1) {
+            // East wall - shadow to the left
+            shadowX = screenX - shadowWidth; // Start to the left of the tile
+            shadowGradient = ctx.createLinearGradient(shadowX + shadowWidth, shadowY, shadowX, shadowY);
+          } else {
+            // West wall - shadow to the right
+            shadowX = screenX + screenSize; // Start at the right edge of the tile
+            shadowGradient = ctx.createLinearGradient(shadowX, shadowY, shadowX + shadowWidth, shadowY);
+          }
+          
+          // Same gradient stops as north wall shadow for consistency
+          shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0.5)'); // More intense start
+          shadowGradient.addColorStop(0.3, 'rgba(0, 0, 0, 0.3)'); // Gradual fade midpoint
+          shadowGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.12)'); // Soft before end
+          shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)'); // Fade to transparent
+          
+          ctx.fillStyle = shadowGradient;
+          ctx.fillRect(shadowX, shadowY, shadowWidth, shadowHeight);
+        }
       }
     }
     
@@ -1207,6 +1238,42 @@ export function renderWall({
   }
   
   ctx.restore();
+  
+  // Draw interior shadow for east/west walls AFTER all wall rendering and context restoration
+  // This ensures shadows are not clipped and render on top of foundations
+  // East walls (edge === 1) cast shadow to the left (toward interior)
+  // West walls (edge === 3) cast shadow to the right (toward interior)
+  // Shadows should be projected onto the foundation tile, starting from the wall position
+  if (wall.edge === 1 || wall.edge === 3) {
+    const shadowWidth = screenSize * 0.3; // Shadow extends horizontally onto the foundation
+    const shadowY = screenY; // Start at the top of the foundation tile (where wall meets ground)
+    const shadowHeight = screenSize; // Shadow covers the full height of the foundation tile
+    let shadowX: number;
+    let shadowGradient: CanvasGradient;
+    
+    if (wall.edge === 1) {
+      // East wall - shadow extends to the left (toward interior)
+      // Wall is positioned at: screenX + screenSize - EAST_WEST_WALL_THICKNESS / 2
+      // Shadow should start from where the wall meets the foundation interior and extend leftward
+      shadowX = screenX + screenSize - EAST_WEST_WALL_THICKNESS / 2 - shadowWidth; // Start from wall position, extend left
+      shadowGradient = ctx.createLinearGradient(shadowX + shadowWidth, shadowY, shadowX, shadowY);
+    } else {
+      // West wall - shadow extends to the right (toward interior)
+      // Wall is positioned at: screenX - EAST_WEST_WALL_THICKNESS / 2 (centered on left edge)
+      // Shadow should start from where the wall meets the foundation interior (screenX) and extend rightward
+      shadowX = screenX; // Start from the left edge of the foundation tile (where wall meets interior)
+      shadowGradient = ctx.createLinearGradient(shadowX, shadowY, shadowX + shadowWidth, shadowY);
+    }
+    
+    // Same gradient stops as north wall shadow for consistency
+    shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0.5)'); // More intense start (at wall)
+    shadowGradient.addColorStop(0.3, 'rgba(0, 0, 0, 0.3)'); // Gradual fade midpoint
+    shadowGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.12)'); // Soft before end
+    shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)'); // Fade to transparent
+    
+    ctx.fillStyle = shadowGradient;
+    ctx.fillRect(shadowX, shadowY, shadowWidth, shadowHeight);
+  }
 }
 
 /**
