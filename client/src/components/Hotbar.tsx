@@ -897,6 +897,9 @@ const Hotbar: React.FC<HotbarProps> = ({
                   case 'lantern':
                       connection.reducers.quickMoveToLantern(containerId, itemInstanceId);
                       break;
+                  case 'homestead_hearth':
+                      connection.reducers.quickMoveToHearth(containerId, itemInstanceId);
+                      break;
                   case 'rain_collector':
                       // Rain collectors use a different function signature with slot index
                       connection.reducers.moveItemToRainCollector(containerId, itemInstanceId, 0);

@@ -22,6 +22,9 @@ use crate::rain_collector::rain_collector as RainCollectorTableTrait;
 // Import furnace types for collision detection
 use crate::furnace::{Furnace, FURNACE_COLLISION_RADIUS, FURNACE_COLLISION_Y_OFFSET};
 use crate::furnace::furnace as FurnaceTableTrait;
+// Import homestead hearth types for collision detection
+use crate::homestead_hearth::{HomesteadHearth, HEARTH_COLLISION_RADIUS, HEARTH_COLLISION_Y_OFFSET};
+use crate::homestead_hearth::homestead_hearth as HomesteadHearthTableTrait;
 // Import wall cell table trait for collision detection
 use crate::building::wall_cell as WallCellTableTrait;
 use crate::TILE_SIZE_PX;
@@ -69,6 +72,7 @@ pub fn calculate_slide_collision_with_grid(
     let shelters = ctx.db.shelter(); // Access shelter table
     let rain_collectors = ctx.db.rain_collector(); // Access rain collector table
     let furnaces = ctx.db.furnace(); // Access furnace table
+    let homestead_hearths = ctx.db.homestead_hearth(); // Access homestead hearth table
     let wall_cells = ctx.db.wall_cell(); // Access wall cell table
     
     // GET: Current player's crouching state for effective radius calculation
@@ -509,6 +513,56 @@ pub fn calculate_slide_collision_with_grid(
                     }
                 }
             },
+            spatial_grid::EntityType::HomesteadHearth(hearth_id) => { // ADDED HomesteadHearth slide logic
+                if let Some(hearth) = homestead_hearths.id().find(hearth_id) {
+                    if hearth.is_destroyed { continue; }
+                    let hearth_collision_y = hearth.pos_y - HEARTH_COLLISION_Y_OFFSET;
+                    let dx = final_x - hearth.pos_x;
+                    let dy = final_y - hearth_collision_y;
+                    let dist_sq = dx * dx + dy * dy;
+                    let min_dist = current_player_radius + HEARTH_COLLISION_RADIUS + SLIDE_SEPARATION_DISTANCE;
+                    let min_dist_sq = min_dist * min_dist;
+
+                    if dist_sq < min_dist_sq {
+                        log::debug!("Player-HomesteadHearth collision for slide: {:?} vs hearth {}", sender_id, hearth.id);
+                        let collision_normal_x = dx;
+                        let collision_normal_y = dy;
+                        let normal_mag_sq = dist_sq;
+                        if normal_mag_sq > 0.0 {
+                            let normal_mag = normal_mag_sq.sqrt();
+                            let norm_x = collision_normal_x / normal_mag;
+                            let norm_y = collision_normal_y / normal_mag;
+                            let dot_product = server_dx * norm_x + server_dy * norm_y;
+                            
+                            // Only slide if moving toward the object (dot_product < 0)
+                            if dot_product < 0.0 {
+                                let projection_x = dot_product * norm_x;
+                                let projection_y = dot_product * norm_y;
+                                let slide_dx = server_dx - projection_x;
+                                let slide_dy = server_dy - projection_y;
+                                final_x = current_player_pos_x + slide_dx;
+                                final_y = current_player_pos_y + slide_dy;
+                                
+                                // 🛡️ SEPARATION ENFORCEMENT: Ensure minimum separation after sliding
+                                let final_dx = final_x - hearth.pos_x;
+                                let final_dy = final_y - hearth_collision_y;
+                                let final_dist = (final_dx * final_dx + final_dy * final_dy).sqrt();
+                                if final_dist < min_dist {
+                                    let separation_direction = if final_dist > 0.001 {
+                                        (final_dx / final_dist, final_dy / final_dist)
+                                    } else {
+                                        (1.0, 0.0) // Default direction
+                                    };
+                                    final_x = hearth.pos_x + separation_direction.0 * min_dist;
+                                    final_y = hearth_collision_y + separation_direction.1 * min_dist;
+                                }
+                            }
+                            final_x = final_x.max(current_player_radius).min(WORLD_WIDTH_PX - current_player_radius);
+                            final_y = final_y.max(current_player_radius).min(WORLD_HEIGHT_PX - current_player_radius);
+                        }
+                    }
+                }
+            },
             _ => {} // Campfire, etc. - no slide collision
         }
     }
@@ -651,6 +705,7 @@ pub fn resolve_push_out_collision_with_grid(
     let shelters = ctx.db.shelter(); // Access shelter table
     let rain_collectors = ctx.db.rain_collector(); // Access rain collector table
     let furnaces = ctx.db.furnace(); // Access furnace table
+    let homestead_hearths = ctx.db.homestead_hearth(); // Access homestead hearth table
     let wall_cells = ctx.db.wall_cell(); // Access wall cell table
     
     // GET: Current player's crouching state for effective radius calculation
@@ -929,6 +984,29 @@ pub fn resolve_push_out_collision_with_grid(
                         let dy = resolved_y - furnace_collision_y;
                         let dist_sq = dx * dx + dy * dy;
                         let min_dist = current_player_radius + crate::furnace::FURNACE_COLLISION_RADIUS + separation_distance;
+                        let min_dist_sq = min_dist * min_dist;
+                        
+                        // OPTIMIZATION: Early exit with exact distance check
+                        if dist_sq >= min_dist_sq || dist_sq <= 0.0 {
+                            continue;
+                        }
+                        
+                        overlap_found_in_iter = true;
+                        let distance = dist_sq.sqrt();
+                        let overlap = (min_dist - distance) + separation_distance;
+                        resolved_x += (dx / distance) * overlap;
+                        resolved_y += (dy / distance) * overlap;
+                    }
+                },
+                spatial_grid::EntityType::HomesteadHearth(hearth_id) => {
+                    log::debug!("[PushOutEntityType] Found HomesteadHearth: {}", hearth_id);
+                    if let Some(hearth) = homestead_hearths.id().find(hearth_id) {
+                        if hearth.is_destroyed { continue; }
+                        let hearth_collision_y = hearth.pos_y - HEARTH_COLLISION_Y_OFFSET;
+                        let dx = resolved_x - hearth.pos_x;
+                        let dy = resolved_y - hearth_collision_y;
+                        let dist_sq = dx * dx + dy * dy;
+                        let min_dist = current_player_radius + HEARTH_COLLISION_RADIUS + separation_distance;
                         let min_dist_sq = min_dist * min_dist;
                         
                         // OPTIMIZATION: Early exit with exact distance check

@@ -159,7 +159,8 @@ const getEntityY = (item: YSortedEntityType, timestamp: number): number => {
     case 'wild_animal':
     case 'barrel':
     case 'sleeping_bag':
-      return entity.posY;
+      // Placeables should render above north walls, so give them a higher Y value
+      return entity.posY + 10000; // Higher than north walls (5000) to ensure they render above
     case 'foundation_cell': {
       // Foundation cells use cell coordinates - convert to world pixel Y
       // Use top edge of tile (cellY * 48) to ensure foundations render below players
@@ -172,9 +173,13 @@ const getEntityY = (item: YSortedEntityType, timestamp: number): number => {
       const FOUNDATION_TILE_SIZE = 96;
       const baseY = wall.cellY * FOUNDATION_TILE_SIZE;
       
-      if (wall.edge === 0 || wall.edge === 2) {
-        // North/south walls: render ABOVE players but BELOW east/west walls
-        // Use bottom edge + offset to render after players behind the wall
+      if (wall.edge === 0) {
+        // North walls: render BELOW placeables (hearth, campfires, etc.) but ABOVE players
+        // Use a lower Y value so placeables can render above them
+        const bottomEdgeY = baseY + FOUNDATION_TILE_SIZE;
+        return bottomEdgeY + 5000; // Lower than placeables but still above players
+      } else if (wall.edge === 2) {
+        // South walls: render ABOVE players but BELOW east/west walls
         const bottomEdgeY = baseY + FOUNDATION_TILE_SIZE;
         return bottomEdgeY + 10000; // High value ensures walls render above players
       } else {
@@ -272,6 +277,7 @@ const isPlayerOnSameTileAsBuilding = (
   
   return isOnSameTile;
 };
+
 
 
 // ===== PERFORMANCE OPTIMIZATION CONSTANTS =====
@@ -1310,6 +1316,30 @@ export function useEntityFiltering(
         const foundation = a.entity as SpacetimeDBFoundationCell;
         if (isPlayerOnSameTileAsBuilding(player, foundation)) {
           return -1; // Player renders after (above) foundation
+        }
+      }
+      
+      // CRITICAL FIX: Placeable objects should ALWAYS render above north walls (edge 0)
+      // North walls extend upward visually, so placeables should always render on top
+      // Simple rule: if it's a north wall and a placeable object, placeable always wins
+      const placeableObjectTypes: Array<YSortedEntityType['type']> = [
+        'campfire', 'furnace', 'lantern', 'homestead_hearth', 'wooden_storage_box', 
+        'stash', 'barrel', 'rain_collector', 'sleeping_bag'
+      ];
+      
+      if (placeableObjectTypes.includes(a.type) && b.type === 'wall_cell') {
+        const wall = b.entity as SpacetimeDBWallCell;
+        // For north walls (edge 0), always render placeable above
+        if (wall.edge === 0) {
+          return 1; // Placeable renders after (above) north wall
+        }
+      }
+      
+      if (placeableObjectTypes.includes(b.type) && a.type === 'wall_cell') {
+        const wall = a.entity as SpacetimeDBWallCell;
+        // For north walls (edge 0), always render placeable above
+        if (wall.edge === 0) {
+          return -1; // Placeable renders after (above) north wall
         }
       }
       

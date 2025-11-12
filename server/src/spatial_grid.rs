@@ -38,6 +38,8 @@ use crate::rain_collector::rain_collector as RainCollectorTableTrait;
 use crate::furnace::furnace as FurnaceTableTrait;
 // Import wild animal table trait
 use crate::wild_animal_npc::wild_animal as WildAnimalTableTrait;
+// Import homestead hearth table trait
+use crate::homestead_hearth::homestead_hearth as HomesteadHearthTableTrait;
 
 // Cell size should be larger than the largest collision radius to ensure
 // we only need to check adjacent cells. We use 8x the player radius for better performance with larger worlds.
@@ -73,6 +75,7 @@ pub enum EntityType {
     RainCollector(u32), // ADDED RainCollector entity type (assuming u32 ID)
     Furnace(u32), // ADDED Furnace entity type (assuming u32 ID)
     WildAnimal(u64), // ADDED WildAnimal entity type
+    HomesteadHearth(u32), // ADDED HomesteadHearth entity type
     // EXCLUDED: Grass - removed for performance to fix rubber-banding issues
 }
 
@@ -121,7 +124,8 @@ impl SpatialGrid {
                             + PlayerCorpseTableTrait
                             + RainCollectorTableTrait
                             + FurnaceTableTrait
-                            + WildAnimalTableTrait>
+                            + WildAnimalTableTrait
+                            + HomesteadHearthTableTrait>
                            (db: &DB, current_time: spacetimedb::Timestamp) -> Self {
         let mut grid = Self::new();
         grid.populate_from_world(db, current_time);
@@ -202,10 +206,11 @@ impl SpatialGrid {
                                   + CampfireTableTrait + WoodenStorageBoxTableTrait 
                                   + HarvestableResourceTableTrait + DroppedItemTableTrait
                                   + ShelterTableTrait 
-                                  + PlayerCorpseTableTrait
-                                  + RainCollectorTableTrait
-                                  + FurnaceTableTrait
-                                  + WildAnimalTableTrait> // ADDED WildAnimalTableTrait to bounds
+                            + PlayerCorpseTableTrait
+                            + RainCollectorTableTrait
+                            + FurnaceTableTrait
+                            + WildAnimalTableTrait
+                            + HomesteadHearthTableTrait> // ADDED HomesteadHearthTableTrait to bounds
                                  (&mut self, db: &DB, current_time: spacetimedb::Timestamp) {
         self.clear();
         
@@ -313,6 +318,13 @@ impl SpatialGrid {
                 self.add_entity(EntityType::WildAnimal(animal.id), animal.pos_x, animal.pos_y);
             }
         }
+        
+        // Add homestead hearths (only non-destroyed)
+        for hearth in db.homestead_hearth().iter() {
+            if !hearth.is_destroyed {
+                self.add_entity(EntityType::HomesteadHearth(hearth.id), hearth.pos_x, hearth.pos_y);
+            }
+        }
     }
     
     // PERFORMANCE OPTIMIZED: Faster population method for high-density areas
@@ -323,7 +335,8 @@ impl SpatialGrid {
                                             + PlayerCorpseTableTrait
                                             + RainCollectorTableTrait
                                             + FurnaceTableTrait
-                                            + WildAnimalTableTrait>
+                                            + WildAnimalTableTrait
+                                            + HomesteadHearthTableTrait>
                                            (&mut self, db: &DB, current_time: spacetimedb::Timestamp) {
         self.clear();
         
@@ -419,6 +432,13 @@ impl SpatialGrid {
             }
         }
         
+        // Add homestead hearths - only non-destroyed ones
+        for hearth in db.homestead_hearth().iter() {
+            if !hearth.is_destroyed {
+                entities_to_add.push((EntityType::HomesteadHearth(hearth.id), hearth.pos_x, hearth.pos_y));
+            }
+        }
+        
         // Batch add all simple entities
         for (entity_type, x, y) in entities_to_add {
             self.add_entity(entity_type, x, y);
@@ -473,7 +493,8 @@ pub fn get_cached_spatial_grid<DB: PlayerTableTrait + TreeTableTrait + StoneTabl
                                  + PlayerCorpseTableTrait
                                  + RainCollectorTableTrait
                                  + FurnaceTableTrait
-                                 + WildAnimalTableTrait>
+                                 + WildAnimalTableTrait
+                                 + HomesteadHearthTableTrait>
                               (db: &DB, current_time: spacetimedb::Timestamp) -> &'static SpatialGrid {
     unsafe {
         // Check if we need to refresh the cache

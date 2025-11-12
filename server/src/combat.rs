@@ -108,6 +108,7 @@ pub enum TargetId {
     AnimalCorpse(u32), // ADDED: Animal corpse target
     Barrel(u64), // ADDED: Barrel target
     HomesteadHearth(u32), // ADDED: Homestead Hearth target
+    Wall(u64), // ADDED: Wall target
 }
 
 /// Represents a potential target within attack range
@@ -153,7 +154,12 @@ fn is_line_blocked_by_shelter(
     end_x: f32,
     end_y: f32,
 ) -> bool {
-    // Delegate to shelter module
+    // Check walls first (walls block everything)
+    if crate::building::is_line_blocked_by_walls(ctx, start_x, start_y, end_x, end_y) {
+        return true;
+    }
+    
+    // Then check shelters
     crate::shelter::is_line_blocked_by_shelter(ctx, attacker_id, target_id, start_x, start_y, end_x, end_y)
 }
 
@@ -851,6 +857,56 @@ pub fn find_targets_in_cone(
         }
     }
     
+    // Check walls (can be directly targeted)
+    use crate::building::{wall_cell, FOUNDATION_TILE_SIZE_PX};
+    for wall in ctx.db.wall_cell().iter() {
+        if wall.is_destroyed {
+            continue;
+        }
+        
+        // Calculate wall center position (foundation cell center)
+        let wall_world_x = (wall.cell_x as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+        let wall_world_y = (wall.cell_y as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+        
+        let dx = wall_world_x - player.position_x;
+        let dy = wall_world_y - player.position_y;
+        let dist_sq = dx * dx + dy * dy;
+        
+        if dist_sq < (attack_range * attack_range) && dist_sq > 0.0 {
+            let distance = dist_sq.sqrt();
+            let target_vec_x = dx / distance;
+            let target_vec_y = dy / distance;
+            
+            let dot_product = forward_x * target_vec_x + forward_y * target_vec_y;
+            let angle_rad = dot_product.acos();
+            
+            if angle_rad <= half_attack_angle_rad {
+                // Check if line of sight is blocked by shelter walls (but not by other walls)
+                if is_line_blocked_by_shelter(
+                    ctx,
+                    player.identity,
+                    None,
+                    player.position_x,
+                    player.position_y,
+                    wall_world_x,
+                    wall_world_y,
+                ) {
+                    log::debug!(
+                        "Player {:?} cannot attack Wall {}: line of sight blocked by shelter",
+                        player.identity, wall.id
+                    );
+                    continue;
+                }
+                
+                targets.push(Target {
+                    target_type: TargetType::Wall,
+                    id: TargetId::Wall(wall.id),
+                    distance_sq: dist_sq,
+                });
+            }
+        }
+    }
+    
     // Check Shelters - delegate to shelter module
     crate::shelter::add_shelter_targets_to_cone(ctx, player, attack_range, half_attack_angle_rad, forward_x, forward_y, &mut targets);
     
@@ -912,7 +968,9 @@ fn is_destructible_deployable(target_type: TargetType) -> bool {
         TargetType::RainCollector |
         TargetType::Furnace |
         TargetType::Barrel | // Includes barrels and other destructible deployables
-        TargetType::HomesteadHearth // ADDED: Homestead Hearth is destructible
+        TargetType::HomesteadHearth | // ADDED: Homestead Hearth is destructible
+        TargetType::Wall | // ADDED: Walls are destructible structures
+        TargetType::Foundation // ADDED: Foundations are destructible structures
     )
 }
 
@@ -981,17 +1039,26 @@ pub fn calculate_damage_and_yield(
 
     // Check for PvP damage for Players, Animals, AND Deployable Structures
     if target_type == TargetType::Player || target_type == TargetType::Animal || is_destructible_deployable(target_type) {
-        let min_pvp_dmg = item_def.pvp_damage_min.unwrap_or(0) as f32;
-        let max_pvp_dmg = item_def.pvp_damage_max.unwrap_or(min_pvp_dmg as u32) as f32;
-        if max_pvp_dmg > 0.0 { // Only override default if PvP damage is defined
-            damage = if min_pvp_dmg >= max_pvp_dmg {
-                min_pvp_dmg
-            } else {
-                rng.gen_range(min_pvp_dmg..=max_pvp_dmg)
-            };
+        // If PvP damage is explicitly set (even if zero), use it
+        if item_def.pvp_damage_min.is_some() || item_def.pvp_damage_max.is_some() {
+            let min_pvp_dmg = item_def.pvp_damage_min.unwrap_or(0) as f32;
+            let max_pvp_dmg = item_def.pvp_damage_max.unwrap_or(min_pvp_dmg as u32) as f32;
             
-            // For players and animals, no yield. For deployables, they handle their own item drops in their respective damage functions
-            return (damage, 0, "".to_string());
+            // If explicitly set to zero, return zero damage (e.g., Blueprint)
+            if max_pvp_dmg == 0.0 && min_pvp_dmg == 0.0 {
+                return (0.0, 0, "".to_string());
+            }
+            
+            if max_pvp_dmg > 0.0 { // Only override default if PvP damage is defined and non-zero
+                damage = if min_pvp_dmg >= max_pvp_dmg {
+                    min_pvp_dmg
+                } else {
+                    rng.gen_range(min_pvp_dmg..=max_pvp_dmg)
+                };
+                
+                // For players and animals, no yield. For deployables, they handle their own item drops in their respective damage functions
+                return (damage, 0, "".to_string());
+            }
         }
     }
 
@@ -2357,11 +2424,72 @@ pub fn process_attack(
                 return Err("Target hearth not found".to_string());
             }
         },
+        TargetId::Wall(wall_id) => {
+            use crate::building::{wall_cell, FOUNDATION_TILE_SIZE_PX};
+            if let Some(wall) = ctx.db.wall_cell().id().find(wall_id) {
+                // Calculate wall center position (foundation cell center)
+                let wall_world_x = (wall.cell_x as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+                let wall_world_y = (wall.cell_y as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+                (wall_world_x, wall_world_y, None)
+            } else {
+                return Err("Target wall not found".to_string());
+            }
+        },
     };
 
     // Get attacker position
     let attacker = ctx.db.player().identity().find(&attacker_id)
         .ok_or_else(|| "Attacker not found".to_string())?;
+
+    // Check if melee attack hits a wall first (walls block attacks AND take damage)
+    // EXCEPTION: If the target itself is a wall, skip this check (handle direct wall damage below)
+    let target_is_wall = matches!(target.id, TargetId::Wall(_));
+    if !target_is_wall {
+        if let Some(wall_id) = crate::building::check_line_hits_wall(
+            ctx,
+            attacker.position_x,
+            attacker.position_y,
+            target_x,
+            target_y,
+        ) {
+        log::info!(
+            "[ProcessAttack] Melee attack from Player {:?} hit Wall {} - damaging wall and blocking attack",
+            attacker_id, wall_id
+        );
+        
+        // Calculate damage for the wall
+        let (damage, _, _) = calculate_damage_and_yield(item_def, TargetType::Wall, rng);
+        
+        // Apply damage to the wall
+        match crate::building::damage_wall(
+            ctx,
+            attacker_id,
+            wall_id,
+            damage,
+            timestamp,
+        ) {
+            Ok(_) => {
+                log::info!(
+                    "[ProcessAttack] Melee attack dealt {:.1} damage to Wall {}",
+                    damage, wall_id
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "[ProcessAttack] Error applying melee damage to Wall {}: {}",
+                    wall_id, e
+                );
+            }
+        }
+        
+        // Block the attack from hitting targets behind the wall
+        return Ok(AttackResult {
+            hit: true, // Attack hit something (the wall)
+            target_type: Some(TargetType::Wall),
+            resource_granted: None,
+        });
+        }
+    }
 
     // Check if line of sight is blocked by shelter walls
     // EXCEPTION: If the target itself is a shelter, allow the attack (direct shelter damage)
@@ -2468,6 +2596,15 @@ pub fn process_attack(
                 .map(|_| AttackResult {
                     hit: true,
                     target_type: Some(TargetType::HomesteadHearth),
+                    resource_granted: None,
+                })
+        },
+        TargetId::Wall(wall_id) => {
+            // Direct wall attack - damage the targeted wall
+            crate::building::damage_wall(ctx, attacker_id, *wall_id, damage, timestamp)
+                .map(|_| AttackResult {
+                    hit: true,
+                    target_type: Some(TargetType::Wall),
                     resource_granted: None,
                 })
         },

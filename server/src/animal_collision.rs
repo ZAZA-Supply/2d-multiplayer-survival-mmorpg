@@ -19,8 +19,14 @@ use crate::player_corpse::{PlayerCorpse, CORPSE_COLLISION_RADIUS, CORPSE_COLLISI
 use crate::player_corpse::player_corpse as PlayerCorpseTableTrait;
 use crate::furnace::{Furnace, FURNACE_COLLISION_RADIUS, FURNACE_COLLISION_Y_OFFSET};
 use crate::furnace::furnace as FurnaceTableTrait;
+use crate::homestead_hearth::{HomesteadHearth, HEARTH_COLLISION_RADIUS, HEARTH_COLLISION_Y_OFFSET};
+use crate::homestead_hearth::homestead_hearth as HomesteadHearthTableTrait;
+use crate::building::wall_cell as WallCellTableTrait;
+use crate::building::foundation_cell as FoundationCellTableTrait;
+use crate::building::FOUNDATION_TILE_SIZE_PX;
 use crate::wild_animal_npc::{WildAnimal, wild_animal as WildAnimalTableTrait};
 use crate::fishing::is_water_tile;
+use crate::TILE_SIZE_PX;
 
 // Animal collision constants
 pub const ANIMAL_COLLISION_RADIUS: f32 = 32.0; // Animals maintain 32px distance from each other
@@ -50,6 +56,9 @@ pub enum CollisionType {
     WoodenBox,
     RainCollector,
     PlayerCorpse,
+    HomesteadHearth,
+    Wall,
+    Foundation,
 }
 
 /// Comprehensive collision check for animal movement
@@ -119,6 +128,24 @@ pub fn resolve_animal_collision(
         final_y = current_y + pushback_y;
         collision_detected = true;
         log::debug!("[AnimalCollision] Animal {} pushed back by environment: ({:.1}, {:.1})", 
+                   animal_id, pushback_x, pushback_y);
+    }
+    
+    // Check wall collisions - walls are static and positioned on tile edges
+    if let Some((pushback_x, pushback_y)) = check_wall_collision(&ctx.db, final_x, final_y) {
+        final_x = current_x + pushback_x;
+        final_y = current_y + pushback_y;
+        collision_detected = true;
+        log::debug!("[AnimalCollision] Animal {} pushed back by wall: ({:.1}, {:.1})", 
+                   animal_id, pushback_x, pushback_y);
+    }
+    
+    // Check foundation triangle hypotenuse collisions
+    if let Some((pushback_x, pushback_y)) = check_foundation_collision(&ctx.db, final_x, final_y) {
+        final_x = current_x + pushback_x;
+        final_y = current_y + pushback_y;
+        collision_detected = true;
+        log::debug!("[AnimalCollision] Animal {} pushed back by foundation: ({:.1}, {:.1})", 
                    animal_id, pushback_x, pushback_y);
     }
     
@@ -247,7 +274,8 @@ pub fn check_environmental_collision_with_grid<DB>(
 ) -> Option<(f32, f32)> 
 where
     DB: TreeTableTrait + StoneTableTrait + WoodenStorageBoxTableTrait 
-        + RainCollectorTableTrait + PlayerCorpseTableTrait + FurnaceTableTrait,
+        + RainCollectorTableTrait + PlayerCorpseTableTrait + FurnaceTableTrait
+        + HomesteadHearthTableTrait,
 {
     let nearby_entities = grid.get_entities_in_range(proposed_x, proposed_y);
     
@@ -359,7 +387,202 @@ where
                     }
                 }
             },
+            spatial_grid::EntityType::HomesteadHearth(hearth_id) => {
+                if let Some(hearth) = db.homestead_hearth().id().find(hearth_id) {
+                    if hearth.is_destroyed { continue; }
+                    let hearth_collision_y = hearth.pos_y - HEARTH_COLLISION_Y_OFFSET;
+                    let dx = proposed_x - hearth.pos_x;
+                    let dy = proposed_y - hearth_collision_y;
+                    let distance_sq = dx * dx + dy * dy;
+                    let min_distance = ANIMAL_COLLISION_RADIUS + HEARTH_COLLISION_RADIUS;
+                    let min_distance_sq = min_distance * min_distance;
+                    
+                    if distance_sq < min_distance_sq && distance_sq > 0.1 {
+                        let distance = distance_sq.sqrt();
+                        let pushback_x = (dx / distance) * COLLISION_PUSHBACK_FORCE;
+                        let pushback_y = (dy / distance) * COLLISION_PUSHBACK_FORCE;
+                        return Some((pushback_x, pushback_y));
+                    }
+                }
+            },
             _ => {} // Other entities don't block animal movement
+        }
+    }
+    None
+}
+
+/// Checks collision with walls (thin edges along tile boundaries)
+pub fn check_wall_collision<DB: WallCellTableTrait>(
+    db: &DB,
+    proposed_x: f32,
+    proposed_y: f32,
+) -> Option<(f32, f32)> {
+    const WALL_COLLISION_THICKNESS: f32 = 6.0; // Thin collision thickness (matches player collision)
+    const CHECK_RADIUS_TILES: i32 = 2; // Check walls within 2 tiles
+    
+    let animal_tile_x = (proposed_x / TILE_SIZE_PX as f32).floor() as i32;
+    let animal_tile_y = (proposed_y / TILE_SIZE_PX as f32).floor() as i32;
+    
+    let wall_cells = db.wall_cell();
+    
+    for tile_offset_x in -CHECK_RADIUS_TILES..=CHECK_RADIUS_TILES {
+        for tile_offset_y in -CHECK_RADIUS_TILES..=CHECK_RADIUS_TILES {
+            let check_tile_x = animal_tile_x + tile_offset_x;
+            let check_tile_y = animal_tile_y + tile_offset_y;
+            
+            // Find walls on this tile
+            for wall in wall_cells.idx_cell_coords().filter((check_tile_x, check_tile_y)) {
+                if wall.is_destroyed { continue; }
+                
+                // Calculate wall edge collision bounds
+                let tile_left = check_tile_x as f32 * TILE_SIZE_PX as f32;
+                let tile_top = check_tile_y as f32 * TILE_SIZE_PX as f32;
+                let tile_right = tile_left + TILE_SIZE_PX as f32;
+                let tile_bottom = tile_top + TILE_SIZE_PX as f32;
+                
+                // Determine wall edge bounds based on edge direction
+                // Edge 0 = North (top), 1 = East (right), 2 = South (bottom), 3 = West (left)
+                let (wall_min_x, wall_max_x, wall_min_y, wall_max_y) = match wall.edge {
+                    0 => { // North (top edge) - horizontal line
+                        (tile_left, tile_right, tile_top - WALL_COLLISION_THICKNESS / 2.0, tile_top + WALL_COLLISION_THICKNESS / 2.0)
+                    },
+                    1 => { // East (right edge) - vertical line
+                        (tile_right - WALL_COLLISION_THICKNESS / 2.0, tile_right + WALL_COLLISION_THICKNESS / 2.0, tile_top, tile_bottom)
+                    },
+                    2 => { // South (bottom edge) - horizontal line
+                        (tile_left, tile_right, tile_bottom - WALL_COLLISION_THICKNESS / 2.0, tile_bottom + WALL_COLLISION_THICKNESS / 2.0)
+                    },
+                    3 => { // West (left edge) - vertical line
+                        (tile_left - WALL_COLLISION_THICKNESS / 2.0, tile_left + WALL_COLLISION_THICKNESS / 2.0, tile_top, tile_bottom)
+                    },
+                    _ => continue, // Skip diagonal or invalid edges
+                };
+                
+                // Check if animal circle intersects wall AABB
+                let closest_x = proposed_x.max(wall_min_x).min(wall_max_x);
+                let closest_y = proposed_y.max(wall_min_y).min(wall_max_y);
+                let dx = proposed_x - closest_x;
+                let dy = proposed_y - closest_y;
+                let dist_sq = dx * dx + dy * dy;
+                
+                if dist_sq < ANIMAL_COLLISION_RADIUS * ANIMAL_COLLISION_RADIUS {
+                    // Collision detected - calculate pushback direction
+                    let distance = dist_sq.sqrt();
+                    if distance > 0.001 {
+                        let pushback_x = (dx / distance) * COLLISION_PUSHBACK_FORCE;
+                        let pushback_y = (dy / distance) * COLLISION_PUSHBACK_FORCE;
+                        return Some((pushback_x, pushback_y));
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Checks collision with foundation triangle hypotenuses (outer edges)
+pub fn check_foundation_collision<DB: FoundationCellTableTrait>(
+    db: &DB,
+    proposed_x: f32,
+    proposed_y: f32,
+) -> Option<(f32, f32)> {
+    const FOUNDATION_COLLISION_THICKNESS: f32 = 8.0; // Thickness for triangle hypotenuse collision
+    const CHECK_RADIUS_CELLS: i32 = 2; // Check foundations within 2 foundation cells (192px)
+    
+    // Convert world position to foundation cell coordinates
+    let foundation_cell_x = (proposed_x / FOUNDATION_TILE_SIZE_PX as f32).floor() as i32;
+    let foundation_cell_y = (proposed_y / FOUNDATION_TILE_SIZE_PX as f32).floor() as i32;
+    
+    let foundations = db.foundation_cell();
+    
+    for cell_offset_x in -CHECK_RADIUS_CELLS..=CHECK_RADIUS_CELLS {
+        for cell_offset_y in -CHECK_RADIUS_CELLS..=CHECK_RADIUS_CELLS {
+            let check_cell_x = foundation_cell_x + cell_offset_x;
+            let check_cell_y = foundation_cell_y + cell_offset_y;
+            
+            // Find foundations at this cell
+            for foundation in foundations.idx_cell_coords().filter((check_cell_x, check_cell_y)) {
+                if foundation.is_destroyed { continue; }
+                
+                // Only check triangle foundations (shapes 2-5)
+                let foundation_shape = foundation.shape as i32;
+                if foundation_shape < 2 || foundation_shape > 5 {
+                    continue; // Skip full foundations (walls handle their edges)
+                }
+                
+                // Calculate foundation cell world bounds
+                let cell_top_left_x = foundation.cell_x as f32 * FOUNDATION_TILE_SIZE_PX as f32;
+                let cell_top_left_y = foundation.cell_y as f32 * FOUNDATION_TILE_SIZE_PX as f32;
+                let cell_bottom_right_x = cell_top_left_x + FOUNDATION_TILE_SIZE_PX as f32;
+                let cell_bottom_right_y = cell_top_left_y + FOUNDATION_TILE_SIZE_PX as f32;
+                
+                // Calculate hypotenuse endpoints based on triangle shape
+                // Triangle shapes: 2=TriNW, 3=TriNE, 4=TriSE, 5=TriSW
+                let (hyp_start_x, hyp_start_y, hyp_end_x, hyp_end_y) = match foundation_shape {
+                    2 => { // TriNW - hypotenuse from top-right to bottom-left
+                        (cell_bottom_right_x, cell_top_left_y, cell_top_left_x, cell_bottom_right_y)
+                    },
+                    3 => { // TriNE - hypotenuse from top-left to bottom-right
+                        (cell_top_left_x, cell_top_left_y, cell_bottom_right_x, cell_bottom_right_y)
+                    },
+                    4 => { // TriSE - hypotenuse from bottom-left to top-right
+                        (cell_top_left_x, cell_bottom_right_y, cell_bottom_right_x, cell_top_left_y)
+                    },
+                    5 => { // TriSW - hypotenuse from bottom-right to top-left
+                        (cell_bottom_right_x, cell_bottom_right_y, cell_top_left_x, cell_top_left_y)
+                    },
+                    _ => continue, // Invalid triangle shape
+                };
+                
+                // Find closest point on hypotenuse line segment to animal position
+                let line_vec_x = hyp_end_x - hyp_start_x;
+                let line_vec_y = hyp_end_y - hyp_start_y;
+                let line_length_sq = line_vec_x * line_vec_x + line_vec_y * line_vec_y;
+                
+                if line_length_sq < 0.001 {
+                    continue; // Degenerate line
+                }
+                
+                // Project animal position onto line segment
+                let to_start_x = proposed_x - hyp_start_x;
+                let to_start_y = proposed_y - hyp_start_y;
+                let t = ((to_start_x * line_vec_x + to_start_y * line_vec_y) / line_length_sq).max(0.0).min(1.0);
+                
+                let closest_point_x = hyp_start_x + t * line_vec_x;
+                let closest_point_y = hyp_start_y + t * line_vec_y;
+                
+                // Calculate distance from animal to closest point on hypotenuse
+                let dx = proposed_x - closest_point_x;
+                let dy = proposed_y - closest_point_y;
+                let dist_sq = dx * dx + dy * dy;
+                let total_thickness = ANIMAL_COLLISION_RADIUS + FOUNDATION_COLLISION_THICKNESS / 2.0;
+                let total_thickness_sq = total_thickness * total_thickness;
+                
+                if dist_sq < total_thickness_sq && dist_sq > 0.1 {
+                    // Collision detected - calculate pushback direction (perpendicular to hypotenuse)
+                    let distance = dist_sq.sqrt();
+                    // Normal is perpendicular to line (pointing away from animal)
+                    let line_normal_x = -line_vec_y;
+                    let line_normal_y = line_vec_x;
+                    let normal_length = (line_normal_x * line_normal_x + line_normal_y * line_normal_y).sqrt();
+                    
+                    if normal_length > 0.001 {
+                        let norm_x = line_normal_x / normal_length;
+                        let norm_y = line_normal_y / normal_length;
+                        
+                        // Ensure normal points away from animal
+                        let to_closest_x = closest_point_x - proposed_x;
+                        let to_closest_y = closest_point_y - proposed_y;
+                        let dot = norm_x * to_closest_x + norm_y * to_closest_y;
+                        let final_norm_x = if dot < 0.0 { norm_x } else { -norm_x };
+                        let final_norm_y = if dot < 0.0 { norm_y } else { -norm_y };
+                        
+                        let pushback_x = final_norm_x * COLLISION_PUSHBACK_FORCE;
+                        let pushback_y = final_norm_y * COLLISION_PUSHBACK_FORCE;
+                        return Some((pushback_x, pushback_y));
+                    }
+                }
+            }
         }
     }
     None
@@ -394,6 +617,16 @@ pub fn validate_animal_spawn_position(
     // Check environmental collisions
     if let Some(_) = check_environmental_collision(ctx, pos_x, pos_y) {
         return Err(format!("Cannot spawn animal in environmental obstacle at ({:.1}, {:.1})", pos_x, pos_y));
+    }
+    
+    // Check wall collisions
+    if let Some(_) = check_wall_collision(&ctx.db, pos_x, pos_y) {
+        return Err(format!("Cannot spawn animal inside wall at ({:.1}, {:.1})", pos_x, pos_y));
+    }
+    
+    // Check foundation collisions
+    if let Some(_) = check_foundation_collision(&ctx.db, pos_x, pos_y) {
+        return Err(format!("Cannot spawn animal on foundation edge at ({:.1}, {:.1})", pos_x, pos_y));
     }
     
     Ok(())

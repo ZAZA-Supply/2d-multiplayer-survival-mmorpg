@@ -1474,9 +1474,16 @@ pub fn clear_all_effects_on_death(ctx: &ReducerContext, player_id: Identity) {
     cancel_bandage_burst_effects(ctx, player_id);
     
     // Clear any other effects (burn, food poisoning, seawater poisoning, wet, exhausted, etc.)
+    // BUT preserve BuildingPrivilege - it should persist across death
     let mut effects_to_remove = Vec::new();
     for effect in ctx.db.active_consumable_effect().iter() {
         if effect.player_id == player_id {
+            // Skip BuildingPrivilege - it persists across death
+            if effect.effect_type == EffectType::BuildingPrivilege {
+                log::debug!("[PlayerDeath] Preserving BuildingPrivilege effect {} for deceased player {:?}", 
+                    effect.effect_id, player_id);
+                continue;
+            }
             effects_to_remove.push(effect.effect_id);
             log::debug!("[PlayerDeath] Removing {:?} effect {} for deceased player {:?}", 
                 effect.effect_type, effect.effect_id, player_id);

@@ -256,7 +256,8 @@ function AppContent() {
             barrels, // Add barrels to collision system
             seaStacks, // Add sea stacks to collision system
             wallCells, // Add wall cells for collision detection
-            foundationCells // Add foundation cells for collision detection (especially triangle hypotenuses)
+            foundationCells, // Add foundation cells for collision detection (especially triangle hypotenuses)
+            homesteadHearths // Add homestead hearths for collision detection
         }
     });
 

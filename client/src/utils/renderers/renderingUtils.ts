@@ -1040,7 +1040,8 @@ export const renderYSortedEntities = ({
             // Draw outline only if this is THE closest interactable target
             if (isTheClosestTarget) {
                 const outlineColor = getInteractionOutlineColor('open');
-                drawInteractionOutline(ctx, hearth.posX, hearth.posY - 48, 96, 96, cycleProgress, outlineColor);
+                // Moved up by ~20% (15px) to match indicator box and E label position
+                drawInteractionOutline(ctx, hearth.posX, hearth.posY - 63, 96, 96, cycleProgress, outlineColor);
             }
         } else if (type === 'foundation_cell') {
             const foundation = entity as SpacetimeDBFoundationCell;

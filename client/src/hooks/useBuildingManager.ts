@@ -206,7 +206,103 @@ function predictTriangleShape(
     }
   }
   
+  // Priority 1.5: Check cardinal directions for TRIANGLE foundations (follow curves/patterns)
+  // When placing next to a triangle foundation, suggest a shape that continues the curve/pattern
+  // This detects diagonal edges (hypotenuses) and matches them to continue smooth curves
+  const curveSuggestions: FoundationShape[] = [];
+  
+  // Helper: Get triangle foundation at a given offset
+  const getTriangleAt = (dx: number, dy: number): FoundationShape | null => {
+    const key = `${cellX + dx},${cellY + dy}`;
+    const adj = adjacentFoundations.get(key);
+    if (adj && adj.shape >= FoundationShape.TriNW && adj.shape <= FoundationShape.TriSW) {
+      return adj.shape;
+    }
+    return null;
+  };
+  
+  // Check cardinal directions for triangles and suggest shapes that continue the pattern
+  const triangleNorth = getTriangleAt(0, -1);
+  const triangleSouth = getTriangleAt(0, 1);
+  const triangleEast = getTriangleAt(1, 0);
+  const triangleWest = getTriangleAt(-1, 0);
+  
+  // Pattern continuation logic: match the diagonal edge that connects the two cells
+  // When placing adjacent to a triangle, we want to continue the diagonal line smoothly
+  // This means matching the edge that would form a continuous diagonal curve
+  
+  // INVERTED: Fill the space closest to existing foundations by suggesting complementary triangles
+  // When placing next to a triangle, suggest the COMPLEMENTARY triangle to fill the space
+  if (triangleNorth !== null) {
+    // Triangle to the north - suggest complementary to fill space closest
+    if (triangleNorth === FoundationShape.TriNW) {
+      // TriNW above → fill space → TriSE (complementary)
+      curveSuggestions.push(FoundationShape.TriSE);
+    } else if (triangleNorth === FoundationShape.TriNE) {
+      // TriNE above → fill space → TriSW (complementary)
+      curveSuggestions.push(FoundationShape.TriSW);
+    } else if (triangleNorth === FoundationShape.TriSE) {
+      // TriSE above → fill space → TriNW (complementary)
+      curveSuggestions.push(FoundationShape.TriNW);
+    } else if (triangleNorth === FoundationShape.TriSW) {
+      // TriSW above → fill space → TriNE (complementary)
+      curveSuggestions.push(FoundationShape.TriNE);
+    }
+  }
+  
+  if (triangleSouth !== null) {
+    // Triangle to the south - suggest complementary to fill space closest
+    if (triangleSouth === FoundationShape.TriNW) {
+      // TriNW below → fill space → TriSE (complementary)
+      curveSuggestions.push(FoundationShape.TriSE);
+    } else if (triangleSouth === FoundationShape.TriNE) {
+      // TriNE below → fill space → TriSW (complementary)
+      curveSuggestions.push(FoundationShape.TriSW);
+    } else if (triangleSouth === FoundationShape.TriSE) {
+      // TriSE below → fill space → TriNW (complementary)
+      curveSuggestions.push(FoundationShape.TriNW);
+    } else if (triangleSouth === FoundationShape.TriSW) {
+      // TriSW below → fill space → TriNE (complementary)
+      curveSuggestions.push(FoundationShape.TriNE);
+    }
+  }
+  
+  if (triangleEast !== null) {
+    // Triangle to the east - suggest complementary to fill space closest
+    if (triangleEast === FoundationShape.TriNW) {
+      // TriNW to right → fill space → TriSE (complementary)
+      curveSuggestions.push(FoundationShape.TriSE);
+    } else if (triangleEast === FoundationShape.TriNE) {
+      // TriNE to right → fill space → TriSW (complementary)
+      curveSuggestions.push(FoundationShape.TriSW);
+    } else if (triangleEast === FoundationShape.TriSE) {
+      // TriSE to right → fill space → TriNW (complementary)
+      curveSuggestions.push(FoundationShape.TriNW);
+    } else if (triangleEast === FoundationShape.TriSW) {
+      // TriSW to right → fill space → TriNE (complementary)
+      curveSuggestions.push(FoundationShape.TriNE);
+    }
+  }
+  
+  if (triangleWest !== null) {
+    // Triangle to the west - suggest complementary to fill space closest
+    if (triangleWest === FoundationShape.TriNW) {
+      // TriNW to left → fill space → TriSE (complementary)
+      curveSuggestions.push(FoundationShape.TriSE);
+    } else if (triangleWest === FoundationShape.TriNE) {
+      // TriNE to left → fill space → TriSW (complementary)
+      curveSuggestions.push(FoundationShape.TriSW);
+    } else if (triangleWest === FoundationShape.TriSE) {
+      // TriSE to left → fill space → TriNW (complementary)
+      curveSuggestions.push(FoundationShape.TriNW);
+    } else if (triangleWest === FoundationShape.TriSW) {
+      // TriSW to left → fill space → TriNE (complementary)
+      curveSuggestions.push(FoundationShape.TriNE);
+    }
+  }
+  
   // Priority 2: Check cardinal directions for full foundations (N, E, S, W)
+  // BUT only if we don't have triangle curve suggestions (triangles take priority for curves)
   // When placing next to a full foundation, suggest triangle that creates smooth corner/edge
   // The triangle should form a corner that "follows" the existing structure
   const cardinalSuggestions: FoundationShape[] = [];
@@ -226,8 +322,6 @@ function predictTriangleShape(
   
   // Determine corner based on adjacent foundations
   // When two foundations meet, fill the INSIDE corner (where they meet)
-  // FLIP VERTICALLY: User says predictions are always wrong by vertical axis
-  // So if we predict bottom, it should be top (and vice versa)
   if (hasNorth && hasEast) {
     // Foundation above and to right → meet at top-right → fill INSIDE corner → TriNE (top-right)
     cardinalSuggestions.push(FoundationShape.TriNE);
@@ -254,7 +348,29 @@ function predictTriangleShape(
     cardinalSuggestions.push(FoundationShape.TriNW);
   }
   
-  // If we have cardinal suggestions, return the first one (most specific)
+  // PRIORITY: Curve suggestions (triangles) take precedence over corner filling (full foundations)
+  // If we have curve suggestions, prioritize them (they follow existing patterns)
+  if (curveSuggestions.length > 0) {
+    // Return most common suggestion (if multiple triangles suggest the same shape)
+    const counts = new Map<FoundationShape, number>();
+    for (const shape of curveSuggestions) {
+      counts.set(shape, (counts.get(shape) || 0) + 1);
+    }
+    
+    let maxCount = 0;
+    let mostCommon: FoundationShape | null = null;
+    for (const [shape, count] of counts.entries()) {
+      if (count > maxCount) {
+        maxCount = count;
+        mostCommon = shape;
+      }
+    }
+    
+    return mostCommon || curveSuggestions[0];
+  }
+  
+  // If we have cardinal suggestions (for full foundations), return the first one (most specific)
+  // Only used when there are no triangle curve suggestions
   if (cardinalSuggestions.length > 0) {
     return cardinalSuggestions[0];
   }
@@ -699,11 +815,12 @@ export const useBuildingManager = (
     // Update ref to current shape
     foundationShapeRef.current = foundationShape;
     
-    const { tileX, tileY } = worldPosToTileCoords(worldMouseX, worldMouseY);
+    // Convert world pixel coordinates to foundation cell coordinates (96px grid)
+    const { cellX, cellY } = worldPixelsToFoundationCell(worldMouseX, worldMouseY);
     
-    // Check if we've moved to a different tile
+    // Check if we've moved to a different foundation cell
     const lastTile = lastPredictedTileRef.current;
-    const tileChanged = !lastTile || lastTile.tileX !== tileX || lastTile.tileY !== tileY;
+    const tileChanged = !lastTile || lastTile.tileX !== cellX || lastTile.tileY !== cellY;
     
     // Skip if shape was manually set AND we're still on the same tile
     if (manuallySetShapeRef.current !== null && !tileChanged) {
@@ -731,26 +848,26 @@ export const useBuildingManager = (
     // Only predict if we're in triangle mode (shape is a triangle)
     if (!isTriangle) return;
     
-    // Always re-predict when tile changes (foundations might have changed)
-    // Predict the best triangle shape
-    const predictedShape = predictTriangleShape(connection, tileX, tileY);
+    // Always re-predict when foundation cell changes (foundations might have changed)
+    // Predict the best triangle shape using foundation cell coordinates
+    const predictedShape = predictTriangleShape(connection, cellX, cellY);
     
     if (predictedShape !== null) {
-      console.log('[BuildingManager] Auto-predicting triangle shape:', predictedShape, 'at tile', { tileX, tileY }, 'current:', currentShape, 'tileChanged:', tileChanged);
-      // Update if prediction is different from current shape OR if tile changed
+      console.log('[BuildingManager] Auto-predicting triangle shape:', predictedShape, 'at foundation cell', { cellX, cellY }, 'current:', currentShape, 'tileChanged:', tileChanged);
+      // Update if prediction is different from current shape OR if foundation cell changed
       if (predictedShape !== currentShape || tileChanged) {
         setFoundationShape(predictedShape);
         foundationShapeRef.current = predictedShape;
       }
-      lastPredictedTileRef.current = { tileX, tileY };
+      lastPredictedTileRef.current = { tileX: cellX, tileY: cellY };
     } else {
       // No clear pattern, but we're in triangle mode - default to TriNW if not already set
       if (currentShape !== FoundationShape.TriNW || tileChanged) {
-        console.log('[BuildingManager] No prediction, defaulting to TriNW at tile', { tileX, tileY });
+        console.log('[BuildingManager] No prediction, defaulting to TriNW at foundation cell', { cellX, cellY });
         setFoundationShape(FoundationShape.TriNW);
         foundationShapeRef.current = FoundationShape.TriNW;
       }
-      lastPredictedTileRef.current = { tileX, tileY };
+      lastPredictedTileRef.current = { tileX: cellX, tileY: cellY };
     }
   }, [isBuilding, mode, foundationShape, worldMouseX, worldMouseY, connection]);
 

@@ -1274,6 +1274,59 @@ export function renderWall({
     ctx.fillStyle = shadowGradient;
     ctx.fillRect(shadowX, shadowY, shadowWidth, shadowHeight);
   }
+  
+  // --- Health Bar Rendering (similar to barrels, shelters, etc.) ---
+  const HEALTH_BAR_WIDTH = 60;
+  const HEALTH_BAR_HEIGHT = 6;
+  const HEALTH_BAR_Y_OFFSET = 10;
+  const HEALTH_BAR_VISIBLE_DURATION_MS = 3000;
+  
+  if (!wall.isDestroyed && wall.health < wall.maxHealth && wall.lastHitTime) {
+    const nowMs = Date.now();
+    const lastHitTimeMs = Number(wall.lastHitTime.microsSinceUnixEpoch / 1000n);
+    const elapsedSinceHit = nowMs - lastHitTimeMs;
+    
+    if (elapsedSinceHit < HEALTH_BAR_VISIBLE_DURATION_MS) {
+      const healthPercentage = Math.max(0, wall.health / wall.maxHealth);
+      
+      // Calculate wall center position for health bar
+      // Use the foundation cell center as reference
+      const wallCenterX = screenX + screenSize / 2;
+      const wallCenterY = screenY + screenSize / 2;
+      
+      // Position health bar above the wall (or below for north walls)
+      // For north walls (edge 0), position below since they extend upward
+      // For other walls, position above
+      const barOuterX = wallCenterX - HEALTH_BAR_WIDTH / 2;
+      const barOuterY = wall.edge === 0 
+        ? screenY + screenSize + HEALTH_BAR_Y_OFFSET  // Below for north walls
+        : screenY - HEALTH_BAR_Y_OFFSET - HEALTH_BAR_HEIGHT; // Above for other walls
+      
+      const timeSinceLastHitRatio = elapsedSinceHit / HEALTH_BAR_VISIBLE_DURATION_MS;
+      const opacity = Math.max(0, 1 - Math.pow(timeSinceLastHitRatio, 2)); // Fade out faster at the end
+      
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      
+      // Background
+      ctx.fillStyle = `rgba(0, 0, 0, ${0.5})`;
+      ctx.fillRect(barOuterX, barOuterY, HEALTH_BAR_WIDTH, HEALTH_BAR_HEIGHT);
+      
+      // Health bar
+      const healthBarInnerWidth = HEALTH_BAR_WIDTH * healthPercentage;
+      const r = Math.floor(255 * (1 - healthPercentage));
+      const g = Math.floor(255 * healthPercentage);
+      ctx.fillStyle = `rgba(${r}, ${g}, 0, 1)`;
+      ctx.fillRect(barOuterX, barOuterY, healthBarInnerWidth, HEALTH_BAR_HEIGHT);
+      
+      // Border
+      ctx.strokeStyle = `rgba(0, 0, 0, ${0.7})`;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(barOuterX, barOuterY, HEALTH_BAR_WIDTH, HEALTH_BAR_HEIGHT);
+      
+      ctx.restore();
+    }
+  }
 }
 
 /**
@@ -1758,23 +1811,26 @@ export function renderWallPreview({
     // Draw rectangular wall preview
     if (wallImage && wallImage.complete && wallImage.naturalHeight !== 0) {
       // Draw a portion of the wall tile image for the wall preview
+      // Match the actual wall rendering exactly
       if (edge === 0) {
-        // North wall - use only TOP 3/4 of texture (cropped, not stretched)
-        // Simply crop to top 3/4 and draw at wall dimensions
+        // North wall - use BOTTOM half of texture (matches actual rendering)
+        // Draw at 3/4 height (NORTH_WALL_HEIGHT) to match actual wall
+        const sourceY = wallImage.height * 0.5; // Start from middle (bottom half)
+        const sourceHeight = wallImage.height * 0.5; // Bottom half of texture
         ctx.drawImage(
           wallImage,
-          0, 0, wallImage.width, wallImage.height * 0.75, // Source: TOP 3/4 of texture
-          wallX, wallY, wallWidth, wallHeight // Destination: wall dimensions
+          0, sourceY, wallImage.width, sourceHeight, // Source: BOTTOM half of texture
+          wallX, wallY, wallWidth, wallHeight // Destination: wall dimensions (PREVIEW_NORTH_WALL_HEIGHT = 0.75 * screenSize)
         );
       } else if (edge === 2) {
-        // South wall - use full texture for full height
+        // South wall - use full texture for full height (matches actual rendering)
         ctx.drawImage(
           wallImage,
           0, 0, wallImage.width, wallImage.height, // Source: full texture
-          wallX, wallY, wallWidth, wallHeight // Destination: full wall
+          wallX, wallY, wallWidth, wallHeight // Destination: full wall (PREVIEW_SOUTH_WALL_HEIGHT = screenSize)
         );
       } else {
-        // Vertical wall - draw vertical strip from tile
+        // East/West walls - draw vertical strip from tile (matches actual rendering)
         const sourceX = edge === 3 ? 0 : wallImage.width - EAST_WEST_WALL_THICKNESS / worldScale;
         ctx.drawImage(
           wallImage,

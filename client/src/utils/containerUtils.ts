@@ -135,7 +135,8 @@ export function handleWorldDrop(
     if (!containerType) return false;
     
     const reducers = getDragDropReducerNames(containerType);
-    const quantityToDrop = sourceInfo.splitQuantity ?? sourceInfo.item.instance.quantity;
+    // Ensure quantityToDrop is always a number
+    const quantityToDrop = Number(sourceInfo.splitQuantity ?? sourceInfo.item.instance.quantity);
     
     try {
         const rawEntityId = sourceInfo.sourceContainerEntityId;
@@ -147,6 +148,9 @@ export function handleWorldDrop(
             entityIdNum = rawEntityId;
         } else if (typeof rawEntityId === 'bigint') {
             entityIdNum = Number(rawEntityId);
+        } else if (typeof rawEntityId === 'string') {
+            const parsed = parseInt(rawEntityId, 10);
+            if (!isNaN(parsed)) entityIdNum = parsed;
         }
         
         // Validate slot index
@@ -156,10 +160,12 @@ export function handleWorldDrop(
         } else if (typeof rawSlotIndex === 'string') {
             const parsed = parseInt(rawSlotIndex, 10);
             if (!isNaN(parsed)) slotIndexNum = parsed;
+        } else if (typeof rawSlotIndex === 'bigint') {
+            slotIndexNum = Number(rawSlotIndex);
         }
         
-        if (entityIdNum === null || slotIndexNum === null) {
-            setDropError(`Cannot drop item: Invalid container ID or slot index.`);
+        if (entityIdNum === null || slotIndexNum === null || isNaN(quantityToDrop) || quantityToDrop <= 0) {
+            setDropError(`Cannot drop item: Invalid container ID, slot index, or quantity.`);
             return true;
         }
         
@@ -670,13 +676,35 @@ export function handleContainerToPlayerSplit(
     const reducers = getDragDropReducerNames(containerType);
     
     try {
-        const sourceEntityId = sourceInfo.sourceSlot.parentId ? Number(sourceInfo.sourceSlot.parentId) : null;
-        const sourceSlotIndex = typeof sourceInfo.sourceSlot.index === 'number' 
-            ? sourceInfo.sourceSlot.index 
-            : parseInt(sourceInfo.sourceSlot.index.toString(), 10);
+        // Convert source entity ID to number
+        let sourceEntityId: number | null = null;
+        const rawParentId = sourceInfo.sourceSlot.parentId;
+        if (typeof rawParentId === 'number') {
+            sourceEntityId = rawParentId;
+        } else if (typeof rawParentId === 'bigint') {
+            sourceEntityId = Number(rawParentId);
+        } else if (typeof rawParentId === 'string') {
+            const parsed = parseInt(rawParentId, 10);
+            if (!isNaN(parsed)) sourceEntityId = parsed;
+        }
         
-        if (sourceEntityId === null || isNaN(sourceSlotIndex)) {
-            setDropError("Could not determine source container slot for split.");
+        // Convert source slot index to number
+        let sourceSlotIndex: number | null = null;
+        const rawSlotIndex = sourceInfo.sourceSlot.index;
+        if (typeof rawSlotIndex === 'number') {
+            sourceSlotIndex = rawSlotIndex;
+        } else if (typeof rawSlotIndex === 'string') {
+            const parsed = parseInt(rawSlotIndex, 10);
+            if (!isNaN(parsed)) sourceSlotIndex = parsed;
+        } else if (typeof rawSlotIndex === 'bigint') {
+            sourceSlotIndex = Number(rawSlotIndex);
+        }
+        
+        // Ensure quantityToSplit is a number
+        const quantityToSplitNum = Number(quantityToSplit);
+        
+        if (sourceEntityId === null || sourceSlotIndex === null || isNaN(quantityToSplitNum) || quantityToSplitNum <= 0) {
+            setDropError("Could not determine source container slot for split or invalid quantity.");
             return true;
         }
         
@@ -685,7 +713,7 @@ export function handleContainerToPlayerSplit(
             connection.reducers[reducerName](
                 sourceEntityId,
                 sourceSlotIndex,
-                quantityToSplit,
+                quantityToSplitNum,
                 targetSlotType,
                 targetSlotIndexNum
             );
@@ -717,20 +745,57 @@ export function handleWithinContainerSplit(
     const reducers = getDragDropReducerNames(containerType);
     
     try {
-        const sourceSlotIndex = typeof sourceInfo.sourceSlot.index === 'number' 
-            ? sourceInfo.sourceSlot.index 
-            : parseInt(sourceInfo.sourceSlot.index.toString(), 10);
-        const targetSlotIndex = typeof targetSlot.index === 'number' 
-            ? targetSlot.index 
-            : parseInt(targetSlot.index.toString(), 10);
+        // Convert source slot index to number
+        let sourceSlotIndex: number | null = null;
+        const rawSourceSlotIndex = sourceInfo.sourceSlot.index;
+        if (typeof rawSourceSlotIndex === 'number') {
+            sourceSlotIndex = rawSourceSlotIndex;
+        } else if (typeof rawSourceSlotIndex === 'string') {
+            const parsed = parseInt(rawSourceSlotIndex, 10);
+            if (!isNaN(parsed)) sourceSlotIndex = parsed;
+        } else if (typeof rawSourceSlotIndex === 'bigint') {
+            sourceSlotIndex = Number(rawSourceSlotIndex);
+        }
         
-        if (isNaN(sourceSlotIndex) || isNaN(targetSlotIndex)) {
+        // Convert target slot index to number
+        let targetSlotIndex: number | null = null;
+        const rawTargetSlotIndex = targetSlot.index;
+        if (typeof rawTargetSlotIndex === 'number') {
+            targetSlotIndex = rawTargetSlotIndex;
+        } else if (typeof rawTargetSlotIndex === 'string') {
+            const parsed = parseInt(rawTargetSlotIndex, 10);
+            if (!isNaN(parsed)) targetSlotIndex = parsed;
+        } else if (typeof rawTargetSlotIndex === 'bigint') {
+            targetSlotIndex = Number(rawTargetSlotIndex);
+        }
+        
+        if (sourceSlotIndex === null || targetSlotIndex === null) {
             setDropError("Invalid source or target slot for split.");
             return true;
         }
         
-        const sourceContainerId = sourceInfo.sourceSlot.parentId ? Number(sourceInfo.sourceSlot.parentId) : null;
-        const targetContainerId = targetSlot.parentId ? Number(targetSlot.parentId) : null;
+        // Convert container IDs to numbers
+        let sourceContainerId: number | null = null;
+        const rawSourceParentId = sourceInfo.sourceSlot.parentId;
+        if (typeof rawSourceParentId === 'number') {
+            sourceContainerId = rawSourceParentId;
+        } else if (typeof rawSourceParentId === 'bigint') {
+            sourceContainerId = Number(rawSourceParentId);
+        } else if (typeof rawSourceParentId === 'string') {
+            const parsed = parseInt(rawSourceParentId, 10);
+            if (!isNaN(parsed)) sourceContainerId = parsed;
+        }
+        
+        let targetContainerId: number | null = null;
+        const rawTargetParentId = targetSlot.parentId;
+        if (typeof rawTargetParentId === 'number') {
+            targetContainerId = rawTargetParentId;
+        } else if (typeof rawTargetParentId === 'bigint') {
+            targetContainerId = Number(rawTargetParentId);
+        } else if (typeof rawTargetParentId === 'string') {
+            const parsed = parseInt(rawTargetParentId, 10);
+            if (!isNaN(parsed)) targetContainerId = parsed;
+        }
         
         if (sourceContainerId !== targetContainerId) {
             setDropError(`Cannot split between different ${containerType}s.`);
@@ -739,6 +804,14 @@ export function handleWithinContainerSplit(
         
         if (sourceContainerId === null) {
             setDropError(`Cannot split within ${containerType}: container context lost.`);
+            return true;
+        }
+        
+        // Ensure quantityToSplit is a number
+        const quantityToSplitNum = Number(quantityToSplit);
+        
+        if (isNaN(quantityToSplitNum) || quantityToSplitNum <= 0) {
+            setDropError("Invalid quantity for split.");
             return true;
         }
         
@@ -752,7 +825,7 @@ export function handleWithinContainerSplit(
                 connection.reducers[reducerName](
                     sourceContainerId,
                     sourceSlotIndex,
-                    quantityToSplit,
+                    quantityToSplitNum,
                     targetSlotIndex
                 );
             } else {
@@ -761,7 +834,7 @@ export function handleWithinContainerSplit(
                     sourceContainerId,
                     sourceSlotIndex,
                     targetSlotIndex,
-                    quantityToSplit
+                    quantityToSplitNum
                 );
             }
         } else {

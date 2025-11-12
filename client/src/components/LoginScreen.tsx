@@ -871,7 +871,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
                                     maxWidth: '800px',
                                     margin: '0 auto',
                                 }}>
-                                    Where <strong>Rust's</strong> intense survival meets <strong>Blazing Beaks'</strong> quirky combat, all wrapped in <strong>Stardew Valley's</strong>
+                                    Where <strong>Rust's</strong> intense survival meets <strong>Blazing Beaks'</strong> quirky combat, all wrapped in <strong>Stardew Valley's&nbsp;</strong>
                                     cozy farming vibes. Survive as a resourceful babushka in this top-down multiplayer experience where
                                     every meal matters and every trade counts. Start with basic gear, hunt wild animals, grow crops,
                                     and brew nourishing soups that keep you alive through harsh winters. Build from simple shelters to
@@ -1020,7 +1020,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
                                         },
                                         {
                                             question: "HOW DO I START SURVIVING?",
-                                            answer: "You begin with basic survival gear and your grandmother's wisdom. Hunt wild animals for meat and pelts, gather plant fibers to weave into clothing and shelter materials, collect wood and stone to build your first camp fire. Cook hearty meals to stay fed and warm through the changing seasons."
+                                            answer: "You begin with basic survival gear and a lifetime of accumulated wisdom. Hunt wild animals for meat and pelts, gather plant fibers to weave into clothing and shelter materials, collect wood and stone to build your first camp fire. Cook hearty meals to stay fed and warm through the changing seasons."
                                         },
                                         {
                                             question: "WHAT'S SO SPECIAL ABOUT BREWING?",

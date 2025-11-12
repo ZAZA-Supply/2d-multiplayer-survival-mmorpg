@@ -218,6 +218,7 @@ pub fn get_tool_definitions() -> Vec<ItemDefinition> {
         ItemBuilder::new("Blueprint", "A blueprint that allows you to build structures.", ItemCategory::Tool)
             .icon("blueprint.png")
             .equippable(None)
+            .pvp_damage(0, 0) // Blueprint does no damage - it's only for building structures
             
             .crafting_cost(vec![
                 CostIngredient { item_name: "Wood".to_string(), quantity: 50 },

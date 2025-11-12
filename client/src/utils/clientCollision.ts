@@ -1,5 +1,5 @@
 // AAA-Quality Client-side Collision Detection System
-import { Player, Tree, Stone, WoodenStorageBox, Shelter, RainCollector, WildAnimal, Barrel, Furnace, WallCell, FoundationCell } from '../generated';
+import { Player, Tree, Stone, WoodenStorageBox, Shelter, RainCollector, WildAnimal, Barrel, Furnace, WallCell, FoundationCell, HomesteadHearth } from '../generated';
 import { gameConfig, FOUNDATION_TILE_SIZE, foundationCellToWorldCenter } from '../config/gameConfig';
 
 // Add at top after imports:
@@ -307,6 +307,29 @@ function getCollisionCandidates(
     });
   }
   
+  // Filter homestead hearths
+  if (entities.homesteadHearths && entities.homesteadHearths.size > 0) {
+    const nearbyHearths = filterEntitiesByDistance(
+      entities.homesteadHearths,
+      playerX,
+      playerY,
+      COLLISION_PERF.STRUCTURE_CULL_DISTANCE_SQ,
+      COLLISION_PERF.MAX_STRUCTURES_TO_CHECK
+    );
+    
+    for (const hearth of nearbyHearths) {
+      if (hearth.isDestroyed) continue; // Skip destroyed hearths
+      
+      shapes.push({
+        id: hearth.id.toString(),
+        type: `hearth-${hearth.id.toString()}`,
+        x: hearth.posX + COLLISION_OFFSETS.HOMESTEAD_HEARTH.x,
+        y: hearth.posY + COLLISION_OFFSETS.HOMESTEAD_HEARTH.y,
+        radius: COLLISION_RADII.HOMESTEAD_HEARTH
+      });
+    }
+  }
+  
   // Filter sea stacks
   const nearbySeaStacks = filterEntitiesByDistance(
     entities.seaStacks,
@@ -396,96 +419,8 @@ function getCollisionCandidates(
     }
   }
   
-  // Filter foundation cells - create collision along edges (especially hypotenuse for triangles)
-  
-  if (entities.foundationCells && entities.foundationCells.size > 0) {
-    // Check foundations within reasonable distance
-    for (const foundation of entities.foundationCells.values()) {
-      if (foundation.isDestroyed) continue; // Skip destroyed foundations
-      
-      // Calculate foundation cell center position
-      const { x: foundationCenterX, y: foundationCenterY } = foundationCellToWorldCenter(foundation.cellX, foundation.cellY);
-      
-      // Check distance to player
-      const dx = foundationCenterX - playerX;
-      const dy = foundationCenterY - playerY;
-      const distanceSq = dx * dx + dy * dy;
-      const maxDistanceSq = 150 * 150; // Check foundations within 150px
-      
-      if (distanceSq > maxDistanceSq) continue;
-      
-      const foundationShape = foundation.shape as number;
-      const isTriangle = foundationShape >= 2 && foundationShape <= 5;
-      
-      if (isTriangle) {
-        // Triangle foundations - create collision along the hypotenuse (outer edge)
-        // Triangle shapes: 2=TriNW, 3=TriNE, 4=TriSE, 5=TriSW
-        // Hypotenuse coordinates:
-        // TriNW (2): DiagNW_SE - from (cellX+1, cellY) to (cellX, cellY+1) in cell space
-        // TriNE (3): DiagNE_SW - from (cellX, cellY) to (cellX+1, cellY+1) in cell space
-        // TriSE (4): DiagNW_SE - from (cellX, cellY+1) to (cellX+1, cellY) in cell space
-        // TriSW (5): DiagNE_SW - from (cellX+1, cellY+1) to (cellX, cellY) in cell space
-        
-        const cellTopLeftX = foundation.cellX * FOUNDATION_TILE_SIZE;
-        const cellTopLeftY = foundation.cellY * FOUNDATION_TILE_SIZE;
-        const cellBottomRightX = cellTopLeftX + FOUNDATION_TILE_SIZE;
-        const cellBottomRightY = cellTopLeftY + FOUNDATION_TILE_SIZE;
-        
-        let hypStartX: number, hypStartY: number, hypEndX: number, hypEndY: number;
-        
-        switch (foundationShape) {
-          case 2: // TriNW - hypotenuse from top-right to bottom-left
-            hypStartX = cellBottomRightX;
-            hypStartY = cellTopLeftY;
-            hypEndX = cellTopLeftX;
-            hypEndY = cellBottomRightY;
-            break;
-          case 3: // TriNE - hypotenuse from top-left to bottom-right
-            hypStartX = cellTopLeftX;
-            hypStartY = cellTopLeftY;
-            hypEndX = cellBottomRightX;
-            hypEndY = cellBottomRightY;
-            break;
-          case 4: // TriSE - hypotenuse from bottom-left to top-right
-            hypStartX = cellTopLeftX;
-            hypStartY = cellBottomRightY;
-            hypEndX = cellBottomRightX;
-            hypEndY = cellTopLeftY;
-            break;
-          case 5: // TriSW - hypotenuse from bottom-right to top-left
-            hypStartX = cellBottomRightX;
-            hypStartY = cellBottomRightY;
-            hypEndX = cellTopLeftX;
-            hypEndY = cellTopLeftY;
-            break;
-          default:
-            continue; // Invalid triangle shape
-        }
-        
-        // Create a collision shape along ONLY the hypotenuse edge (line segment)
-        // This allows players to walk through the empty part and inside part of the triangle
-        const hypLength = Math.sqrt((hypEndX - hypStartX) ** 2 + (hypEndY - hypStartY) ** 2);
-        
-        // Create a thin line segment collision shape
-        shapes.push({
-          id: `foundation-triangle-${foundation.id.toString()}`,
-          type: `foundation-triangle-${foundation.id.toString()}`,
-          x: hypStartX, // Use start point as reference
-          y: hypStartY,
-          lineStartX: hypStartX,
-          lineStartY: hypStartY,
-          lineEndX: hypEndX,
-          lineEndY: hypEndY,
-          lineThickness: FOUNDATION_COLLISION_THICKNESS
-        });
-      } else {
-        // Full foundation - create collision along all edges
-        // For full foundations, walls handle edge collision, but we can add foundation base collision
-        // Actually, full foundations don't need collision - walls handle it
-        // But we could add a base collision if needed
-      }
-    }
-  }
+  // Foundations do NOT have collision - players can walk through them freely
+  // Only walls (placed on foundation edges) have collision
   
   return shapes;
 }
@@ -501,6 +436,7 @@ const COLLISION_RADII = {
   WILD_ANIMAL: 40, // Add wild animal collision radius
   BARREL: 25, // Smaller barrel collision radius for better accuracy
   SEA_STACK: 60, // Base radius for sea stacks - reduced significantly for smoother collision like trees
+  HOMESTEAD_HEARTH: 55, // Homestead hearth collision radius (matches server-side HEARTH_COLLISION_RADIUS)
 } as const;
 
 // Collision offsets for sprite positioning - align with visual sprite base
@@ -514,6 +450,7 @@ const COLLISION_OFFSETS = {
   WILD_ANIMAL: { x: 0, y: 0 }, // No offset needed for animals
   BARREL: { x: 0, y: -48 }, // Barrel collision at visual center (matches server)
   SEA_STACK: { x: 0, y: -120 }, // Offset up to position collision higher on the structure
+  HOMESTEAD_HEARTH: { x: 0, y: -72.5 }, // Homestead hearth collision offset (matches server-side HEARTH_COLLISION_Y_OFFSET)
 } as const;
 
 // Shelter AABB dimensions
@@ -546,6 +483,7 @@ export interface GameEntities {
   seaStacks: Map<string, any>; // Sea stacks from SpacetimeDB
   wallCells: Map<string, WallCell>; // Add wall cells for collision
   foundationCells: Map<string, FoundationCell>; // Add foundation cells for collision
+  homesteadHearths: Map<string, HomesteadHearth>; // Add homestead hearths for collision
 }
 
 interface CollisionShape {

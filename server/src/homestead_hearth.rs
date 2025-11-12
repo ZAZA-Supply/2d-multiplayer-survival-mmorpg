@@ -13,8 +13,13 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 // --- Constants --- 
-pub(crate) const HEARTH_COLLISION_RADIUS: f32 = 20.0;
-pub(crate) const HEARTH_COLLISION_Y_OFFSET: f32 = 0.0;
+// Hearth visual is 125x125 pixels, drawn with: drawY = posY - drawHeight - HEARTH_RENDER_Y_OFFSET
+// Visual top: posY - 125 - 10 = posY - 135
+// Visual bottom: posY - 135 + 125 = posY - 10
+// Visual center Y: posY - 135 + 62.5 = posY - 72.5
+// Collision should match the visual center and size
+pub(crate) const HEARTH_COLLISION_RADIUS: f32 = 55.0; // Half of 110, slightly smaller than visual 125x125 for gameplay
+pub(crate) const HEARTH_COLLISION_Y_OFFSET: f32 = -72.5; // Offset upward to match exact visual center
 pub(crate) const PLAYER_HEARTH_COLLISION_DISTANCE_SQUARED: f32 = 
     (super::PLAYER_RADIUS + HEARTH_COLLISION_RADIUS) * (super::PLAYER_RADIUS + HEARTH_COLLISION_RADIUS);
 pub(crate) const HEARTH_HEARTH_COLLISION_DISTANCE_SQUARED: f32 = 
@@ -145,7 +150,7 @@ pub struct HomesteadHearth {
 const ALLOWED_ITEM_NAMES: &[&str] = &[
     "Wood",
     "Stone",
-    "Metal",
+    "Metal Fragments",
     "Cloth",
     "Fiber",
     "Coal",
@@ -1071,16 +1076,16 @@ pub fn grant_building_privilege_from_hearth(
     let distance_squared = dx * dx + dy * dy;
 
     if distance_squared > BUILDING_PRIVILEGE_RADIUS_SQUARED {
-        return Err("Too far from hearth to receive building privilege.".to_string());
+        return Err("Too far from hearth to toggle building privilege.".to_string());
     }
 
-    // Grant building privilege (persistent - never remove it)
-    // If player already has it, refresh it to ensure it's active
-    if !player_has_building_privilege(ctx, sender_id) {
+    // Toggle building privilege: remove if player already has it, grant if they don't
+    if player_has_building_privilege(ctx, sender_id) {
+        remove_building_privilege(ctx, sender_id);
+        log::info!("Player {:?} revoked building privilege from hearth {}", sender_id, hearth_id);
+    } else {
         grant_building_privilege(ctx, sender_id)?;
         log::info!("Player {:?} granted building privilege from hearth {}", sender_id, hearth_id);
-    } else {
-        log::info!("Player {:?} already has building privilege (persistent)", sender_id);
     }
 
     Ok(())
@@ -1107,7 +1112,7 @@ pub fn move_item_to_hearth(
         .ok_or_else(|| format!("Item definition {} not found", item_to_move.item_def_id))?;
     
     if !is_item_allowed(&item_def) {
-        return Err(format!("Item '{}' is not allowed in hearth inventory. Only building materials (Wood, Stone, Metal, Cloth, Fiber, Coal) are allowed.", item_def.name));
+        return Err(format!("Item '{}' is not allowed in hearth inventory. Only building materials (Wood, Stone, Metal Fragments, Cloth, Fiber, Coal) are allowed.", item_def.name));
     }
     
     // Use generic handler
@@ -1168,7 +1173,7 @@ pub fn split_stack_into_hearth(
         .ok_or_else(|| format!("Item definition {} not found", source_item.item_def_id))?;
     
     if !is_item_allowed(&item_def) {
-        return Err(format!("Item '{}' is not allowed in hearth inventory. Only building materials (Wood, Stone, Metal, Cloth, Fiber, Coal) are allowed.", item_def.name));
+        return Err(format!("Item '{}' is not allowed in hearth inventory. Only building materials (Wood, Stone, Metal Fragments, Cloth, Fiber, Coal) are allowed.", item_def.name));
     }
     
     let mut source_item_mut = source_item;
@@ -1256,7 +1261,7 @@ pub fn quick_move_to_hearth(
         .ok_or_else(|| format!("Item definition {} not found", item_to_move.item_def_id))?;
     
     if !is_item_allowed(&item_def) {
-        return Err(format!("Item '{}' is not allowed in hearth inventory. Only building materials (Wood, Stone, Metal, Cloth, Fiber, Coal) are allowed.", item_def.name));
+        return Err(format!("Item '{}' is not allowed in hearth inventory. Only building materials (Wood, Stone, Metal Fragments, Cloth, Fiber, Coal) are allowed.", item_def.name));
     }
     
     inventory_management::handle_quick_move_to_container(ctx, &mut hearth, item_instance_id)?;
@@ -1365,6 +1370,9 @@ pub fn damage_hearth(
         
         log::info!("[HearthDamage] Hearth {} destroyed by player {:?}", hearth_id, attacker_id);
         
+        // Emit destruction sound
+        crate::sound_events::emit_foundation_twig_destroyed_sound(ctx, hearth.pos_x, hearth.pos_y, attacker_id);
+        
         // Drop all items from inventory to world
         let mut items_dropped = 0;
         for slot_index in 0..NUM_HEARTH_SLOTS {
@@ -1395,6 +1403,9 @@ pub fn damage_hearth(
         }
         
         log::info!("[HearthDamage] Dropped {} items from destroyed hearth {}", items_dropped, hearth_id);
+    } else {
+        // Hearth damaged but not destroyed - emit hit sound
+        crate::sound_events::emit_melee_hit_sharp_sound(ctx, hearth.pos_x, hearth.pos_y, attacker_id);
     }
     
     // Update the hearth

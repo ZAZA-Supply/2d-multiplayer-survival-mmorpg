@@ -1046,32 +1046,6 @@ pub fn destroy_foundation(ctx: &ReducerContext, foundation_id: u64) -> Result<()
         return Err("Repair Hammer must be equipped to destroy foundations.".to_string());
     }
     
-    // 2.5. Check building privilege AND distance from hearth
-    use crate::homestead_hearth::{player_has_building_privilege, BUILDING_PRIVILEGE_RADIUS_SQUARED};
-    if !player_has_building_privilege(ctx, sender_id) {
-        return Err("Building privilege required. Hold E near a Homestead Hearth to gain building privilege.".to_string());
-    }
-    
-    // Check if player is within building privilege radius of ANY hearth
-    let hearths = ctx.db.homestead_hearth();
-    let mut within_radius = false;
-    for hearth in hearths.iter() {
-        if hearth.is_destroyed {
-            continue;
-        }
-        let dx = player.position_x - hearth.pos_x;
-        let dy = player.position_y - hearth.pos_y;
-        let distance_squared = dx * dx + dy * dy;
-        if distance_squared <= BUILDING_PRIVILEGE_RADIUS_SQUARED {
-            within_radius = true;
-            break;
-        }
-    }
-    
-    if !within_radius {
-        return Err("Too far from any Homestead Hearth. Building privilege only works within 500px of a hearth.".to_string());
-    }
-    
     // 3. Find foundation
     let foundation = foundations.id().find(&foundation_id)
         .ok_or_else(|| "Foundation not found".to_string())?;
@@ -1089,6 +1063,12 @@ pub fn destroy_foundation(ctx: &ReducerContext, foundation_id: u64) -> Result<()
     if foundation.owner != sender_id {
         return Err("You can only destroy foundations that you built.".to_string());
     }
+    
+    // 4.6. Building privilege check: Only required if destroying OTHER players' structures
+    // Own twig structures can be destroyed without building privilege (for early game setup)
+    // But we already checked ownership above, so if we reach here, it's the player's own foundation
+    // So we skip building privilege check for own twig foundations
+    // (This allows players to destroy their own twig structures before placing a hearth)
     
     // 5. Check placement distance from player
     let world_x = (foundation.cell_x as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
@@ -1663,32 +1643,6 @@ pub fn destroy_wall(ctx: &ReducerContext, wall_id: u64) -> Result<(), String> {
         return Err("Repair Hammer must be equipped to destroy walls.".to_string());
     }
     
-    // 2.5. Check building privilege AND distance from hearth
-    use crate::homestead_hearth::{player_has_building_privilege, BUILDING_PRIVILEGE_RADIUS_SQUARED};
-    if !player_has_building_privilege(ctx, sender_id) {
-        return Err("Building privilege required. Hold E near a Homestead Hearth to gain building privilege.".to_string());
-    }
-    
-    // Check if player is within building privilege radius of ANY hearth
-    let hearths = ctx.db.homestead_hearth();
-    let mut within_radius = false;
-    for hearth in hearths.iter() {
-        if hearth.is_destroyed {
-            continue;
-        }
-        let dx = player.position_x - hearth.pos_x;
-        let dy = player.position_y - hearth.pos_y;
-        let distance_squared = dx * dx + dy * dy;
-        if distance_squared <= BUILDING_PRIVILEGE_RADIUS_SQUARED {
-            within_radius = true;
-            break;
-        }
-    }
-    
-    if !within_radius {
-        return Err("Too far from any Homestead Hearth. Building privilege only works within 500px of a hearth.".to_string());
-    }
-    
     // 3. Find wall
     let wall = walls.id().find(&wall_id)
         .ok_or_else(|| "Wall not found".to_string())?;
@@ -1706,6 +1660,12 @@ pub fn destroy_wall(ctx: &ReducerContext, wall_id: u64) -> Result<(), String> {
     if wall.owner != sender_id {
         return Err("You can only destroy walls that you built.".to_string());
     }
+    
+    // 4.6. Building privilege check: Only required if destroying OTHER players' structures
+    // Own twig structures can be destroyed without building privilege (for early game setup)
+    // But we already checked ownership above, so if we reach here, it's the player's own wall
+    // So we skip building privilege check for own twig walls
+    // (This allows players to destroy their own twig structures before placing a hearth)
     
     // 5. Check placement distance from player
     let world_x = (wall.cell_x as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
@@ -1735,4 +1695,228 @@ pub fn destroy_wall(ctx: &ReducerContext, wall_id: u64) -> Result<(), String> {
     );
     
     Ok(())
+}
+
+// --- Wall Damage Function ---
+
+/// Applies weapon damage to a wall (called from combat system or projectile collision)
+pub fn damage_wall(
+    ctx: &ReducerContext,
+    attacker_id: Identity,
+    wall_id: u64,
+    damage: f32,
+    timestamp: Timestamp,
+) -> Result<(), String> {
+    let walls = ctx.db.wall_cell();
+    
+    // Find the wall
+    let mut wall = walls.id().find(&wall_id)
+        .ok_or_else(|| format!("Wall with ID {} not found.", wall_id))?;
+    
+    if wall.is_destroyed {
+        return Err("Wall is already destroyed.".to_string());
+    }
+    
+    let old_health = wall.health;
+    wall.health = (wall.health - damage).max(0.0);
+    wall.last_hit_time = Some(timestamp);
+    wall.last_damaged_by = Some(attacker_id);
+    
+    log::info!(
+        "Player {:?} hit Wall {} for {:.1} damage. Health: {:.1} -> {:.1}",
+        attacker_id, wall_id, damage, old_health, wall.health
+    );
+    
+    if wall.health <= 0.0 {
+        // Wall destroyed
+        wall.health = 0.0;
+        wall.is_destroyed = true;
+        wall.destroyed_at = Some(timestamp);
+        
+        log::info!("[WallDamage] Wall {} destroyed by player {:?}", wall_id, attacker_id);
+        
+        // Emit destruction sound (use twig destroyed sound for all tiers, or melee hit sound)
+        let world_x = (wall.cell_x as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+        let world_y = (wall.cell_y as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+        
+        // Use foundation twig destroyed sound for all wall tiers (or could use melee hit sound)
+        crate::sound_events::emit_foundation_twig_destroyed_sound(ctx, world_x, world_y, attacker_id);
+    } else {
+        // Wall damaged but not destroyed
+        log::info!("[WallDamage] Wall {} damaged, health: {:.1}", wall_id, wall.health);
+        
+        // Emit hit sound (use melee hit sound for all tiers)
+        let world_x = (wall.cell_x as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+        let world_y = (wall.cell_y as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+        
+        // Use melee hit sound for wall hits (similar to other structures)
+        crate::sound_events::emit_melee_hit_sharp_sound(ctx, world_x, world_y, attacker_id);
+    }
+    
+    // Update the wall
+    walls.id().update(wall);
+    
+    Ok(())
+}
+
+// --- Projectile and Melee Collision Detection ---
+
+/// Checks if a line segment intersects with a wall edge
+/// Returns Some((wall_id, collision_x, collision_y)) if collision occurs
+pub fn check_projectile_wall_collision(
+    ctx: &ReducerContext,
+    start_x: f32,
+    start_y: f32,
+    end_x: f32,
+    end_y: f32,
+) -> Option<(u64, f32, f32)> {
+    const WALL_COLLISION_THICKNESS: f32 = 6.0; // Same as player collision
+    
+    let walls = ctx.db.wall_cell();
+    
+    // Calculate which tiles to check (within 2 tiles of line segment)
+    let min_x = start_x.min(end_x);
+    let max_x = start_x.max(end_x);
+    let min_y = start_y.min(end_y);
+    let max_y = start_y.max(end_y);
+    
+    let start_tile_x = ((min_x - 96.0) / TILE_SIZE_PX as f32).floor() as i32;
+    let end_tile_x = ((max_x + 96.0) / TILE_SIZE_PX as f32).ceil() as i32;
+    let start_tile_y = ((min_y - 96.0) / TILE_SIZE_PX as f32).floor() as i32;
+    let end_tile_y = ((max_y + 96.0) / TILE_SIZE_PX as f32).ceil() as i32;
+    
+    for tile_x in start_tile_x..=end_tile_x {
+        for tile_y in start_tile_y..=end_tile_y {
+            // Find walls on this tile
+            for wall in walls.idx_cell_coords().filter((tile_x, tile_y)) {
+                if wall.is_destroyed {
+                    continue;
+                }
+                
+                // Calculate wall edge collision bounds
+                let tile_left = tile_x as f32 * TILE_SIZE_PX as f32;
+                let tile_top = tile_y as f32 * TILE_SIZE_PX as f32;
+                let tile_right = tile_left + TILE_SIZE_PX as f32;
+                let tile_bottom = tile_top + TILE_SIZE_PX as f32;
+                
+                // Determine wall edge bounds based on edge direction
+                // Edge 0 = North (top), 1 = East (right), 2 = South (bottom), 3 = West (left)
+                let (wall_min_x, wall_max_x, wall_min_y, wall_max_y) = match wall.edge {
+                    0 => { // North (top edge) - horizontal line
+                        (tile_left, tile_right, tile_top - WALL_COLLISION_THICKNESS / 2.0, tile_top + WALL_COLLISION_THICKNESS / 2.0)
+                    },
+                    1 => { // East (right edge) - vertical line
+                        (tile_right - WALL_COLLISION_THICKNESS / 2.0, tile_right + WALL_COLLISION_THICKNESS / 2.0, tile_top, tile_bottom)
+                    },
+                    2 => { // South (bottom edge) - horizontal line
+                        (tile_left, tile_right, tile_bottom - WALL_COLLISION_THICKNESS / 2.0, tile_bottom + WALL_COLLISION_THICKNESS / 2.0)
+                    },
+                    3 => { // West (left edge) - vertical line
+                        (tile_left - WALL_COLLISION_THICKNESS / 2.0, tile_left + WALL_COLLISION_THICKNESS / 2.0, tile_top, tile_bottom)
+                    },
+                    _ => continue, // Skip invalid edges
+                };
+                
+                // Check if line segment intersects wall AABB
+                if line_intersects_aabb(start_x, start_y, end_x, end_y, wall_min_x, wall_max_x, wall_min_y, wall_max_y) {
+                    // Calculate approximate collision point
+                    let collision_x = end_x.max(wall_min_x).min(wall_max_x);
+                    let collision_y = end_y.max(wall_min_y).min(wall_max_y);
+                    
+                    log::info!(
+                        "[ProjectileCollision] Projectile path from ({:.1}, {:.1}) to ({:.1}, {:.1}) hits Wall {} at ({:.1}, {:.1})",
+                        start_x, start_y, end_x, end_y, wall.id, collision_x, collision_y
+                    );
+                    
+                    return Some((wall.id, collision_x, collision_y));
+                }
+            }
+        }
+    }
+    
+    None
+}
+
+/// Checks if a line segment is blocked by walls (for melee attacks)
+/// Returns Some(wall_id) if a wall is hit, None otherwise
+pub fn check_line_hits_wall(
+    ctx: &ReducerContext,
+    start_x: f32,
+    start_y: f32,
+    end_x: f32,
+    end_y: f32,
+) -> Option<u64> {
+    check_projectile_wall_collision(ctx, start_x, start_y, end_x, end_y)
+        .map(|(wall_id, _, _)| wall_id)
+}
+
+/// Checks if a line segment is blocked by walls (for melee attacks)
+/// Legacy function for backward compatibility - use check_line_hits_wall() for new code
+pub fn is_line_blocked_by_walls(
+    ctx: &ReducerContext,
+    start_x: f32,
+    start_y: f32,
+    end_x: f32,
+    end_y: f32,
+) -> bool {
+    check_line_hits_wall(ctx, start_x, start_y, end_x, end_y).is_some()
+}
+
+/// Helper function: Checks if a line segment intersects with an AABB
+fn line_intersects_aabb(
+    x1: f32, y1: f32, x2: f32, y2: f32,
+    left: f32, right: f32, top: f32, bottom: f32
+) -> bool {
+    let dx = x2 - x1;
+    let dy = y2 - y1;
+    
+    // If line is a point, check if it's inside the AABB
+    if dx.abs() < 0.001 && dy.abs() < 0.001 {
+        return x1 >= left && x1 <= right && y1 >= top && y1 <= bottom;
+    }
+    
+    let mut t_min: f32 = 0.0;
+    let mut t_max: f32 = 1.0;
+    
+    // Check X bounds
+    if dx.abs() > 0.001 {
+        let t1 = (left - x1) / dx;
+        let t2 = (right - x1) / dx;
+        let t_near = t1.min(t2);
+        let t_far = t1.max(t2);
+        
+        t_min = t_min.max(t_near);
+        t_max = t_max.min(t_far);
+        
+        if t_min > t_max {
+            return false;
+        }
+    } else {
+        // Line is vertical, check if it's within X bounds
+        if x1 < left || x1 > right {
+            return false;
+        }
+    }
+    
+    // Check Y bounds
+    if dy.abs() > 0.001 {
+        let t1 = (top - y1) / dy;
+        let t2 = (bottom - y1) / dy;
+        let t_near = t1.min(t2);
+        let t_far = t1.max(t2);
+        
+        t_min = t_min.max(t_near);
+        t_max = t_max.min(t_far);
+        
+        if t_min > t_max {
+            return false;
+        }
+    } else {
+        // Line is horizontal, check if it's within Y bounds
+        if y1 < top || y1 > bottom {
+            return false;
+        }
+    }
+    
+    true // Line intersects AABB
 }

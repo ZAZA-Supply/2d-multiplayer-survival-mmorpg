@@ -83,7 +83,7 @@ import { drawMinimapOntoCanvas } from './Minimap';
 import { renderCampfire } from '../utils/renderers/campfireRenderingUtils';
 import { renderPlayerCorpse } from '../utils/renderers/playerCorpseRenderingUtils';
 import { renderStash } from '../utils/renderers/stashRenderingUtils';
-import { renderPlayerTorchLight, renderCampfireLight, renderLanternLight, renderFurnaceLight, renderHearthLight } from '../utils/renderers/lightRenderingUtils';
+import { renderPlayerTorchLight, renderCampfireLight, renderLanternLight, renderFurnaceLight } from '../utils/renderers/lightRenderingUtils';
 import { renderTree } from '../utils/renderers/treeRenderingUtils';
 import { renderCloudsDirectly } from '../utils/renderers/cloudRenderingUtils';
 import { useFallingTreeAnimations } from '../hooks/useFallingTreeAnimations';
@@ -1057,6 +1057,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   const furnaceParticles = useFurnaceParticles({
     visibleFurnacesMap,
   });
+
 
   // Resource sparkle particle effects - shows sparkles on harvestable resources (viewport-culled)
   const resourceSparkleParticles = useResourceSparkleParticles({
@@ -2108,18 +2109,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       });
     });
 
-    // Hearth Lights - Only draw for visible hearths (always on, warm orange glow)
-    visibleHomesteadHearthsMap.forEach((hearth: SpacetimeDBHomesteadHearth) => {
-      renderHearthLight({
-        ctx,
-        hearth: hearth,
-        cameraOffsetX,
-        cameraOffsetY,
-      });
-      
-      // Homestead hearth interaction indicators (for hold actions like grant building privilege)
-      drawIndicatorIfNeeded('homestead_hearth', hearth.id, hearth.posX, hearth.posY, 96, true); // 96px height for hearth
-    });
+     // Homestead hearth interaction indicators (for hold actions like grant building privilege)
+     // Hearth visual is 125x125, so use 125 for height to match the visual
+     // Offset moved up by ~20% (15px) for better alignment
+     visibleHomesteadHearthsMap.forEach((hearth: SpacetimeDBHomesteadHearth) => {
+       drawIndicatorIfNeeded('homestead_hearth', hearth.id, hearth.posX, hearth.posY - 15, 125, true);
+     });
 
     // --- Render Torch Light for ALL players (Local and Remote) ---
     players.forEach(player => {

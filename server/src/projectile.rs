@@ -237,6 +237,22 @@ pub fn fire_projectile(ctx: &ReducerContext, target_world_x: f32, target_world_y
         log::debug!("Player {:?} firing from inside their shelter {} to target inside same shelter - allowed", player_id, shelter_id);
     }
 
+    // --- Check if projectile path would immediately hit a wall very close to player ---
+    if let Some((wall_id, collision_x, collision_y)) = crate::building::check_projectile_wall_collision(
+        ctx,
+        player.position_x,
+        player.position_y,
+        target_world_x,
+        target_world_y,
+    ) {
+        let collision_distance = ((collision_x - player.position_x).powi(2) + (collision_y - player.position_y).powi(2)).sqrt();
+        const MIN_FIRING_DISTANCE: f32 = 80.0; // About 2 tiles
+        
+        if collision_distance < MIN_FIRING_DISTANCE {
+            return Err(format!("Cannot fire projectile - wall too close ({:.1} units)", collision_distance));
+        }
+    }
+    
     // --- Check if projectile path would immediately hit a shelter wall very close to player ---
     if let Some((shelter_id, collision_x, collision_y)) = shelter::check_projectile_shelter_collision(
         ctx,
@@ -630,7 +646,72 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
         
         let travel_distance = ((current_x - projectile.start_pos_x).powi(2) + (current_y - projectile.start_pos_y).powi(2)).sqrt();
         
-        // Check for shelter wall collision first
+        // Check for wall collision first (before shelter)
+        if let Some((wall_id, collision_x, collision_y)) = crate::building::check_projectile_wall_collision(
+            ctx,
+            prev_x,
+            prev_y,
+            current_x,
+            current_y,
+        ) {
+            log::info!(
+                "[ProjectileUpdate] Projectile {} from owner {:?} hit Wall {} at ({:.1}, {:.1})",
+                projectile.id, projectile.owner_id, wall_id, collision_x, collision_y
+            );
+            
+            // Apply damage to the wall before handling the projectile
+            let item_defs_table = ctx.db.item_definition();
+            if let Some(weapon_item_def) = item_defs_table.id().find(projectile.item_def_id) {
+                if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                    let final_damage = calculate_projectile_damage(&weapon_item_def, &ammo_item_def, &projectile, &mut rng);
+
+                    if final_damage > 0.0 {
+                        match crate::building::damage_wall(
+                            ctx,
+                            projectile.owner_id,
+                            wall_id,
+                            final_damage,
+                            current_time,
+                        ) {
+                            Ok(_) => {
+                                log::info!(
+                                    "[ProjectileUpdate] Projectile {} (weapon: {} + ammo: {}) dealt {:.1} damage to Wall {}",
+                                    projectile.id, weapon_item_def.name, ammo_item_def.name, final_damage, wall_id
+                                );
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "[ProjectileUpdate] Error applying projectile damage to Wall {}: {}",
+                                    wall_id, e
+                                );
+                            }
+                        }
+                    } else {
+                        log::debug!(
+                            "[ProjectileUpdate] Combined damage from weapon '{}' and ammunition '{}' is 0, no damage applied to Wall {}",
+                            weapon_item_def.name, ammo_item_def.name, wall_id
+                        );
+                    }
+                } else {
+                    log::warn!(
+                        "[ProjectileUpdate] ItemDefinition not found for projectile's ammunition (ID: {}). Cannot apply wall damage.",
+                        projectile.ammo_def_id
+                    );
+                }
+            } else {
+                log::warn!(
+                    "[ProjectileUpdate] ItemDefinition not found for projectile's weapon (ID: {}). Cannot apply wall damage.",
+                    projectile.item_def_id
+                );
+            }
+            
+            // Projectile hit wall - stop it and create dropped item
+            missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, collision_x, collision_y));
+            projectiles_to_delete.push(projectile.id);
+            continue;
+        }
+        
+        // Check for shelter wall collision
         if let Some((shelter_id, collision_x, collision_y)) = shelter::check_projectile_shelter_collision(
             ctx, 
             projectile.start_pos_x, 
@@ -1510,6 +1591,22 @@ pub fn throw_item(ctx: &ReducerContext, target_world_x: f32, target_world_y: f32
         log::debug!("Player {:?} throwing from inside their shelter {} to target inside same shelter - allowed", player_id, shelter_id);
     }
 
+    // --- Check if projectile path would immediately hit a wall very close to player ---
+    if let Some((wall_id, collision_x, collision_y)) = crate::building::check_projectile_wall_collision(
+        ctx,
+        player.position_x,
+        player.position_y,
+        target_world_x,
+        target_world_y,
+    ) {
+        let collision_distance = ((collision_x - player.position_x).powi(2) + (collision_y - player.position_y).powi(2)).sqrt();
+        const MIN_THROWING_DISTANCE: f32 = 80.0; // About 2 tiles
+        
+        if collision_distance < MIN_THROWING_DISTANCE {
+            return Err(format!("Cannot throw item - wall too close ({:.1} units)", collision_distance));
+        }
+    }
+    
     // --- Check if projectile path would immediately hit a shelter wall very close to player ---
     if let Some((shelter_id, collision_x, collision_y)) = shelter::check_projectile_shelter_collision(
         ctx,

@@ -26,6 +26,9 @@ use crate::environment::{calculate_chunk_index, WORLD_WIDTH_CHUNKS};
 // Import the new player_collision module
 use crate::player_collision;
 
+// Import building module for wall collision checks
+use crate::building::{wall_cell as WallCellTableTrait, FOUNDATION_TILE_SIZE_PX};
+
 // Import grass types
 use crate::grass::GrassAppearanceType;
 
@@ -304,8 +307,155 @@ pub fn dodge_roll(ctx: &ReducerContext, move_x: f32, move_y: f32) -> Result<(), 
 
     // Clamp target to world bounds
     let effective_radius = get_effective_player_radius(current_player.is_crouching);
-    let clamped_target_x = target_x.max(effective_radius).min(WORLD_WIDTH_PX - effective_radius);
-    let clamped_target_y = target_y.max(effective_radius).min(WORLD_HEIGHT_PX - effective_radius);
+    let mut clamped_target_x = target_x.max(effective_radius).min(WORLD_WIDTH_PX - effective_radius);
+    let mut clamped_target_y = target_y.max(effective_radius).min(WORLD_HEIGHT_PX - effective_radius);
+
+    // Check for wall collisions along the dodge roll path
+    // Use binary search to find the closest valid position that doesn't collide with walls
+    let start_x = current_player.position_x;
+    let start_y = current_player.position_y;
+    let mut valid_target_x = clamped_target_x;
+    let mut valid_target_y = clamped_target_y;
+    
+    // Check if target position collides with walls
+    let walls = ctx.db.wall_cell();
+    const WALL_COLLISION_THICKNESS: f32 = 6.0;
+    const CHECK_RADIUS_TILES: i32 = 2; // Check walls within 2 foundation tiles
+    
+    // Convert world coordinates to foundation cell coordinates (walls use foundation cell coords)
+    let target_cell_x = (clamped_target_x / FOUNDATION_TILE_SIZE_PX as f32).floor() as i32;
+    let target_cell_y = (clamped_target_y / FOUNDATION_TILE_SIZE_PX as f32).floor() as i32;
+    
+    let mut hit_wall = false;
+    for cell_offset_x in -CHECK_RADIUS_TILES..=CHECK_RADIUS_TILES {
+        for cell_offset_y in -CHECK_RADIUS_TILES..=CHECK_RADIUS_TILES {
+            let check_cell_x = target_cell_x + cell_offset_x;
+            let check_cell_y = target_cell_y + cell_offset_y;
+            
+            for wall in walls.idx_cell_coords().filter((check_cell_x, check_cell_y)) {
+                if wall.is_destroyed { continue; }
+                
+                // Calculate wall edge collision bounds using foundation cell coordinates
+                let tile_left = check_cell_x as f32 * FOUNDATION_TILE_SIZE_PX as f32;
+                let tile_top = check_cell_y as f32 * FOUNDATION_TILE_SIZE_PX as f32;
+                let tile_right = tile_left + FOUNDATION_TILE_SIZE_PX as f32;
+                let tile_bottom = tile_top + FOUNDATION_TILE_SIZE_PX as f32;
+                
+                let (wall_min_x, wall_max_x, wall_min_y, wall_max_y) = match wall.edge {
+                    0 => { // North
+                        (tile_left, tile_right, tile_top - WALL_COLLISION_THICKNESS / 2.0, tile_top + WALL_COLLISION_THICKNESS / 2.0)
+                    },
+                    1 => { // East
+                        (tile_right - WALL_COLLISION_THICKNESS / 2.0, tile_right + WALL_COLLISION_THICKNESS / 2.0, tile_top, tile_bottom)
+                    },
+                    2 => { // South
+                        (tile_left, tile_right, tile_bottom - WALL_COLLISION_THICKNESS / 2.0, tile_bottom + WALL_COLLISION_THICKNESS / 2.0)
+                    },
+                    3 => { // West
+                        (tile_left - WALL_COLLISION_THICKNESS / 2.0, tile_left + WALL_COLLISION_THICKNESS / 2.0, tile_top, tile_bottom)
+                    },
+                    _ => continue,
+                };
+                
+                // Check if player circle at target position intersects wall
+                let closest_x = clamped_target_x.max(wall_min_x).min(wall_max_x);
+                let closest_y = clamped_target_y.max(wall_min_y).min(wall_max_y);
+                let dx = clamped_target_x - closest_x;
+                let dy = clamped_target_y - closest_y;
+                let dist_sq = dx * dx + dy * dy;
+                
+                if dist_sq < effective_radius * effective_radius {
+                    hit_wall = true;
+                    break;
+                }
+            }
+            if hit_wall { break; }
+        }
+        if hit_wall { break; }
+    }
+    
+    // If target position hits a wall, find closest valid position along the path
+    if hit_wall {
+        // Use binary search to find the closest valid position
+        let mut min_dist = 0.0;
+        let mut max_dist = DODGE_ROLL_DISTANCE;
+        let mut best_valid_x = start_x;
+        let mut best_valid_y = start_y;
+        
+        // Binary search for valid position (up to 10 iterations for precision)
+        for _ in 0..10 {
+            let test_dist = (min_dist + max_dist) / 2.0;
+            let test_x = start_x + (dodge_dx * test_dist);
+            let test_y = start_y + (dodge_dy * test_dist);
+            
+            // Clamp to world bounds
+            let test_clamped_x = test_x.max(effective_radius).min(WORLD_WIDTH_PX - effective_radius);
+            let test_clamped_y = test_y.max(effective_radius).min(WORLD_HEIGHT_PX - effective_radius);
+            
+            // Check if this position collides with walls
+            // Convert world coordinates to foundation cell coordinates
+            let test_cell_x = (test_clamped_x / FOUNDATION_TILE_SIZE_PX as f32).floor() as i32;
+            let test_cell_y = (test_clamped_y / FOUNDATION_TILE_SIZE_PX as f32).floor() as i32;
+            
+            let mut collides = false;
+            for cell_offset_x in -CHECK_RADIUS_TILES..=CHECK_RADIUS_TILES {
+                for cell_offset_y in -CHECK_RADIUS_TILES..=CHECK_RADIUS_TILES {
+                    let check_cell_x = test_cell_x + cell_offset_x;
+                    let check_cell_y = test_cell_y + cell_offset_y;
+                    
+                    for wall in walls.idx_cell_coords().filter((check_cell_x, check_cell_y)) {
+                        if wall.is_destroyed { continue; }
+                        
+                        // Calculate wall edge collision bounds using foundation cell coordinates
+                        let tile_left = check_cell_x as f32 * FOUNDATION_TILE_SIZE_PX as f32;
+                        let tile_top = check_cell_y as f32 * FOUNDATION_TILE_SIZE_PX as f32;
+                        let tile_right = tile_left + FOUNDATION_TILE_SIZE_PX as f32;
+                        let tile_bottom = tile_top + FOUNDATION_TILE_SIZE_PX as f32;
+                        
+                        let (wall_min_x, wall_max_x, wall_min_y, wall_max_y) = match wall.edge {
+                            0 => {
+                                (tile_left, tile_right, tile_top - WALL_COLLISION_THICKNESS / 2.0, tile_top + WALL_COLLISION_THICKNESS / 2.0)
+                            },
+                            1 => {
+                                (tile_right - WALL_COLLISION_THICKNESS / 2.0, tile_right + WALL_COLLISION_THICKNESS / 2.0, tile_top, tile_bottom)
+                            },
+                            2 => {
+                                (tile_left, tile_right, tile_bottom - WALL_COLLISION_THICKNESS / 2.0, tile_bottom + WALL_COLLISION_THICKNESS / 2.0)
+                            },
+                            3 => {
+                                (tile_left - WALL_COLLISION_THICKNESS / 2.0, tile_left + WALL_COLLISION_THICKNESS / 2.0, tile_top, tile_bottom)
+                            },
+                            _ => continue,
+                        };
+                        
+                        let closest_x = test_clamped_x.max(wall_min_x).min(wall_max_x);
+                        let closest_y = test_clamped_y.max(wall_min_y).min(wall_max_y);
+                        let dx = test_clamped_x - closest_x;
+                        let dy = test_clamped_y - closest_y;
+                        let dist_sq = dx * dx + dy * dy;
+                        
+                        if dist_sq < effective_radius * effective_radius {
+                            collides = true;
+                            break;
+                        }
+                    }
+                    if collides { break; }
+                }
+                if collides { break; }
+            }
+            
+            if collides {
+                max_dist = test_dist;
+            } else {
+                min_dist = test_dist;
+                best_valid_x = test_clamped_x;
+                best_valid_y = test_clamped_y;
+            }
+        }
+        
+        clamped_target_x = best_valid_x;
+        clamped_target_y = best_valid_y;
+    }
 
     // Determine direction string for 8-directional support
     let direction_string = if dodge_dx == 0.0 && dodge_dy < 0.0 {

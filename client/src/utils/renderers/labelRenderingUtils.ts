@@ -345,7 +345,8 @@ export function renderInteractionLabels({
                 const HEARTH_HEIGHT = 96; // Approximate height
                 const visualCenterY = hearth.posY - (HEARTH_HEIGHT / 2);
                 textX = hearth.posX;
-                textY = visualCenterY - 50;
+                // Moved up by ~20% (15px) to match indicator box position
+                textY = visualCenterY - 65;
                 renderStyledInteractionLabel(ctx, text, textX, textY);
             }
             break;
