@@ -724,6 +724,7 @@ export interface RenderWallParams {
   viewOffsetY: number;
   foundationTileImagesRef?: React.RefObject<Map<string, HTMLImageElement>>;
   allWalls?: Map<string, any>; // ADDED: All walls to check for adjacent walls
+  cycleProgress?: number; // ADDED: Day/night cycle progress for exterior shadows
 }
 
 export function renderWall({
@@ -734,6 +735,7 @@ export function renderWall({
   viewOffsetY,
   foundationTileImagesRef,
   allWalls,
+  cycleProgress = 0.5, // Default to noon if not provided
 }: RenderWallParams): void {
   if (wall.isDestroyed) {
     return;
@@ -875,12 +877,17 @@ export function renderWall({
   
   if (isDiagonalWall && isTriangle) {
     // ═══════════════════════════════════════════════════════════════════════════
-    // TRIANGLE LABELS - SEE BELOW FOR 2A, 2B, 3A, 3B, 4A, 4B, 5A, 5B
+    // TRIANGLE FOUNDATION WALLS (2A/2B, 3A/3B, 4A/4B, 5A/5B)
     // ═══════════════════════════════════════════════════════════════════════════
-    // For diagonal walls on triangles: draw TWO triangles
-    // 1. Fill the entire foundation triangle (A)
+    // For diagonal walls on triangles: draw TWO triangles with wall graphics
+    // 1. Draw the foundation triangle (A) with wall texture
     // 2. Take the same triangle, transform it, and move it up one full tile (B)
-    // These two triangles together form the wall
+    // These two triangles together form the wall, using wall graphics based on tier
+    
+    // Get wall image based on tier (same as cardinal walls)
+    const isNorthWall = false; // Diagonal walls don't use interior/exterior distinction
+    const wallFilename = getWallTileFilename(wall.tier, isNorthWall);
+    const wallImage = foundationTileImagesRef?.current?.get(wallFilename);
     
     const tierColors: Record<number, string> = {
       0: '#8B4513', // Twig - brown
@@ -895,12 +902,13 @@ export function renderWall({
     let v1X: number, v1Y: number, v2X: number, v2Y: number, v3X: number, v3Y: number;
     
     // ============================================================================
-    // TRIANGLE LABELS:
+    // TRIANGLE FOUNDATION WALLS:
     // Each triangle foundation wall is composed of two triangles: bottom (A) and top (B)
     // 2A, 2B = TriNW (Top-left triangle foundation) - bottom and top triangles
     // 3A, 3B = TriNE (Top-right triangle foundation) - bottom and top triangles
     // 4A, 4B = TriSE (Bottom-right triangle foundation) - bottom and top triangles
     // 5A, 5B = TriSW (Bottom-left triangle foundation) - bottom and top triangles
+    // All triangles now use wall graphics based on tier (same as cardinal walls)
     // ============================================================================
     
     // Determine triangle vertices based on foundation shape
@@ -951,7 +959,117 @@ export function renderWall({
         return;
     }
     
-    const fillColor = tierColors[wall.tier] || '#8B4513';
+    // Draw exterior shadow for triangle foundations BEFORE drawing triangles
+    // This ensures shadows appear behind the walls
+    if (cycleProgress !== undefined) {
+      renderWallExteriorShadow({
+        ctx,
+        wall: wall as any,
+        worldScale,
+        cycleProgress,
+        viewOffsetX,
+        viewOffsetY,
+      });
+    }
+    
+    // Draw interior shadow for diagonal walls on triangle foundations (TriSE and TriSW only)
+    // These shadows are time-independent and always visible
+    // Draw BEFORE triangles so shadows appear behind walls
+    if (wall.foundationShape === 4 || wall.foundationShape === 5) {
+      ctx.save();
+      const shadowDepth = screenSize * 0.3; // Same depth as other wall shadows
+      
+      // Get the diagonal edge coordinates for the triangle
+      let hypStartX: number, hypStartY: number, hypEndX: number, hypEndY: number;
+      
+      if (wall.foundationShape === 4) {
+        // TriSE - DiagNW_SE (edge 5): from bottom-left to top-right
+        hypStartX = screenX;
+        hypStartY = screenY + screenSize;
+        hypEndX = screenX + screenSize;
+        hypEndY = screenY;
+      } else {
+        // TriSW - DiagNE_SW (edge 4): from bottom-right to top-left
+        hypStartX = screenX + screenSize;
+        hypStartY = screenY + screenSize;
+        hypEndX = screenX;
+        hypEndY = screenY;
+      }
+      
+      // Calculate the diagonal vector and its perpendicular (pointing inward)
+      const dx = hypEndX - hypStartX;
+      const dy = hypEndY - hypStartY;
+      
+      // Perpendicular vector pointing inward
+      const perpX = -dy;
+      const perpY = dx;
+      const perpLength = Math.sqrt(perpX * perpX + perpY * perpY);
+      
+      // Normalize perpendicular vector
+      const perpNormX = perpX / perpLength;
+      const perpNormY = perpY / perpLength;
+      
+      // Determine which side is "inside" based on triangle interior point
+      // For TriSE (4): interior is at bottom-right corner (screenX + screenSize, screenY + screenSize)
+      // For TriSW (5): interior is at bottom-left corner (screenX, screenY + screenSize)
+      let interiorX: number, interiorY: number;
+      if (wall.foundationShape === 4) {
+        // TriSE - interior is bottom-right corner
+        interiorX = screenX + screenSize;
+        interiorY = screenY + screenSize;
+      } else {
+        // TriSW - interior is bottom-left corner
+        interiorX = screenX;
+        interiorY = screenY + screenSize;
+      }
+      
+      const wallMidX = (hypStartX + hypEndX) / 2;
+      const wallMidY = (hypStartY + hypEndY) / 2;
+      
+      // Check if perpendicular points toward triangle interior (if not, flip it)
+      const toInteriorX = interiorX - wallMidX;
+      const toInteriorY = interiorY - wallMidY;
+      const dotProduct = perpNormX * toInteriorX + perpNormY * toInteriorY;
+      
+      // If dot product is negative, flip the perpendicular direction
+      const finalPerpX = dotProduct < 0 ? -perpNormX : perpNormX;
+      const finalPerpY = dotProduct < 0 ? -perpNormY : perpNormY;
+      
+      // Calculate shadow start and end points along the diagonal
+      const shadowStartX = hypStartX + finalPerpX * shadowDepth;
+      const shadowStartY = hypStartY + finalPerpY * shadowDepth;
+      const shadowEndX = hypEndX + finalPerpX * shadowDepth;
+      const shadowEndY = hypEndY + finalPerpY * shadowDepth;
+      
+      // Create gradient along the perpendicular direction
+      const gradientStartX = wallMidX;
+      const gradientStartY = wallMidY;
+      const gradientEndX = wallMidX + finalPerpX * shadowDepth;
+      const gradientEndY = wallMidY + finalPerpY * shadowDepth;
+      
+      const shadowGradient = ctx.createLinearGradient(
+        gradientStartX, gradientStartY,
+        gradientEndX, gradientEndY
+      );
+      
+      // Same gradient stops as north/east/west walls for consistency
+      shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0.5)'); // More intense start
+      shadowGradient.addColorStop(0.3, 'rgba(0, 0, 0, 0.3)'); // Gradual fade midpoint
+      shadowGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.12)'); // Soft before end
+      shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)'); // Fade to transparent
+      
+      // Draw shadow as a quadrilateral
+      ctx.fillStyle = shadowGradient;
+      ctx.beginPath();
+      ctx.moveTo(hypStartX, hypStartY); // Start at wall start
+      ctx.lineTo(hypEndX, hypEndY); // Along wall end
+      ctx.lineTo(shadowEndX, shadowEndY); // Shadow end point
+      ctx.lineTo(shadowStartX, shadowStartY); // Shadow start point
+      ctx.closePath();
+      ctx.fill();
+      
+      ctx.restore();
+    }
     
     // === Draw bottom triangle (A): 2A, 3A, 4A, 5A ===
     // For 2A/3A: draw at foundation vertices
@@ -981,32 +1099,67 @@ export function renderWall({
       drawV3Y = v3Y;
     }
     
-    ctx.fillStyle = fillColor;
+    // Draw bottom triangle (A) with wall image
+    ctx.save(); // Save before clipping triangle A
     ctx.beginPath();
     ctx.moveTo(drawV1X, drawV1Y);
     ctx.lineTo(drawV2X, drawV2Y);
     ctx.lineTo(drawV3X, drawV3Y);
     ctx.closePath();
-    ctx.fill();
+    ctx.clip(); // Clip to bottom triangle (A) shape
+    
+    // Draw wall image on bottom triangle (A)
+    if (wallImage && wallImage.complete && wallImage.naturalHeight !== 0) {
+      // Calculate bounding box for the triangle
+      const minX = Math.min(drawV1X, drawV2X, drawV3X);
+      const maxX = Math.max(drawV1X, drawV2X, drawV3X);
+      const minY = Math.min(drawV1Y, drawV2Y, drawV3Y);
+      const maxY = Math.max(drawV1Y, drawV2Y, drawV3Y);
+      const triangleWidth = maxX - minX;
+      const triangleHeight = maxY - minY;
+      
+      // Draw the wall image covering the triangle area
+      ctx.drawImage(
+        wallImage,
+        0, 0, wallImage.width, wallImage.height, // Source: full image
+        minX, minY, triangleWidth, triangleHeight // Destination: triangle bounding box
+      );
+      
+      // Apply darkening overlay for south triangle foundations (TriSE=4, TriSW=5)
+      // Same as north walls - make them darker/shaded since they're interior-facing
+      if (wall.foundationShape === 4 || wall.foundationShape === 5) {
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.globalAlpha = 0.15; // Darkening intensity (same as north walls)
+        ctx.fillStyle = '#000000'; // Black for darkening
+        ctx.fillRect(minX, minY, triangleWidth, triangleHeight);
+        
+        // Reset composite operation and alpha
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1.0;
+      }
+    } else {
+      // Fallback: Draw colored triangle
+      ctx.fillStyle = tierColors[wall.tier] || '#8B4513';
+      ctx.beginPath();
+      ctx.moveTo(drawV1X, drawV1Y);
+      ctx.lineTo(drawV2X, drawV2Y);
+      ctx.lineTo(drawV3X, drawV3Y);
+      ctx.closePath();
+      ctx.fill();
+    }
+    
+    ctx.restore(); // Restore clipping for triangle A
     
     // Draw border for bottom triangle (A)
+    ctx.save();
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(drawV1X, drawV1Y);
+    ctx.lineTo(drawV2X, drawV2Y);
+    ctx.lineTo(drawV3X, drawV3Y);
+    ctx.closePath();
     ctx.stroke();
-    
-    // Draw label on bottom triangle (A)
-    const labelA = `${wall.foundationShape}A`;
-    const centerAX = (drawV1X + drawV2X + drawV3X) / 3;
-    const centerAY = (drawV1Y + drawV2Y + drawV3Y) / 3;
-    ctx.save();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 3;
-    ctx.font = `bold ${16 * worldScale}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.strokeText(labelA, centerAX, centerAY);
-    ctx.fillText(labelA, centerAX, centerAY);
     ctx.restore();
     
     // === Create top triangle (B) by transforming bottom triangle (A) ===
@@ -1041,30 +1194,68 @@ export function renderWall({
     }
     
     // === Draw top triangle (B): 2B, 3B, 4B, 5B ===
-    ctx.fillStyle = fillColor;
+    ctx.save();
+    
+    // Clip to top triangle (B) shape
     ctx.beginPath();
     ctx.moveTo(mirrorV1X, mirrorV1Y);
     ctx.lineTo(mirrorV2X, mirrorV2Y);
     ctx.lineTo(mirrorV3X, mirrorV3Y);
     ctx.closePath();
-    ctx.fill();
+    ctx.clip();
     
-    // Draw border for top triangle
-    ctx.stroke();
+    // Draw wall image on top triangle (B)
+    if (wallImage && wallImage.complete && wallImage.naturalHeight !== 0) {
+      // Calculate bounding box for the triangle
+      const minX = Math.min(mirrorV1X, mirrorV2X, mirrorV3X);
+      const maxX = Math.max(mirrorV1X, mirrorV2X, mirrorV3X);
+      const minY = Math.min(mirrorV1Y, mirrorV2Y, mirrorV3Y);
+      const maxY = Math.max(mirrorV1Y, mirrorV2Y, mirrorV3Y);
+      const triangleWidth = maxX - minX;
+      const triangleHeight = maxY - minY;
+      
+      // Draw the wall image covering the triangle area
+      ctx.drawImage(
+        wallImage,
+        0, 0, wallImage.width, wallImage.height, // Source: full image
+        minX, minY, triangleWidth, triangleHeight // Destination: triangle bounding box
+      );
+      
+      // Apply darkening overlay for south triangle foundations (TriSE=4, TriSW=5)
+      // Same as north walls - make them darker/shaded since they're interior-facing
+      if (wall.foundationShape === 4 || wall.foundationShape === 5) {
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.globalAlpha = 0.15; // Darkening intensity (same as north walls)
+        ctx.fillStyle = '#000000'; // Black for darkening
+        ctx.fillRect(minX, minY, triangleWidth, triangleHeight);
+        
+        // Reset composite operation and alpha
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1.0;
+      }
+    } else {
+      // Fallback: Draw colored triangle
+      ctx.fillStyle = tierColors[wall.tier] || '#8B4513';
+      ctx.beginPath();
+      ctx.moveTo(mirrorV1X, mirrorV1Y);
+      ctx.lineTo(mirrorV2X, mirrorV2Y);
+      ctx.lineTo(mirrorV3X, mirrorV3Y);
+      ctx.closePath();
+      ctx.fill();
+    }
     
-    // Draw label on top triangle (B)
-    const labelB = `${wall.foundationShape}B`;
-    const centerBX = (mirrorV1X + mirrorV2X + mirrorV3X) / 3;
-    const centerBY = (mirrorV1Y + mirrorV2Y + mirrorV3Y) / 3;
+    ctx.restore(); // Restore clipping
+    
+    // Draw border for top triangle (B)
     ctx.save();
-    ctx.fillStyle = '#FFFFFF';
     ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 3;
-    ctx.font = `bold ${16 * worldScale}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.strokeText(labelB, centerBX, centerBY);
-    ctx.fillText(labelB, centerBX, centerBY);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(mirrorV1X, mirrorV1Y);
+    ctx.lineTo(mirrorV2X, mirrorV2Y);
+    ctx.lineTo(mirrorV3X, mirrorV3Y);
+    ctx.closePath();
+    ctx.stroke();
     ctx.restore();
     
     ctx.restore();
@@ -1125,6 +1316,79 @@ export function renderWall({
       ctx.restore();
     }
     
+    // Draw interior shadow for diagonal walls (same formula as north/east/west walls)
+    // Shadow extends inward perpendicular to the diagonal wall
+    // Draw BEFORE the wall stroke so it's visible on the foundation tile
+    ctx.save();
+    const shadowDepth = screenSize * 0.3; // Same depth as other wall shadows
+    
+    // Calculate the diagonal vector and its perpendicular (pointing inward)
+    const dx = hypEndX - hypStartX;
+    const dy = hypEndY - hypStartY;
+    const diagonalLength = Math.sqrt(dx * dx + dy * dy);
+    
+    // Perpendicular vector pointing inward (rotate 90 degrees clockwise)
+    // For DiagNE_SW (top-left to bottom-right), inward is toward top-right
+    // For DiagNW_SE (top-right to bottom-left), inward is toward top-left
+    const perpX = -dy; // Perpendicular X component
+    const perpY = dx;  // Perpendicular Y component
+    const perpLength = Math.sqrt(perpX * perpX + perpY * perpY);
+    
+    // Normalize perpendicular vector
+    const perpNormX = perpX / perpLength;
+    const perpNormY = perpY / perpLength;
+    
+    // Determine which side is "inside" based on foundation center
+    const foundationCenterX = screenX + screenSize / 2;
+    const foundationCenterY = screenY + screenSize / 2;
+    const wallMidX = (hypStartX + hypEndX) / 2;
+    const wallMidY = (hypStartY + hypEndY) / 2;
+    
+    // Check if perpendicular points toward center (if not, flip it)
+    const toCenterX = foundationCenterX - wallMidX;
+    const toCenterY = foundationCenterY - wallMidY;
+    const dotProduct = perpNormX * toCenterX + perpNormY * toCenterY;
+    
+    // If dot product is negative, flip the perpendicular direction
+    const finalPerpX = dotProduct < 0 ? -perpNormX : perpNormX;
+    const finalPerpY = dotProduct < 0 ? -perpNormY : perpNormY;
+    
+    // Calculate shadow start and end points along the diagonal
+    const shadowStartX = hypStartX + finalPerpX * shadowDepth;
+    const shadowStartY = hypStartY + finalPerpY * shadowDepth;
+    const shadowEndX = hypEndX + finalPerpX * shadowDepth;
+    const shadowEndY = hypEndY + finalPerpY * shadowDepth;
+    
+    // Create gradient along the perpendicular direction
+    const gradientStartX = wallMidX;
+    const gradientStartY = wallMidY;
+    const gradientEndX = wallMidX + finalPerpX * shadowDepth;
+    const gradientEndY = wallMidY + finalPerpY * shadowDepth;
+    
+    const shadowGradient = ctx.createLinearGradient(
+      gradientStartX, gradientStartY,
+      gradientEndX, gradientEndY
+    );
+    
+    // Same gradient stops as north/east/west walls for consistency
+    shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0.5)'); // More intense start
+    shadowGradient.addColorStop(0.3, 'rgba(0, 0, 0, 0.3)'); // Gradual fade midpoint
+    shadowGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.12)'); // Soft before end
+    shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)'); // Fade to transparent
+    
+    // Draw shadow as a quadrilateral
+    ctx.fillStyle = shadowGradient;
+    ctx.beginPath();
+    ctx.moveTo(hypStartX, hypStartY); // Start at wall start
+    ctx.lineTo(hypEndX, hypEndY); // Along wall end
+    ctx.lineTo(shadowEndX, shadowEndY); // Shadow end point
+    ctx.lineTo(shadowStartX, shadowStartY); // Shadow start point
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.restore();
+    
+    // Draw wall stroke AFTER the shadow so the shadow is visible
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2;
     ctx.lineCap = 'square';
@@ -1134,6 +1398,36 @@ export function renderWall({
     ctx.stroke();
   } else {
     // Draw cardinal wall as a visible rectangle
+    // For north walls, draw exterior shadow FIRST before any wall rendering
+    // This ensures the wall appears above its exterior shadow
+    if (wall.edge === 0 && cycleProgress !== undefined) {
+      renderWallExteriorShadow({
+        ctx,
+        wall: wall as any,
+        worldScale,
+        cycleProgress,
+        viewOffsetX,
+        viewOffsetY,
+      });
+    }
+    
+    // For north walls, draw interior shadow FIRST before any wall rendering
+    if (wall.edge === 0) {
+      // Draw shadow BELOW the wall, projected onto the ground/foundation
+      // Sea of Stars style - softer, more gradual fade
+      // Shadow should be on the foundation tile below, not on the wall itself
+      const shadowHeight = screenSize * 0.3; // Shadow extends onto the foundation below
+      const shadowY = screenY; // Start at the top of the foundation tile (where wall meets ground)
+      
+      const shadowGradient = ctx.createLinearGradient(wallX, shadowY, wallX, shadowY + shadowHeight);
+      shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0.5)'); // More intense start
+      shadowGradient.addColorStop(0.3, 'rgba(0, 0, 0, 0.3)'); // Gradual fade midpoint
+      shadowGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.12)'); // Soft before end
+      shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)'); // Fade to transparent at bottom
+      ctx.fillStyle = shadowGradient;
+      ctx.fillRect(wallX, shadowY, wallWidth, shadowHeight);
+    }
+    
     // First draw the texture/image if available
     if (wallImage && wallImage.complete && wallImage.naturalHeight !== 0) {
       // Draw a portion of the wall tile image for the wall
@@ -1141,13 +1435,13 @@ export function renderWall({
       // For vertical walls (E/W), we take a vertical strip from the tile
       // Horizontal wall - draw scaled tile for north/south walls (taller for isometric)
       if (wall.edge === 0) {
-        // North wall (interior) - use BOTTOM half of texture, make it lighter, add shadow at base
+        // North wall (interior) - use BOTTOM half of texture, make it lighter
         const sourceY = wallImage.height * 0.5; // Start from middle (bottom half)
         const sourceHeight = wallImage.height * 0.5; // Bottom half of texture
         
         ctx.save();
         
-        // Draw the bottom half of the image
+        // Draw the bottom half of the image AFTER shadow so wall appears on top
         ctx.drawImage(
           wallImage,
           0, sourceY, wallImage.width, sourceHeight, // Source: BOTTOM half of texture
@@ -1164,23 +1458,59 @@ export function renderWall({
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1.0;
         
-        // Draw shadow BELOW the wall, projected onto the ground/foundation
-        // Sea of Stars style - softer, more gradual fade
-        // Shadow should be on the foundation tile below, not on the wall itself
-        const shadowHeight = screenSize * 0.3; // Shadow extends onto the foundation below
-        const shadowY = screenY; // Start at the top of the foundation tile (where wall meets ground)
-        
-        const shadowGradient = ctx.createLinearGradient(wallX, shadowY, wallX, shadowY + shadowHeight);
-        shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0.5)'); // More intense start
-        shadowGradient.addColorStop(0.3, 'rgba(0, 0, 0, 0.3)'); // Gradual fade midpoint
-        shadowGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.12)'); // Soft before end
-        shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)'); // Fade to transparent at bottom
-        ctx.fillStyle = shadowGradient;
-        ctx.fillRect(wallX, shadowY, wallWidth, shadowHeight);
-        
         ctx.restore();
       } else if (wall.edge === 2) {
         // South wall - use full texture for full height (1 tile)
+        // Check if there's an east wall or west wall on the same foundation and draw their interior shadows first
+        // This ensures south walls render above east/west wall shadows
+        if (allWalls) {
+          // Find east wall on the same foundation tile (edge === 1)
+          for (const [_, eastWall] of allWalls) {
+            if (eastWall.cellX === wall.cellX && 
+                eastWall.cellY === wall.cellY && 
+                eastWall.edge === 1 && 
+                !eastWall.isDestroyed && 
+                eastWall.foundationShape === wall.foundationShape) {
+              // Draw east wall's interior shadow BEFORE drawing south wall
+              const shadowWidth = screenSize * 0.3;
+              const shadowY = screenY;
+              const shadowHeight = screenSize;
+              const shadowX = screenX + screenSize - EAST_WEST_WALL_THICKNESS / 2 - shadowWidth;
+              const shadowGradient = ctx.createLinearGradient(shadowX + shadowWidth, shadowY, shadowX, shadowY);
+              shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0.5)');
+              shadowGradient.addColorStop(0.3, 'rgba(0, 0, 0, 0.3)');
+              shadowGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.12)');
+              shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+              ctx.fillStyle = shadowGradient;
+              ctx.fillRect(shadowX, shadowY, shadowWidth, shadowHeight);
+              break; // Found the east wall, no need to continue searching
+            }
+          }
+          
+          // Find west wall on the same foundation tile (edge === 3)
+          for (const [_, westWall] of allWalls) {
+            if (westWall.cellX === wall.cellX && 
+                westWall.cellY === wall.cellY && 
+                westWall.edge === 3 && 
+                !westWall.isDestroyed && 
+                westWall.foundationShape === wall.foundationShape) {
+              // Draw west wall's interior shadow BEFORE drawing south wall
+              const shadowWidth = screenSize * 0.3;
+              const shadowY = screenY;
+              const shadowHeight = screenSize;
+              const shadowX = screenX; // Start from the left edge of the foundation tile
+              const shadowGradient = ctx.createLinearGradient(shadowX, shadowY, shadowX + shadowWidth, shadowY);
+              shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0.5)');
+              shadowGradient.addColorStop(0.3, 'rgba(0, 0, 0, 0.3)');
+              shadowGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.12)');
+              shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+              ctx.fillStyle = shadowGradient;
+              ctx.fillRect(shadowX, shadowY, shadowWidth, shadowHeight);
+              break; // Found the west wall, no need to continue searching
+            }
+          }
+        }
+        
         ctx.drawImage(
           wallImage,
           0, 0, wallImage.width, wallImage.height, // Source: full tile
@@ -1212,19 +1542,11 @@ export function renderWall({
         // For north walls (interior), make them lighter and add shadow
         if (wall.edge === 0) {
           ctx.save();
-          // Apply darkening overlay (make it darker/shaded) for interior north walls
-          ctx.globalCompositeOperation = 'multiply';
-          ctx.globalAlpha = 0.3; // Darkening intensity
-          ctx.fillStyle = '#000000'; // Black for darkening
-          ctx.fillRect(wallX, wallY, wallWidth, wallHeight);
           
-          // Reset composite operation
-          ctx.globalCompositeOperation = 'source-over';
-          ctx.globalAlpha = 1.0;
-          
-          // Draw shadow BELOW the wall, projected onto the ground/foundation (fallback)
+          // Draw shadow BELOW the wall FIRST, projected onto the ground/foundation (fallback)
           // Sea of Stars style - softer, more gradual fade
           // Shadow should be on the foundation tile below, not on the wall itself
+          // Draw shadow BEFORE wall so wall appears on top
           const shadowHeight = screenSize * 0.3; // Shadow extends onto the foundation below
           const shadowY = screenY; // Start at the top of the foundation tile (where wall meets ground)
           
@@ -1235,6 +1557,16 @@ export function renderWall({
           shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)'); // Fade to transparent at bottom
           ctx.fillStyle = shadowGradient;
           ctx.fillRect(wallX, shadowY, wallWidth, shadowHeight);
+          
+          // Apply darkening overlay (make it darker/shaded) for interior north walls AFTER shadow
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.globalAlpha = 0.3; // Darkening intensity
+          ctx.fillStyle = '#000000'; // Black for darkening
+          ctx.fillRect(wallX, wallY, wallWidth, wallHeight);
+          
+          // Reset composite operation
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.globalAlpha = 1.0;
           ctx.restore();
         }
       } else {
@@ -1377,18 +1709,16 @@ export function renderWall({
     }
     
     // Draw black border around the wall
-    // For north walls, skip the bottom border to avoid thick line at the base
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2;
     if (wall.edge === 0) {
-      // North wall - draw border on top and sides only, not bottom
+      // North wall - draw border on all sides including bottom
       ctx.beginPath();
       ctx.moveTo(wallX, wallY); // Top left
       ctx.lineTo(wallX + wallWidth, wallY); // Top right
-      ctx.moveTo(wallX, wallY); // Top left
-      ctx.lineTo(wallX, wallY + wallHeight); // Left side
-      ctx.moveTo(wallX + wallWidth, wallY); // Top right
-      ctx.lineTo(wallX + wallWidth, wallY + wallHeight); // Right side
+      ctx.lineTo(wallX + wallWidth, wallY + wallHeight); // Right side to bottom right
+      ctx.lineTo(wallX, wallY + wallHeight); // Bottom left
+      ctx.closePath(); // Close the path to include the bottom edge
       ctx.stroke();
     } else {
       // Other walls - draw full border
@@ -1408,7 +1738,25 @@ export function renderWall({
   // East walls (edge === 1) cast shadow to the left (toward interior)
   // West walls (edge === 3) cast shadow to the right (toward interior)
   // Shadows should be projected onto the foundation tile, starting from the wall position
+  // NOTE: East/west wall shadows are drawn BEFORE south walls (see south wall rendering above)
+  // So we skip drawing east/west wall shadow here if there's a south wall on the same foundation
   if (wall.edge === 1 || wall.edge === 3) {
+    // For east/west walls, check if there's a south wall on the same foundation
+    // If so, skip drawing shadow here (it was already drawn before the south wall)
+    if (allWalls) {
+      // Find south wall on the same foundation tile (edge === 2)
+      for (const [_, southWall] of allWalls) {
+        if (southWall.cellX === wall.cellX && 
+            southWall.cellY === wall.cellY && 
+            southWall.edge === 2 && 
+            !southWall.isDestroyed && 
+            southWall.foundationShape === wall.foundationShape) {
+          // Skip drawing east/west wall shadow here - it was already drawn before the south wall
+          return;
+        }
+      }
+    }
+    
     const shadowWidth = screenSize * 0.3; // Shadow extends horizontally onto the foundation
     const shadowY = screenY; // Start at the top of the foundation tile (where wall meets ground)
     const shadowHeight = screenSize; // Shadow covers the full height of the foundation tile
@@ -1496,9 +1844,9 @@ export function renderWall({
 /**
  * Render exterior wall shadows that change throughout the day based on sun position
  * Sea of Stars style - soft, atmospheric shadows throughout all time periods
- * Despite the name, this renders EXTERIOR shadows, not interior ones
+ * Shadows extend OUTWARD from walls onto the ground outside the building
  */
-export function renderWallInteriorShadow({
+export function renderWallExteriorShadow({
   ctx,
   wall,
   worldScale,
@@ -1529,9 +1877,20 @@ export function renderWallInteriorShadow({
   let shadowColor = { r: 0, g: 0, b: 0 }; // Can tint shadows based on time of day
   let gradientStops = [0, 0.6, 1.0]; // Default gradient stops
   
+  // Check if this is a triangle foundation
+  const isTriangleFoundation = wall.foundationShape >= 2 && wall.foundationShape <= 5;
+  
   // Dawn (0.0 - 0.05): Very soft shadows, sun rising from east
   if (cycleProgress >= 0.0 && cycleProgress < 0.05) {
-    shouldCastShadow = wall.edge === 3; // West walls cast long, soft shadows
+    if (isTriangleFoundation) {
+      // TriSE (4) and TriNE (3) cast shadows left in morning
+      // TriNW (2) and TriSW (5) don't cast in morning
+      shouldCastShadow = wall.edge === 3 || 
+        (wall.foundationShape === 4 && (wall.edge === 4 || wall.edge === 5)) ||
+        (wall.foundationShape === 3 && (wall.edge === 4 || wall.edge === 5));
+    } else {
+      shouldCastShadow = wall.edge === 3 || wall.edge === 4; // West walls and DiagNE_SW cast long, soft shadows (westward)
+    }
     shadowAlpha = 0.25 + (cycleProgress / 0.05) * 0.15; // 0.25 -> 0.40
     shadowDepth = screenSize * (1.2 - (cycleProgress / 0.05) * 0.4); // 1.2 -> 0.8 (long to medium)
     shadowColor = { r: 20, g: 10, b: 40 }; // Bluish-purple dawn shadows
@@ -1539,7 +1898,13 @@ export function renderWallInteriorShadow({
   }
   // Morning (0.05 - 0.35): Sun in east, shadows cast west
   else if (cycleProgress >= 0.05 && cycleProgress < 0.35) {
-    shouldCastShadow = wall.edge === 3; // West walls
+    if (isTriangleFoundation) {
+      // TriSE (4) and TriNE (3) cast shadows left in morning
+      // TriNW (2) and TriSW (5) don't cast in morning
+      shouldCastShadow = wall.edge === 3 || ((wall.edge === 4 || wall.edge === 5) && (wall.foundationShape === 4 || wall.foundationShape === 3));
+    } else {
+      shouldCastShadow = wall.edge === 3 || wall.edge === 4; // West walls and DiagNE_SW (westward shadows)
+    }
     const morningProgress = (cycleProgress - 0.05) / 0.30;
     shadowAlpha = 0.40 + morningProgress * 0.10; // 0.40 -> 0.50
     shadowDepth = screenSize * (0.8 - morningProgress * 0.1); // 0.8 -> 0.7
@@ -1548,7 +1913,16 @@ export function renderWallInteriorShadow({
   }
   // Noon (0.35 - 0.55): Sun overhead, short shadows from all sides
   else if (cycleProgress >= 0.35 && cycleProgress < 0.55) {
-    shouldCastShadow = true; // All walls cast shadows
+    if (isTriangleFoundation) {
+      // TriSE (4) and TriNE (3) cast shadows left in morning/noon
+      // TriNW (2) and TriSW (5) don't cast until afternoon
+      // Exclude TriNW (2) and TriSW (5) during noon
+      const isTriNW = wall.foundationShape === 2;
+      const isTriSW = wall.foundationShape === 5;
+      shouldCastShadow = !isTriNW && !isTriSW;
+    } else {
+      shouldCastShadow = true; // All walls cast shadows
+    }
     const noonProgress = (cycleProgress - 0.35) / 0.20;
     const peakNoon = Math.abs(noonProgress - 0.5) * 2; // 0 at exact noon (0.45), 1 at edges
     shadowAlpha = 0.20 + peakNoon * 0.05; // 0.20 at noon, 0.25 at edges
@@ -1558,7 +1932,13 @@ export function renderWallInteriorShadow({
   }
   // Afternoon (0.55 - 0.72): Sun in west, shadows cast east
   else if (cycleProgress >= 0.55 && cycleProgress < 0.72) {
-    shouldCastShadow = wall.edge === 1; // East walls
+    if (isTriangleFoundation) {
+      // TriSW (5) and TriNW (2) cast shadows right after noon
+      // TriSE (4) and TriNE (3) don't cast after noon
+      shouldCastShadow = wall.edge === 1 || ((wall.edge === 4 || wall.edge === 5) && (wall.foundationShape === 5 || wall.foundationShape === 2));
+    } else {
+      shouldCastShadow = wall.edge === 1 || wall.edge === 5; // East walls and DiagNW_SE (eastward shadows)
+    }
     const afternoonProgress = (cycleProgress - 0.55) / 0.17;
     shadowAlpha = 0.50 - afternoonProgress * 0.05; // 0.50 -> 0.45
     shadowDepth = screenSize * (0.7 + afternoonProgress * 0.2); // 0.7 -> 0.9 (getting longer)
@@ -1567,7 +1947,13 @@ export function renderWallInteriorShadow({
   }
   // Dusk (0.72 - 0.76): Sun setting in west, long soft shadows
   else if (cycleProgress >= 0.72 && cycleProgress < 0.76) {
-    shouldCastShadow = wall.edge === 1; // East walls cast long shadows
+    if (isTriangleFoundation) {
+      // TriSW (5) and TriNW (2) cast shadows right after noon
+      // TriSE (4) and TriNE (3) don't cast after noon
+      shouldCastShadow = wall.edge === 1 || ((wall.edge === 4 || wall.edge === 5) && (wall.foundationShape === 5 || wall.foundationShape === 2));
+    } else {
+      shouldCastShadow = wall.edge === 1 || wall.edge === 5; // East walls and DiagNW_SE cast long shadows (eastward)
+    }
     const duskProgress = (cycleProgress - 0.72) / 0.04;
     shadowAlpha = 0.45 - duskProgress * 0.15; // 0.45 -> 0.30
     shadowDepth = screenSize * (0.9 + duskProgress * 0.3); // 0.9 -> 1.2 (very long)
@@ -1594,7 +1980,13 @@ export function renderWallInteriorShadow({
   // Twilight Morning / Pre-Dawn (0.92 - 1.0): Starting to get directional
   else if (cycleProgress >= 0.92 && cycleProgress <= 1.0) {
     const preDawnProgress = (cycleProgress - 0.92) / 0.08;
-    shouldCastShadow = wall.edge === 3; // West walls start casting shadows
+    if (isTriangleFoundation) {
+      // TriSE (4) and TriNE (3) cast shadows left in morning
+      // TriNW (2) and TriSW (5) don't cast in morning
+      shouldCastShadow = wall.edge === 3 || ((wall.edge === 4 || wall.edge === 5) && (wall.foundationShape === 4 || wall.foundationShape === 3));
+    } else {
+      shouldCastShadow = wall.edge === 3 || wall.edge === 4; // West walls and DiagNE_SW start casting shadows (westward)
+    }
     shadowAlpha = 0.12 + preDawnProgress * 0.13; // 0.12 -> 0.25
     shadowDepth = screenSize * (0.5 + preDawnProgress * 0.7); // 0.5 -> 1.2
     shadowColor = { r: 15, g: 8, b: 35 }; // Purple pre-dawn
@@ -1695,36 +2087,192 @@ export function renderWallInteriorShadow({
       
     case 4: // DiagNE_SW
     case 5: // DiagNW_SE
-      // For diagonal walls, create a shadow along the diagonal edge extending outward
+      // For diagonal walls, create a shadow along the diagonal edge extending OUTWARD
       {
-        const centerX = screenX + screenSize / 2;
-        const centerY = screenY + screenSize / 2;
-        const angle = wall.edge === 4 ? Math.PI / 4 : -Math.PI / 4;
-        
         ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate(angle);
         
-        // Create a shadow strip along the diagonal extending outward
-        const stripWidth = Math.sqrt(screenSize * screenSize * 2); // Diagonal length
-        const stripHeight = shadowDepth;
+        // Get the diagonal edge coordinates
+        // For triangle foundations, use foundationShape to determine correct coordinates
+        let hypStartX: number, hypStartY: number, hypEndX: number, hypEndY: number;
         
-        // Create gradient perpendicular to the diagonal, extending outward
+        const isTriangle = wall.foundationShape >= 2 && wall.foundationShape <= 5;
+        
+        if (isTriangle) {
+          // Use foundation shape to determine diagonal coordinates (same logic as renderWallTargetIndicator)
+          switch (wall.foundationShape) {
+            case 2: // TriNW - DiagNW_SE (edge 5)
+              hypStartX = screenX + screenSize;
+              hypStartY = screenY;
+              hypEndX = screenX;
+              hypEndY = screenY + screenSize;
+              break;
+            case 3: // TriNE - DiagNE_SW (edge 4)
+              hypStartX = screenX;
+              hypStartY = screenY;
+              hypEndX = screenX + screenSize;
+              hypEndY = screenY + screenSize;
+              break;
+            case 4: // TriSE - DiagNW_SE (edge 5)
+              hypStartX = screenX;
+              hypStartY = screenY + screenSize;
+              hypEndX = screenX + screenSize;
+              hypEndY = screenY;
+              break;
+            case 5: // TriSW - DiagNE_SW (edge 4)
+              hypStartX = screenX + screenSize;
+              hypStartY = screenY + screenSize;
+              hypEndX = screenX;
+              hypEndY = screenY;
+              break;
+            default:
+              // Fallback to non-triangle logic
+              if (wall.edge === 4) {
+                hypStartX = screenX;
+                hypStartY = screenY;
+                hypEndX = screenX + screenSize;
+                hypEndY = screenY + screenSize;
+              } else {
+                hypStartX = screenX + screenSize;
+                hypStartY = screenY;
+                hypEndX = screenX;
+                hypEndY = screenY + screenSize;
+              }
+              break;
+          }
+        } else {
+          // Non-triangle foundations - use edge number directly
+          if (wall.edge === 4) {
+            // DiagNE_SW: from top-left to bottom-right
+            hypStartX = screenX;
+            hypStartY = screenY;
+            hypEndX = screenX + screenSize;
+            hypEndY = screenY + screenSize;
+          } else {
+            // DiagNW_SE: from top-right to bottom-left
+            hypStartX = screenX + screenSize;
+            hypStartY = screenY;
+            hypEndX = screenX;
+            hypEndY = screenY + screenSize;
+          }
+        }
+        
+        // Calculate the diagonal vector
+        const dx = hypEndX - hypStartX;
+        const dy = hypEndY - hypStartY;
+        const perpLength = Math.sqrt(dx * dx + dy * dy);
+        
+        // Perpendicular vector (rotate 90 degrees)
+        const perpX = -dy;
+        const perpY = dx;
+        const perpNormX = perpX / perpLength;
+        const perpNormY = perpY / perpLength;
+        
+        // Calculate shadow direction based on sun position (time of day) and foundation shape
+        // For triangle foundations:
+        // - TriSE (4): casts shadows LEFT in morning, nothing after noon
+        // - TriSW (5): casts shadows RIGHT after noon, nothing in morning
+        // - TriNE (3): casts shadows LEFT in morning, nothing after noon
+        // - TriNW (2): casts shadows RIGHT after noon, nothing in morning
+        // For non-triangle foundations: use time-based direction
+        let desiredShadowDirX: number, desiredShadowDirY: number;
+        
+        if (isTriangle) {
+          // Triangle foundations have specific shadow directions based on shape
+          if (wall.foundationShape === 4 || wall.foundationShape === 3) {
+            // TriSE (4A/4B) and TriNE (3A/3B): cast shadows LEFT in morning only
+            if (cycleProgress >= 0.0 && cycleProgress < 0.55) {
+              desiredShadowDirX = -1; // Left
+              desiredShadowDirY = 0;
+            } else {
+              // After noon: no shadow (but this shouldn't happen due to time-based check)
+              desiredShadowDirX = 0;
+              desiredShadowDirY = 0;
+            }
+          } else if (wall.foundationShape === 5 || wall.foundationShape === 2) {
+            // TriSW (5A/5B) and TriNW (2A/2B): cast shadows RIGHT after noon only
+            if (cycleProgress >= 0.55) {
+              desiredShadowDirX = 1; // Right
+              desiredShadowDirY = 0;
+            } else {
+              // Before noon: no shadow (but this shouldn't happen due to time-based check)
+              desiredShadowDirX = 0;
+              desiredShadowDirY = 0;
+            }
+          } else {
+            // Fallback: use standard time-based direction
+            if (cycleProgress >= 0.0 && cycleProgress < 0.55) {
+              desiredShadowDirX = -1; // Left in morning
+              desiredShadowDirY = 0;
+            } else {
+              desiredShadowDirX = 1; // Right in afternoon
+              desiredShadowDirY = 0;
+            }
+          }
+        } else {
+          // Non-triangle foundations: use time-based direction
+          if (cycleProgress >= 0.0 && cycleProgress < 0.55) {
+            // Dawn through Morning to Noon: sun in east, shadows cast WEST (left, negative X)
+            desiredShadowDirX = -1;
+            desiredShadowDirY = 0;
+          } else {
+            // Afternoon through Dusk: sun in west, shadows cast EAST (right, positive X)
+            desiredShadowDirX = 1;
+            desiredShadowDirY = 0;
+          }
+        }
+        
+        // Normalize desired shadow direction
+        const desiredDirLength = Math.sqrt(desiredShadowDirX ** 2 + desiredShadowDirY ** 2);
+        const desiredDirX = desiredShadowDirX / desiredDirLength;
+        const desiredDirY = desiredShadowDirY / desiredDirLength;
+        
+        // Check which perpendicular direction (perpNorm or -perpNorm) better matches desired shadow direction
+        const dot1 = perpNormX * desiredDirX + perpNormY * desiredDirY;
+        const dot2 = -perpNormX * desiredDirX + -perpNormY * desiredDirY;
+        
+        // Use the perpendicular direction that better matches the desired shadow direction
+        const outwardPerpX = dot1 > dot2 ? perpNormX : -perpNormX;
+        const outwardPerpY = dot1 > dot2 ? perpNormY : -perpNormY;
+        
+        // Calculate wall midpoint for gradient
+        const wallMidX = (hypStartX + hypEndX) / 2;
+        const wallMidY = (hypStartY + hypEndY) / 2;
+        
+        // Calculate shadow start and end points along the diagonal, extending OUTWARD
+        const shadowStartX = hypStartX + outwardPerpX * shadowDepth;
+        const shadowStartY = hypStartY + outwardPerpY * shadowDepth;
+        const shadowEndX = hypEndX + outwardPerpX * shadowDepth;
+        const shadowEndY = hypEndY + outwardPerpY * shadowDepth;
+        
+        // Create gradient along the outward perpendicular direction
+        const gradientStartX = wallMidX;
+        const gradientStartY = wallMidY;
+        const gradientEndX = wallMidX + outwardPerpX * shadowDepth;
+        const gradientEndY = wallMidY + outwardPerpY * shadowDepth;
+        
         const { r, g, b } = shadowColor;
-        const gradient = ctx.createLinearGradient(
-          -stripWidth / 2, -stripHeight / 2, // Edge (wall)
-          -stripWidth / 2, -stripHeight / 2 - stripHeight // Exterior
+        const shadowGradient = ctx.createLinearGradient(
+          gradientStartX, gradientStartY,
+          gradientEndX, gradientEndY
         );
         
-        // Smooth multi-stop gradient
-        gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${shadowAlpha})`);
-        gradient.addColorStop(0.2, `rgba(${r}, ${g}, ${b}, ${shadowAlpha * 0.8})`);
-        gradient.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, ${shadowAlpha * 0.4})`);
-        gradient.addColorStop(0.8, `rgba(${r}, ${g}, ${b}, ${shadowAlpha * 0.1})`);
-        gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+        // Smooth multi-stop gradient (same as other shadows)
+        shadowGradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${shadowAlpha})`);
+        shadowGradient.addColorStop(0.2, `rgba(${r}, ${g}, ${b}, ${shadowAlpha * 0.8})`);
+        shadowGradient.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, ${shadowAlpha * 0.4})`);
+        shadowGradient.addColorStop(0.8, `rgba(${r}, ${g}, ${b}, ${shadowAlpha * 0.1})`);
+        shadowGradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
         
-        ctx.fillStyle = gradient;
-        ctx.fillRect(-stripWidth / 2, -stripHeight / 2 - stripHeight, stripWidth, stripHeight);
+        // Draw shadow as a quadrilateral extending OUTWARD
+        ctx.fillStyle = shadowGradient;
+        ctx.beginPath();
+        ctx.moveTo(hypStartX, hypStartY); // Start at wall start
+        ctx.lineTo(hypEndX, hypEndY); // Along wall end
+        ctx.lineTo(shadowEndX, shadowEndY); // Shadow end point (outward)
+        ctx.lineTo(shadowStartX, shadowStartY); // Shadow start point (outward)
+        ctx.closePath();
+        ctx.fill();
+        
         ctx.restore();
       }
       break;

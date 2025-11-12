@@ -46,7 +46,7 @@ import { renderCampfire } from './campfireRenderingUtils';
 import { renderFurnace } from './furnaceRenderingUtils'; // ADDED: Furnace renderer import
 import { renderLantern } from './lanternRenderingUtils';
 import { renderFoundation } from './foundationRenderingUtils'; // ADDED: Foundation renderer import
-import { renderWall, renderWallInteriorShadow } from './foundationRenderingUtils'; // ADDED: Wall renderer and exterior shadow import
+import { renderWall, renderWallExteriorShadow } from './foundationRenderingUtils'; // ADDED: Wall renderer and exterior shadow import
 import { renderStash } from './stashRenderingUtils';
 import { renderSleepingBag } from './sleepingBagRenderingUtils';
 // Import shelter renderer
@@ -1068,6 +1068,7 @@ export const renderYSortedEntities = ({
                 viewOffsetY: -cameraOffsetY,
                 foundationTileImagesRef: foundationTileImagesRef,
                 allWalls: allWalls, // Pass all walls to check for adjacent walls
+                cycleProgress: cycleProgress, // Pass cycleProgress for exterior shadows on triangle foundations
             });
         } else if (type === 'shelter') {
             // Shelters are fully rendered in the first pass, including shadows.
@@ -1139,15 +1140,22 @@ export const renderYSortedEntities = ({
             // Render exterior wall shadows (change throughout the day based on sun position)
             // Shadows are cast outward onto the ground outside the building
             const wall = entity as SpacetimeDBWallCell;
-            // Cast shadows based on edge position and time of day
-            renderWallInteriorShadow({
-                ctx,
-                wall: wall as any,
-                worldScale: 1.0,
-                cycleProgress,
-                viewOffsetX: -cameraOffsetX,
-                viewOffsetY: -cameraOffsetY,
-            });
+            // Skip triangle foundations - their exterior shadows are rendered in the first pass
+            // Triangle foundations are identified by foundationShape >= 2 && foundationShape <= 5
+            const isTriangleFoundation = wall.foundationShape >= 2 && wall.foundationShape <= 5;
+            // Skip north walls (edge === 0) - their exterior shadows are rendered in the first pass
+            const isNorthWall = wall.edge === 0;
+            if (!isTriangleFoundation && !isNorthWall) {
+                // Cast shadows based on edge position and time of day
+                renderWallExteriorShadow({
+                    ctx,
+                    wall: wall as any,
+                    worldScale: 1.0,
+                    cycleProgress,
+                    viewOffsetX: -cameraOffsetX,
+                    viewOffsetY: -cameraOffsetY,
+                });
+            }
         } else {
             console.warn('Unhandled entity type for Y-sorting (second pass):', type, entity);
         }
