@@ -441,8 +441,6 @@ import { ActiveEquipmentTableHandle } from "./active_equipment_table.ts";
 export { ActiveEquipmentTableHandle };
 import { AnimalCorpseTableHandle } from "./animal_corpse_table.ts";
 export { AnimalCorpseTableHandle };
-import { AnimalWalkingSoundStateTableHandle } from "./animal_walking_sound_state_table.ts";
-export { AnimalWalkingSoundStateTableHandle };
 import { ArrowBreakEventTableHandle } from "./arrow_break_event_table.ts";
 export { ArrowBreakEventTableHandle };
 import { BarrelTableHandle } from "./barrel_table.ts";
@@ -619,8 +617,6 @@ import { AnimalSpecies } from "./animal_species_type.ts";
 export { AnimalSpecies };
 import { AnimalState } from "./animal_state_type.ts";
 export { AnimalState };
-import { AnimalWalkingSoundState } from "./animal_walking_sound_state_type.ts";
-export { AnimalWalkingSoundState };
 import { ArrowBreakEvent } from "./arrow_break_event_type.ts";
 export { ArrowBreakEvent };
 import { Barrel } from "./barrel_type.ts";
@@ -876,15 +872,6 @@ const REMOTE_MODULE = {
       primaryKeyInfo: {
         colName: "id",
         colType: (AnimalCorpse.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
-      },
-    },
-    animal_walking_sound_state: {
-      tableName: "animal_walking_sound_state" as const,
-      rowType: AnimalWalkingSoundState.getTypeScriptAlgebraicType(),
-      primaryKey: "animalId",
-      primaryKeyInfo: {
-        colName: "animalId",
-        colType: (AnimalWalkingSoundState.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
       },
     },
     arrow_break_event: {
@@ -6757,11 +6744,6 @@ export class RemoteTables {
   get animalCorpse(): AnimalCorpseTableHandle<'animal_corpse'> {
     // clientCache is a private property
     return new AnimalCorpseTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<AnimalCorpse>(REMOTE_MODULE.tables.animal_corpse));
-  }
-
-  get animalWalkingSoundState(): AnimalWalkingSoundStateTableHandle<'animal_walking_sound_state'> {
-    // clientCache is a private property
-    return new AnimalWalkingSoundStateTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<AnimalWalkingSoundState>(REMOTE_MODULE.tables.animal_walking_sound_state));
   }
 
   get arrowBreakEvent(): ArrowBreakEventTableHandle<'arrow_break_event'> {
