@@ -637,10 +637,11 @@ export function handlePlayerToContainerSplit(
         const reducerName = reducers.splitFromPlayer;
         if (connection.reducers[reducerName]) {
             // Different parameter orders for fuel vs storage containers
-            const isFuel = ['campfire', 'furnace', 'lantern'].includes(containerType);
+            // Note: homestead_hearth uses fuel container parameter order
+            const isFuel = ['campfire', 'furnace', 'lantern', 'homestead_hearth'].includes(containerType);
             
             if (isFuel) {
-                // Fuel containers: (sourceItemInstanceId, quantityToSplit, targetContainerId, targetSlotIndex)
+                // Fuel containers and hearth: (sourceItemInstanceId, quantityToSplit, targetContainerId, targetSlotIndex)
                 connection.reducers[reducerName](sourceInstanceId, quantityToSplit, targetContainerIdNum, targetSlotIndexNum);
             } else {
                 // Storage containers: (containerId, targetSlotIndex, sourceItemInstanceId, quantityToSplit)

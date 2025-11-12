@@ -743,7 +743,7 @@ const PlayerUI: React.FC<PlayerUIProps> = ({
                         effectData = {
                             id: 'cozy',
                             name: 'Cozy',
-                            emoji: '🏠',
+                            emoji: '🧣',
                             type: 'positive' as const,
                             description: 'Comfortable near a campfire or in your shelter.',
                             // No duration - permanent effect
@@ -810,7 +810,7 @@ const PlayerUI: React.FC<PlayerUIProps> = ({
                                 name: 'Building Privilege',
                                 emoji: '🏗️',
                                 type: 'positive' as const,
-                                description: 'Can upgrade structures near homestead hearths.',
+                                description: 'Can upgrade structures near matron\'s chests.',
                                 // No duration - effectively permanent until revoked
                             };
                         }

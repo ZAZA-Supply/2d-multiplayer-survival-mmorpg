@@ -587,7 +587,7 @@ export function renderWallTargetIndicator({
   const EAST_WEST_WALL_THICKNESS = 12 * worldScale; // For east/west walls
   const DIAGONAL_WALL_THICKNESS = 12 * worldScale; // For diagonal walls
   // Perspective correction: North walls (away from viewer) appear shorter
-  const NORTH_WALL_HEIGHT = screenSize * 0.75; // 0.75 tiles tall (away from viewer)
+  const NORTH_WALL_HEIGHT = screenSize * 1.0; // 1.0 tiles tall (full height)
   const SOUTH_WALL_HEIGHT = screenSize; // 1 tile tall (closer to viewer)
 
   ctx.save();
@@ -782,7 +782,7 @@ export function renderWall({
   }
   
   // Perspective correction: North walls (away from viewer) appear shorter than south walls (closer to viewer)
-  const NORTH_WALL_HEIGHT = screenSize * 0.75; // 0.75 tiles tall (away from viewer, foreshortened)
+  const NORTH_WALL_HEIGHT = screenSize * 1.0; // 1.0 tiles tall (full height)
   const SOUTH_WALL_HEIGHT = screenSize; // 1 tile tall (closer to viewer, full height)
   
   switch (wall.edge) {
@@ -860,68 +860,234 @@ export function renderWall({
     return; // Don't render invalid wall on triangle foundation
   }
   
-  // For diagonal walls on triangles, we need to clip to the triangle AND draw along the hypotenuse
-  if (isTriangle && isValidEdgeForTriangle && (wall.edge === 4 || wall.edge === 5)) {
-    ctx.save();
-    setupTriangleClipPath(ctx, screenX, screenY, screenSize, wall.foundationShape);
-  } else if (isTriangle && isValidEdgeForTriangle) {
-    // For cardinal edges on triangles, clip to triangle shape
-    ctx.save();
-    setupTriangleClipPath(ctx, screenX, screenY, screenSize, wall.foundationShape);
-  }
-  
   // Draw wall rectangle or diagonal line
   const isDiagonalWall = wall.edge === 4 || wall.edge === 5;
   
-  if (isDiagonalWall) {
-    // For diagonal walls on triangles, draw along the hypotenuse (the outer edge)
-    // Determine the hypotenuse coordinates based on triangle shape:
-    // TriNW (2): DiagNW_SE (5) - hypotenuse from (screenX + screenSize, screenY) to (screenX, screenY + screenSize)
-    // TriNE (3): DiagNE_SW (4) - hypotenuse from (screenX, screenY) to (screenX + screenSize, screenY + screenSize)
-    // TriSE (4): DiagNW_SE (5) - hypotenuse from (screenX, screenY + screenSize) to (screenX + screenSize, screenY)
-    // TriSW (5): DiagNE_SW (4) - hypotenuse from (screenX + screenSize, screenY + screenSize) to (screenX, screenY)
+  // For diagonal walls on triangles, DON'T clip - we need to draw outside the foundation
+  // For cardinal edges on triangles, clip to triangle shape
+  let hasClipping = false;
+  if (isTriangle && isValidEdgeForTriangle && !isDiagonalWall) {
+    // For cardinal edges on triangles, clip to triangle shape
+    ctx.save();
+    setupTriangleClipPath(ctx, screenX, screenY, screenSize, wall.foundationShape);
+    hasClipping = true;
+  }
+  
+  if (isDiagonalWall && isTriangle) {
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TRIANGLE LABELS - SEE BELOW FOR 2A, 2B, 3A, 3B, 4A, 4B, 5A, 5B
+    // ═══════════════════════════════════════════════════════════════════════════
+    // For diagonal walls on triangles: draw TWO triangles
+    // 1. Fill the entire foundation triangle (A)
+    // 2. Take the same triangle, transform it, and move it up one full tile (B)
+    // These two triangles together form the wall
     
-    let hypStartX: number, hypStartY: number, hypEndX: number, hypEndY: number;
+    const tierColors: Record<number, string> = {
+      0: '#8B4513', // Twig - brown
+      1: '#654321', // Wood - dark brown
+      2: '#808080', // Stone - gray
+      3: '#C0C0C0', // Metal - silver
+    };
     
-    // Determine hypotenuse coordinates based on triangle shape
+    ctx.save();
+    
+    // Get the three vertices of the foundation triangle
+    let v1X: number, v1Y: number, v2X: number, v2Y: number, v3X: number, v3Y: number;
+    
+    // ============================================================================
+    // TRIANGLE LABELS:
+    // Each triangle foundation wall is composed of two triangles: bottom (A) and top (B)
+    // 2A, 2B = TriNW (Top-left triangle foundation) - bottom and top triangles
+    // 3A, 3B = TriNE (Top-right triangle foundation) - bottom and top triangles
+    // 4A, 4B = TriSE (Bottom-right triangle foundation) - bottom and top triangles
+    // 5A, 5B = TriSW (Bottom-left triangle foundation) - bottom and top triangles
+    // ============================================================================
+    
+    // Determine triangle vertices based on foundation shape
+    // These match setupTriangleClipPath
     switch (wall.foundationShape) {
-      case 2: // TriNW - DiagNW_SE (edge 5)
-        hypStartX = screenX + screenSize;
-        hypStartY = screenY;
-        hypEndX = screenX;
-        hypEndY = screenY + screenSize;
+      case 2: // TriNW - Top-left triangle
+        // === 2A: Bottom triangle (foundation triangle) ===
+        v1X = screenX;
+        v1Y = screenY;
+        v2X = screenX + screenSize;
+        v2Y = screenY;
+        v3X = screenX;
+        v3Y = screenY + screenSize;
         break;
-      case 3: // TriNE - DiagNE_SW (edge 4)
-        hypStartX = screenX;
-        hypStartY = screenY;
-        hypEndX = screenX + screenSize;
-        hypEndY = screenY + screenSize;
+      case 3: // TriNE - Top-right triangle
+        // === 3A: Bottom triangle (foundation triangle) ===
+        v1X = screenX + screenSize;
+        v1Y = screenY;
+        v2X = screenX + screenSize;
+        v2Y = screenY + screenSize;
+        v3X = screenX;
+        v3Y = screenY;
         break;
-      case 4: // TriSE - DiagNW_SE (edge 5)
-        hypStartX = screenX;
-        hypStartY = screenY + screenSize;
-        hypEndX = screenX + screenSize;
-        hypEndY = screenY;
+      case 4: // TriSE - Bottom-right triangle (SOUTH)
+        // === 4A: Bottom triangle (foundation triangle) - REFLECTED across horizontal axis at base ===
+        // Reflect across horizontal axis at base (screenY + screenSize): newY = 2 * baseY - oldY
+        const baseY4 = screenY + screenSize;
+        v1X = screenX + screenSize;
+        v1Y = baseY4; // On axis, stays same
+        v2X = screenX;
+        v2Y = baseY4; // On axis, stays same
+        v3X = screenX + screenSize;
+        v3Y = 2 * baseY4 - screenY; // Reflect upward: was screenY, now screenY + 2*screenSize
         break;
-      case 5: // TriSW - DiagNE_SW (edge 4)
-        hypStartX = screenX + screenSize;
-        hypStartY = screenY + screenSize;
-        hypEndX = screenX;
-        hypEndY = screenY;
+      case 5: // TriSW - Bottom-left triangle (SOUTH)
+        // === 5A: Bottom triangle (foundation triangle) - REFLECTED across horizontal axis at base ===
+        // Reflect across horizontal axis at base (screenY + screenSize): newY = 2 * baseY - oldY
+        const baseY5 = screenY + screenSize;
+        v1X = screenX;
+        v1Y = baseY5; // On axis, stays same
+        v2X = screenX;
+        v2Y = 2 * baseY5 - screenY; // Reflect upward: was screenY, now screenY + 2*screenSize
+        v3X = screenX + screenSize;
+        v3Y = baseY5; // On axis, stays same
         break;
       default:
-        // Fallback (shouldn't happen)
-        hypStartX = screenX;
-        hypStartY = screenY;
-        hypEndX = screenX + screenSize;
-        hypEndY = screenY + screenSize;
-        break;
+        ctx.restore();
+        return;
+    }
+    
+    const fillColor = tierColors[wall.tier] || '#8B4513';
+    
+    // === Draw bottom triangle (A): 2A, 3A, 4A, 5A ===
+    // For 2A/3A: draw at foundation vertices
+    // For 4A and 5A: mirror on vertical axis (keep X, flip Y)
+    const centerX = screenX + screenSize / 2;
+    const centerY = screenY + screenSize / 2;
+    
+    let drawV1X: number, drawV1Y: number, drawV2X: number, drawV2Y: number, drawV3X: number, drawV3Y: number;
+    
+    if (wall.foundationShape === 4 || wall.foundationShape === 5) {
+      // Mirror 4A and 5A on vertical axis: newX = oldX, newY = 2 * centerY - oldY
+      // Move down a few pixels
+      const downOffset = 3 * worldScale;
+      drawV1X = v1X;
+      drawV1Y = 2 * centerY - v1Y + downOffset;
+      drawV2X = v2X;
+      drawV2Y = 2 * centerY - v2Y + downOffset;
+      drawV3X = v3X;
+      drawV3Y = 2 * centerY - v3Y + downOffset;
+    } else {
+      // For 2A/3A: draw at foundation vertices directly (no change)
+      drawV1X = v1X;
+      drawV1Y = v1Y;
+      drawV2X = v2X;
+      drawV2Y = v2Y;
+      drawV3X = v3X;
+      drawV3Y = v3Y;
+    }
+    
+    ctx.fillStyle = fillColor;
+    ctx.beginPath();
+    ctx.moveTo(drawV1X, drawV1Y);
+    ctx.lineTo(drawV2X, drawV2Y);
+    ctx.lineTo(drawV3X, drawV3Y);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Draw border for bottom triangle (A)
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Draw label on bottom triangle (A)
+    const labelA = `${wall.foundationShape}A`;
+    const centerAX = (drawV1X + drawV2X + drawV3X) / 3;
+    const centerAY = (drawV1Y + drawV2Y + drawV3Y) / 3;
+    ctx.save();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.font = `bold ${16 * worldScale}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeText(labelA, centerAX, centerAY);
+    ctx.fillText(labelA, centerAX, centerAY);
+    ctx.restore();
+    
+    // === Create top triangle (B) by transforming bottom triangle (A) ===
+    // 2B, 3B, 4B, 5B
+    // For SOUTH triangle foundations (TriNW=2, TriNE=3), rotate the top triangle 180 degrees around center
+    // For NORTH triangle foundations (TriSE=4, TriSW=5), mirror horizontally (left/right)
+    const isSouthTriangle = wall.foundationShape === 2 || wall.foundationShape === 3;
+    
+    let mirrorV1X: number, mirrorV1Y: number, mirrorV2X: number, mirrorV2Y: number, mirrorV3X: number, mirrorV3Y: number;
+    
+    if (isSouthTriangle) {
+      // === 2B, 3B: Top triangles created from 2A, 3A ===
+      // SOUTH triangles (TriNW=2, TriNE=3): rotate 180 degrees around center, then move up
+      // 180-degree rotation: newX = 2 * centerX - oldX, newY = 2 * centerY - oldY
+      mirrorV1X = 2 * centerX - v1X; // Rotate X around center
+      mirrorV1Y = 2 * centerY - v1Y - screenSize; // Rotate Y around center, then move up
+      mirrorV2X = 2 * centerX - v2X;
+      mirrorV2Y = 2 * centerY - v2Y - screenSize;
+      mirrorV3X = 2 * centerX - v3X;
+      mirrorV3Y = 2 * centerY - v3Y - screenSize;
+    } else {
+      // === 4B, 5B: Top triangles created from 4A, 5A ===
+      // NORTH triangles (TriSE=4, TriSW=5): mirror horizontally (left/right) and move up
+      // Move down a few pixels (same offset as 4A/5A)
+      const downOffset = 3 * worldScale;
+      mirrorV1X = 2 * centerX - v1X;
+      mirrorV1Y = v1Y - screenSize + downOffset; // Move up one tile, then down a few pixels
+      mirrorV2X = 2 * centerX - v2X;
+      mirrorV2Y = v2Y - screenSize + downOffset;
+      mirrorV3X = 2 * centerX - v3X;
+      mirrorV3Y = v3Y - screenSize + downOffset;
+    }
+    
+    // === Draw top triangle (B): 2B, 3B, 4B, 5B ===
+    ctx.fillStyle = fillColor;
+    ctx.beginPath();
+    ctx.moveTo(mirrorV1X, mirrorV1Y);
+    ctx.lineTo(mirrorV2X, mirrorV2Y);
+    ctx.lineTo(mirrorV3X, mirrorV3Y);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Draw border for top triangle
+    ctx.stroke();
+    
+    // Draw label on top triangle (B)
+    const labelB = `${wall.foundationShape}B`;
+    const centerBX = (mirrorV1X + mirrorV2X + mirrorV3X) / 3;
+    const centerBY = (mirrorV1Y + mirrorV2Y + mirrorV3Y) / 3;
+    ctx.save();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.font = `bold ${16 * worldScale}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeText(labelB, centerBX, centerBY);
+    ctx.fillText(labelB, centerBX, centerBY);
+    ctx.restore();
+    
+    ctx.restore();
+  } else if (isDiagonalWall) {
+    // For diagonal walls on non-triangle foundations, use the old method
+    let hypStartX: number, hypStartY: number, hypEndX: number, hypEndY: number;
+    
+    // Determine hypotenuse coordinates
+    if (wall.edge === 4) { // DiagNE_SW
+      hypStartX = screenX;
+      hypStartY = screenY;
+      hypEndX = screenX + screenSize;
+      hypEndY = screenY + screenSize;
+    } else { // DiagNW_SE (edge 5)
+      hypStartX = screenX + screenSize;
+      hypStartY = screenY;
+      hypEndX = screenX;
+      hypEndY = screenY + screenSize;
     }
     
     // Draw diagonal wall texture (rotated strip along hypotenuse)
     if (wallImage && wallImage.complete && wallImage.naturalHeight !== 0) {
       ctx.save();
-      // Calculate angle and center for rotation
       const centerX = (hypStartX + hypEndX) / 2;
       const centerY = (hypStartY + hypEndY) / 2;
       const angle = Math.atan2(hypEndY - hypStartY, hypEndX - hypStartX);
@@ -930,22 +1096,20 @@ export function renderWall({
       ctx.rotate(angle);
       ctx.translate(-centerX, -centerY);
       
-      // Draw a strip along the diagonal
       const stripWidth = Math.sqrt((hypEndX - hypStartX) ** 2 + (hypEndY - hypStartY) ** 2);
       const stripHeight = DIAGONAL_WALL_THICKNESS;
       ctx.drawImage(
         wallImage,
-        0, 0, wallImage.width, DIAGONAL_WALL_THICKNESS / worldScale, // Source
-        centerX - stripWidth / 2, centerY - stripHeight / 2, stripWidth, stripHeight // Destination
+        0, 0, wallImage.width, DIAGONAL_WALL_THICKNESS / worldScale,
+        centerX - stripWidth / 2, centerY - stripHeight / 2, stripWidth, stripHeight
       );
       ctx.restore();
     } else {
-      // Fallback: Draw colored rectangle along hypotenuse
       const tierColors: Record<number, string> = {
-        0: '#8B4513', // Twig - brown
-        1: '#654321', // Wood - dark brown
-        2: '#808080', // Stone - gray
-        3: '#C0C0C0', // Metal - silver
+        0: '#8B4513',
+        1: '#654321',
+        2: '#808080',
+        3: '#C0C0C0',
       };
       ctx.save();
       const centerX = (hypStartX + hypEndX) / 2;
@@ -961,7 +1125,6 @@ export function renderWall({
       ctx.restore();
     }
     
-    // Draw black border along the hypotenuse (on the outer edge)
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2;
     ctx.lineCap = 'square';
@@ -1233,7 +1396,8 @@ export function renderWall({
     }
   }
   
-  if (isTriangle) {
+  // Only restore clipping if it was set up
+  if (hasClipping) {
     ctx.restore();
   }
   
@@ -1708,7 +1872,7 @@ export function renderWallPreview({
   let isDiagonal = edge === 4 || edge === 5;
   
   // Perspective correction: North walls (away from viewer) appear shorter than south walls (closer to viewer)
-  const PREVIEW_NORTH_WALL_HEIGHT = screenSize * 0.75; // 0.75 tiles tall (away from viewer, foreshortened)
+  const PREVIEW_NORTH_WALL_HEIGHT = screenSize * 1.0; // 1.0 tiles tall (full height)
   const PREVIEW_SOUTH_WALL_HEIGHT = screenSize; // 1 tile tall (closer to viewer, full height)
   
   switch (edge) {
@@ -1814,13 +1978,13 @@ export function renderWallPreview({
       // Match the actual wall rendering exactly
       if (edge === 0) {
         // North wall - use BOTTOM half of texture (matches actual rendering)
-        // Draw at 3/4 height (NORTH_WALL_HEIGHT) to match actual wall
+        // Draw at full height (NORTH_WALL_HEIGHT) to match actual wall
         const sourceY = wallImage.height * 0.5; // Start from middle (bottom half)
         const sourceHeight = wallImage.height * 0.5; // Bottom half of texture
         ctx.drawImage(
           wallImage,
           0, sourceY, wallImage.width, sourceHeight, // Source: BOTTOM half of texture
-          wallX, wallY, wallWidth, wallHeight // Destination: wall dimensions (PREVIEW_NORTH_WALL_HEIGHT = 0.75 * screenSize)
+          wallX, wallY, wallWidth, wallHeight // Destination: wall dimensions (PREVIEW_NORTH_WALL_HEIGHT = 1.0 * screenSize)
         );
       } else if (edge === 2) {
         // South wall - use full texture for full height (matches actual rendering)
