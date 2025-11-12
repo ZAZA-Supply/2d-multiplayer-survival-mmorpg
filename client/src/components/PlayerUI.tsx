@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Player, InventoryItem, ItemDefinition, DbConnection, ActiveEquipment, Campfire as SpacetimeDBCampfire, Lantern as SpacetimeDBLantern, WoodenStorageBox as SpacetimeDBWoodenStorageBox, Recipe, CraftingQueueItem, PlayerCorpse, StatThresholdsConfig, Stash as SpacetimeDBStash, ActiveConsumableEffect, KnockedOutStatus, WorldState, RainCollector as SpacetimeDBRainCollector, Furnace as SpacetimeDBFurnace } from '../generated';
+import { Player, InventoryItem, ItemDefinition, DbConnection, ActiveEquipment, Campfire as SpacetimeDBCampfire, Lantern as SpacetimeDBLantern, WoodenStorageBox as SpacetimeDBWoodenStorageBox, Recipe, CraftingQueueItem, PlayerCorpse, StatThresholdsConfig, Stash as SpacetimeDBStash, ActiveConsumableEffect, KnockedOutStatus, WorldState, RainCollector as SpacetimeDBRainCollector, Furnace as SpacetimeDBFurnace, HomesteadHearth as SpacetimeDBHomesteadHearth } from '../generated';
 import { Identity } from 'spacetimedb';
 import InventoryUI, { PopulatedItem } from './InventoryUI';
 import Hotbar from './Hotbar';
@@ -44,6 +44,7 @@ interface PlayerUIProps {
   playerCorpses: Map<string, PlayerCorpse>;
   stashes: Map<string, SpacetimeDBStash>;
   rainCollectors: Map<string, SpacetimeDBRainCollector>;
+  homesteadHearths: Map<string, SpacetimeDBHomesteadHearth>; // ADDED: Homestead Hearths
   onCraftingSearchFocusChange?: (isFocused: boolean) => void;
   showInventory: boolean;
   onToggleInventory: () => void;
@@ -78,6 +79,7 @@ const PlayerUI: React.FC<PlayerUIProps> = ({
     playerCorpses,
     stashes,
     rainCollectors,
+    homesteadHearths,
     onCraftingSearchFocusChange,
     showInventory,
     onToggleInventory,
@@ -780,6 +782,39 @@ const PlayerUI: React.FC<PlayerUIProps> = ({
                             // No duration - permanent effect based on needs
                         };
                         break;
+                    case 'BuildingPrivilege':
+                        // Only show building privilege status if player is within range of a hearth
+                        const BUILDING_PRIVILEGE_RADIUS_SQUARED = 1000.0 * 1000.0; // 1000px radius (doubled from 500px)
+                        let isWithinHearthRange = false;
+                        
+                        if (localPlayer && homesteadHearths) {
+                            for (const hearth of homesteadHearths.values()) {
+                                if (hearth.isDestroyed) continue;
+                                
+                                const dx = localPlayer.positionX - hearth.posX;
+                                const dy = localPlayer.positionY - hearth.posY;
+                                const distanceSquared = dx * dx + dy * dy;
+                                
+                                if (distanceSquared <= BUILDING_PRIVILEGE_RADIUS_SQUARED) {
+                                    isWithinHearthRange = true;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Only show the effect if within range
+                        if (isWithinHearthRange) {
+                            effectApplies = true;
+                            effectData = {
+                                id: 'building_privilege',
+                                name: 'Building Privilege',
+                                emoji: '🏗️',
+                                type: 'positive' as const,
+                                description: 'Can upgrade structures near homestead hearths.',
+                                // No duration - effectively permanent until revoked
+                            };
+                        }
+                        break;
                 }
             } else if (effectTargetPlayerIdHex === localPlayerIdHex && effectTypeTag === 'RemoteBandageBurst') {
                 // Check if remote bandage healer is in range
@@ -806,7 +841,7 @@ const PlayerUI: React.FC<PlayerUIProps> = ({
                 }
             }
             
-            if (effectApplies && effectData && (bufferedRemainingTime > 0 || effectData.id === 'cozy' || effectData.id === 'tree_cover' || effectData.id === 'exhausted')) {
+            if (effectApplies && effectData && (bufferedRemainingTime > 0 || effectData.id === 'cozy' || effectData.id === 'tree_cover' || effectData.id === 'exhausted' || effectData.id === 'building_privilege')) {
                 effects.push(effectData);
             }
         });
@@ -909,6 +944,7 @@ const PlayerUI: React.FC<PlayerUIProps> = ({
                     playerCorpses={playerCorpses}
                     stashes={stashes}
                     rainCollectors={rainCollectors}
+                    homesteadHearths={homesteadHearths}
                     startPlacement={startPlacement}
                     cancelPlacement={cancelPlacement}
                     placementInfo={placementInfo}
@@ -917,6 +953,8 @@ const PlayerUI: React.FC<PlayerUIProps> = ({
                     craftingQueueItems={craftingQueueItems}
                     onCraftingSearchFocusChange={onCraftingSearchFocusChange}
                     worldState={worldState}
+                    players={players}
+                    activeConsumableEffects={activeConsumableEffects}
                  />
              )}
 

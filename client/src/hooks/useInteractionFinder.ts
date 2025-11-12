@@ -4,6 +4,7 @@ import {
     Campfire as SpacetimeDBCampfire,
     Furnace as SpacetimeDBFurnace, // ADDED: Furnace import
     Lantern as SpacetimeDBLantern,
+    HomesteadHearth as SpacetimeDBHomesteadHearth, // ADDED: HomesteadHearth import
     DroppedItem as SpacetimeDBDroppedItem,
     WoodenStorageBox as SpacetimeDBWoodenStorageBox,
     HarvestableResource as SpacetimeDBHarvestableResource,
@@ -34,6 +35,11 @@ import {
     LANTERN_HEIGHT,
     LANTERN_RENDER_Y_OFFSET
 } from '../utils/renderers/lanternRenderingUtils';
+import {
+    PLAYER_HEARTH_INTERACTION_DISTANCE_SQUARED,
+    HEARTH_HEIGHT,
+    HEARTH_RENDER_Y_OFFSET
+} from '../utils/renderers/hearthRenderingUtils'; // ADDED: Hearth interaction constants
 import { PLAYER_CORPSE_INTERACTION_DISTANCE_SQUARED } from '../utils/renderers/playerCorpseRenderingUtils';
 import { PLAYER_BOX_INTERACTION_DISTANCE_SQUARED, BOX_HEIGHT } from '../utils/renderers/woodenStorageBoxRenderingUtils';
 import { getResourceConfig } from '../utils/renderers/resourceConfigurations';
@@ -59,6 +65,7 @@ interface UseInteractionFinderProps {
     campfires: Map<string, SpacetimeDBCampfire>;
     furnaces: Map<string, SpacetimeDBFurnace>; // ADDED: Furnace support
     lanterns: Map<string, SpacetimeDBLantern>;
+    homesteadHearths: Map<string, SpacetimeDBHomesteadHearth>; // ADDED: HomesteadHearths support
     droppedItems: Map<string, SpacetimeDBDroppedItem>;
     woodenStorageBoxes: Map<string, SpacetimeDBWoodenStorageBox>;
     playerCorpses: Map<string, SpacetimeDBPlayerCorpse>;
@@ -86,6 +93,7 @@ interface UseInteractionFinderResult {
     closestInteractableCampfireId: number | null;
     closestInteractableFurnaceId: number | null; // ADDED: Furnace support
     closestInteractableLanternId: number | null;
+    closestInteractableHearthId: number | null; // ADDED: HomesteadHearth support
     closestInteractableDroppedItemId: bigint | null;
     closestInteractableBoxId: number | null;
     isClosestInteractableBoxEmpty: boolean;
@@ -173,6 +181,7 @@ export function useInteractionFinder({
     campfires,
     furnaces, // ADDED: Furnace prop destructuring
     lanterns,
+    homesteadHearths, // ADDED: HomesteadHearths prop destructuring
     droppedItems,
     woodenStorageBoxes,
     playerCorpses,
@@ -194,6 +203,7 @@ export function useInteractionFinder({
     const [closestInteractableCampfireId, setClosestInteractableCampfireId] = useState<number | null>(null);
     const [closestInteractableFurnaceId, setClosestInteractableFurnaceId] = useState<number | null>(null); // ADDED: Furnace state
     const [closestInteractableLanternId, setClosestInteractableLanternId] = useState<number | null>(null);
+    const [closestInteractableHearthId, setClosestInteractableHearthId] = useState<number | null>(null); // ADDED: HomesteadHearth state
     const [closestInteractableDroppedItemId, setClosestInteractableDroppedItemId] = useState<bigint | null>(null);
     const [closestInteractableBoxId, setClosestInteractableBoxId] = useState<number | null>(null);
     const [isClosestInteractableBoxEmpty, setIsClosestInteractableBoxEmpty] = useState<boolean>(false);
@@ -210,6 +220,7 @@ export function useInteractionFinder({
         closestInteractableCampfireId: null,
         closestInteractableFurnaceId: null,
         closestInteractableLanternId: null,
+        closestInteractableHearthId: null, // ADDED: HomesteadHearth
         closestInteractableDroppedItemId: null,
         closestInteractableBoxId: null,
         isClosestInteractableBoxEmpty: false,
@@ -238,6 +249,9 @@ export function useInteractionFinder({
 
         let closestLanternId: number | null = null;
         let closestLanternDistSq = PLAYER_LANTERN_INTERACTION_DISTANCE_SQUARED;
+
+        let closestHearthId: number | null = null; // ADDED: HomesteadHearth tracking
+        let closestHearthDistSq = PLAYER_HEARTH_INTERACTION_DISTANCE_SQUARED;
 
         let closestDroppedItemId: bigint | null = null;
         let closestDroppedItemDistSq = PLAYER_DROPPED_ITEM_INTERACTION_DISTANCE_SQUARED;
@@ -375,6 +389,29 @@ export function useInteractionFinder({
                         )) {
                             closestLanternDistSq = distSq;
                             closestLanternId = lantern.id;
+                        }
+                    }
+                });
+            }
+
+            // Find closest homestead hearth
+            if (homesteadHearths) {
+                homesteadHearths.forEach((hearth) => {
+                    if (hearth.isDestroyed) return;
+                    
+                    const visualCenterY = hearth.posY - (HEARTH_HEIGHT / 2) - HEARTH_RENDER_Y_OFFSET;
+                    
+                    const dx = playerX - hearth.posX;
+                    const dy = playerY - visualCenterY;
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq < closestHearthDistSq) {
+                        // Check shelter access control
+                        if (canPlayerInteractWithObjectInShelter(
+                            playerX, playerY, localPlayer.identity.toHexString(),
+                            hearth.posX, hearth.posY, shelters
+                        )) {
+                            closestHearthDistSq = distSq;
+                            closestHearthId = hearth.id;
                         }
                     }
                 });
@@ -651,6 +688,14 @@ export function useInteractionFinder({
                     }
                 });
             }
+            if (closestHearthId) { // ADDED: HomesteadHearth candidate
+                candidates.push({
+                    type: 'homestead_hearth',
+                    id: closestHearthId,
+                    position: { x: 0, y: 0 },
+                    distance: Math.sqrt(closestHearthDistSq)
+                });
+            }
             if (closestDroppedItemId) {
                 candidates.push({
                     type: 'dropped_item',
@@ -738,6 +783,7 @@ export function useInteractionFinder({
             closestInteractableCampfireId: closestCampfireId,
             closestInteractableFurnaceId: closestFurnaceId, // ADDED: Furnace return
             closestInteractableLanternId: closestLanternId,
+            closestInteractableHearthId: closestHearthId, // ADDED: HomesteadHearth return
             closestInteractableDroppedItemId: closestDroppedItemId,
             closestInteractableBoxId: closestBoxId,
             isClosestInteractableBoxEmpty: isClosestBoxEmpty,
@@ -763,6 +809,9 @@ export function useInteractionFinder({
         }
         if (calculatedResult.closestInteractableLanternId !== closestInteractableLanternId) {
             setClosestInteractableLanternId(calculatedResult.closestInteractableLanternId);
+        }
+        if (calculatedResult.closestInteractableHearthId !== closestInteractableHearthId) { // ADDED: HomesteadHearth state update
+            setClosestInteractableHearthId(calculatedResult.closestInteractableHearthId);
         }
         if (calculatedResult.closestInteractableDroppedItemId !== closestInteractableDroppedItemId) {
             setClosestInteractableDroppedItemId(calculatedResult.closestInteractableDroppedItemId);
@@ -792,7 +841,7 @@ export function useInteractionFinder({
         if (calculatedResult.closestInteractableWaterPosition !== closestInteractableWaterPosition) {
             setClosestInteractableWaterPosition(calculatedResult.closestInteractableWaterPosition);
         }
-    }, [localPlayer, harvestableResources, campfires, furnaces, lanterns, droppedItems, woodenStorageBoxes, playerCorpses, stashes, rainCollectors, sleepingBags, players, shelters, inventoryItems, itemDefinitions, connection, playerDrinkingCooldowns]);
+    }, [localPlayer, harvestableResources, campfires, furnaces, lanterns, homesteadHearths, droppedItems, woodenStorageBoxes, playerCorpses, stashes, rainCollectors, sleepingBags, players, shelters, inventoryItems, itemDefinitions, connection, playerDrinkingCooldowns]);
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -807,6 +856,7 @@ export function useInteractionFinder({
         closestInteractableCampfireId,
         closestInteractableFurnaceId, // ADDED: Furnace final return
         closestInteractableLanternId,
+        closestInteractableHearthId, // ADDED: HomesteadHearth final return
         closestInteractableDroppedItemId,
         closestInteractableBoxId,
         isClosestInteractableBoxEmpty,

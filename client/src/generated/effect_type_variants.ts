@@ -41,4 +41,5 @@ export type TreeCover = { tag: "TreeCover" };
 export type WaterDrinking = { tag: "WaterDrinking" };
 export type Venom = { tag: "Venom" };
 export type Exhausted = { tag: "Exhausted" };
+export type BuildingPrivilege = { tag: "BuildingPrivilege" };
 

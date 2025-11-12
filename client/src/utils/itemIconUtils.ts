@@ -264,6 +264,7 @@ import sleepingBagIcon from '../assets/items/sleeping_bag.png';
 import shelterIcon from '../assets/items/shelter.png';
 import tallowLampIcon from '../assets/items/lantern_off.png';
 import reedRainCollectorIcon from '../assets/items/reed_rain_collector.png';
+import hearthIcon from '../assets/items/hearth.png'; // ADDED: Homestead Hearth icon
 
 // Trophy decorations
 import wolfPeltIcon from '../assets/items/wolf_pelt.png';
@@ -524,6 +525,7 @@ const iconMap: { [key: string]: string | undefined } = {
   'shelter.png': shelterIcon,
   'lantern_off.png': tallowLampIcon,
   'reed_rain_collector.png': reedRainCollectorIcon,
+  'hearth.png': hearthIcon, // ADDED: Homestead Hearth icon
   
   // Trophy decorations
   'wolf_pelt.png': wolfPeltIcon,

@@ -7,6 +7,7 @@ import {
   Campfire as SpacetimeDBCampfire,
   Furnace as SpacetimeDBFurnace, // ADDED: Furnace import
   Lantern as SpacetimeDBLantern,
+  HomesteadHearth as SpacetimeDBHomesteadHearth, // ADDED: Homestead Hearth import
   HarvestableResource as SpacetimeDBHarvestableResource,
   DroppedItem as SpacetimeDBDroppedItem,
   WoodenStorageBox as SpacetimeDBWoodenStorageBox,
@@ -54,6 +55,7 @@ interface EntityFilteringResult {
   visibleDroppedItems: SpacetimeDBDroppedItem[];
   visibleCampfires: SpacetimeDBCampfire[];
   visibleFurnaces: SpacetimeDBFurnace[]; // ADDED: Furnaces
+  visibleHomesteadHearths: SpacetimeDBHomesteadHearth[]; // ADDED: Homestead Hearths
   visiblePlayers: SpacetimeDBPlayer[];
   visibleTrees: SpacetimeDBTree[];
   visibleStones: SpacetimeDBStone[];
@@ -64,6 +66,7 @@ interface EntityFilteringResult {
   visibleCampfiresMap: Map<string, SpacetimeDBCampfire>;
   visibleFurnacesMap: Map<string, SpacetimeDBFurnace>; // ADDED: Furnaces map
   visibleLanternsMap: Map<string, SpacetimeDBLantern>;
+  visibleHomesteadHearthsMap: Map<string, SpacetimeDBHomesteadHearth>; // ADDED: Homestead Hearths map
   visibleDroppedItemsMap: Map<string, SpacetimeDBDroppedItem>;
   visibleBoxesMap: Map<string, SpacetimeDBWoodenStorageBox>;
   visibleProjectilesMap: Map<string, SpacetimeDBProjectile>;
@@ -113,6 +116,7 @@ export type YSortedEntityType =
   | { type: 'campfire'; entity: SpacetimeDBCampfire }
   | { type: 'furnace'; entity: SpacetimeDBFurnace } // ADDED: Furnace type
   | { type: 'lantern'; entity: SpacetimeDBLantern }
+  | { type: 'homestead_hearth'; entity: SpacetimeDBHomesteadHearth } // ADDED: Homestead Hearth type
   | { type: 'dropped_item'; entity: SpacetimeDBDroppedItem }
   | { type: 'projectile'; entity: SpacetimeDBProjectile }
   | { type: 'shelter'; entity: SpacetimeDBShelter }
@@ -145,6 +149,7 @@ const getEntityY = (item: YSortedEntityType, timestamp: number): number => {
     case 'campfire':
     case 'furnace':
     case 'lantern':
+    case 'homestead_hearth': // ADDED: Homestead Hearth (same as campfire)
     case 'planted_seed':
     case 'dropped_item':
     case 'harvestable_resource':
@@ -211,6 +216,7 @@ const getEntityPriority = (item: YSortedEntityType): number => {
     case 'campfire': return 7;
     case 'furnace': return 7.5;
     case 'lantern': return 8;
+    case 'homestead_hearth': return 7.2; // ADDED: Homestead Hearth (between furnace and lantern)
     case 'grass': return 9;
     case 'planted_seed': return 10;
     case 'dropped_item': return 11;
@@ -422,6 +428,7 @@ export function useEntityFiltering(
   campfires: Map<string, SpacetimeDBCampfire>,
   furnaces: Map<string, SpacetimeDBFurnace>, // ADDED: Furnaces parameter
   lanterns: Map<string, SpacetimeDBLantern>,
+  homesteadHearths: Map<string, SpacetimeDBHomesteadHearth>, // ADDED: Homestead Hearths parameter
   harvestableResources: Map<string, SpacetimeDBHarvestableResource>,
   droppedItems: Map<string, SpacetimeDBDroppedItem>,
   woodenStorageBoxes: Map<string, SpacetimeDBWoodenStorageBox>,
@@ -514,10 +521,13 @@ export function useEntityFiltering(
       y = entity.posY;
       width = 48;
       height = 56;
+    } else if ((entity as any).id !== undefined && (entity as any).posX !== undefined && (entity as any).posY !== undefined && (entity as any).slotInstanceId0 !== undefined) {
+      // Handle homestead hearths - check for slotInstanceId0 field (unique to hearths)
+      x = (entity as any).posX;
+      y = (entity as any).posY;
+      width = 96; // HEARTH_WIDTH
+      height = 96; // HEARTH_HEIGHT
     } else if (isHarvestableResource(entity)) {
-      x = entity.posX;
-      y = entity.posY;
-    } else if (isDroppedItem(entity)) {
       x = entity.posX;
       y = entity.posY;
       width = 32;
@@ -702,6 +712,13 @@ export function useEntityFiltering(
     
     return visibleFiltered;
   }, [lanterns, isEntityInView, viewBounds, stableTimestamp]);
+
+  const visibleHomesteadHearths = useMemo(() => 
+    // Check source map - same filtering as campfires
+          homesteadHearths ? Array.from(homesteadHearths.values()).filter(e => isEntityInView(e, viewBounds, stableTimestamp) && !e.isDestroyed)
+    : [],
+    [homesteadHearths, isEntityInView, viewBounds, stableTimestamp]
+  );
 
   const visiblePlayers = useMemo(() => {
     if (!players) return [];
@@ -951,7 +968,12 @@ export function useEntityFiltering(
     new Map(visibleLanterns.map(l => [l.id.toString(), l])), 
     [visibleLanterns]
   );
-  
+
+  const visibleHomesteadHearthsMap = useMemo(() => 
+    new Map(visibleHomesteadHearths.map(h => [h.id.toString(), h])), 
+    [visibleHomesteadHearths]
+  ); 
+
   const visibleDroppedItemsMap = useMemo(() => 
     new Map(visibleDroppedItems.map(i => [i.id.toString(), i])), 
     [visibleDroppedItems]
@@ -1100,6 +1122,7 @@ export function useEntityFiltering(
       campfires: visibleCampfires.length,
       furnaces: visibleFurnaces.length,
       lanterns: visibleLanterns.length,
+      homesteadHearths: visibleHomesteadHearths.length, // ADDED: Homestead Hearths count
       droppedItems: visibleDroppedItems.length,
       projectiles: visibleProjectiles.length,
       shelters: visibleShelters.length,
@@ -1199,6 +1222,7 @@ export function useEntityFiltering(
     visibleCampfires.forEach(e => allEntities[index++] = { type: 'campfire', entity: e });
     visibleFurnaces.forEach(e => allEntities[index++] = { type: 'furnace', entity: e });
     visibleLanterns.forEach(e => allEntities[index++] = { type: 'lantern', entity: e });
+    visibleHomesteadHearths.forEach(e => allEntities[index++] = { type: 'homestead_hearth', entity: e }); // ADDED: Homestead Hearths
     visibleGrass.forEach(e => allEntities[index++] = { type: 'grass', entity: e });
     visiblePlantedSeeds.forEach(e => allEntities[index++] = { type: 'planted_seed', entity: e });
     visibleDroppedItems.forEach(e => allEntities[index++] = { type: 'dropped_item', entity: e });
@@ -1344,7 +1368,9 @@ export function useEntityFiltering(
     visibleHarvestableResources,
     visibleDroppedItems,
     visibleCampfires,
+    visibleFurnaces, // ADDED: Furnaces
     visibleLanterns,
+    visibleHomesteadHearths, // ADDED: Homestead Hearths
     visiblePlayers,
     visibleTrees,
     visibleStones,
@@ -1355,7 +1381,9 @@ export function useEntityFiltering(
     visibleProjectiles,
     visibleHarvestableResourcesMap,
     visibleCampfiresMap,
+    visibleFurnacesMap, // ADDED: Furnaces map
     visibleLanternsMap,
+    visibleHomesteadHearthsMap, // ADDED: Homestead Hearths map
     visibleDroppedItemsMap,
     visibleBoxesMap,
     visibleProjectilesMap,
@@ -1384,8 +1412,6 @@ export function useEntityFiltering(
     visibleBarrelsMap,
     visibleSeaStacks, 
     visibleSeaStacksMap,
-    visibleFurnaces,
-    visibleFurnacesMap,
     visibleFoundationCells,
     visibleFoundationCellsMap,
     visibleWallCells,

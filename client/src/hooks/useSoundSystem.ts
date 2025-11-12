@@ -103,8 +103,15 @@ class AudioCache {
     private accessOrder = new Map<string, number>();
     private accessCounter = 0;
     private readonly maxSize = 50;
+    // Track failed loads to prevent repeated attempts
+    private failedLoads = new Set<string>();
 
     get(filename: string): HTMLAudioElement | null {
+        // Don't even try if we know it failed before
+        if (this.failedLoads.has(filename)) {
+            return null;
+        }
+        
         const audio = this.cache.get(filename);
         if (audio) {
             this.accessOrder.set(filename, ++this.accessCounter);
@@ -114,6 +121,9 @@ class AudioCache {
     }
 
     set(filename: string, audio: HTMLAudioElement): void {
+        // Remove from failed loads if successfully loaded
+        this.failedLoads.delete(filename);
+        
         // Remove oldest if at capacity
         if (this.cache.size >= this.maxSize) {
             let oldestFile = '';
@@ -137,11 +147,20 @@ class AudioCache {
     has(filename: string): boolean {
         return this.cache.has(filename);
     }
+    
+    markFailed(filename: string): void {
+        this.failedLoads.add(filename);
+    }
+    
+    isFailed(filename: string): boolean {
+        return this.failedLoads.has(filename);
+    }
 
     clear(): void {
         this.cache.clear();
         this.accessOrder.clear();
         this.accessCounter = 0;
+        this.failedLoads.clear();
     }
 }
 
@@ -188,11 +207,26 @@ const playLoudSound = async (
         console.warn(`🔊 Web Audio error for ${filename}:`, error);
         // Fallback to regular audio with clamped volume
         const audio = await getAudio(filename);
+        if (!audio) {
+            return; // Failed to load, skip playback
+        }
+        
         const audioClone = audio.cloneNode() as HTMLAudioElement;
         audioClone.volume = Math.min(1.0, volume); // Clamp for fallback
         audioClone.playbackRate = pitchVariation;
         audioClone.currentTime = 0;
-        await audioClone.play();
+        // Handle browser autoplay policies
+        try {
+            const playPromise = audioClone.play();
+            if (playPromise !== undefined) {
+                await playPromise;
+            }
+        } catch (playError: any) {
+            // Browser blocked autoplay - silent failure is expected
+            if (playError.name !== 'NotAllowedError' && playError.name !== 'NotSupportedError') {
+                console.warn(`🔊 Web Audio fallback playback error:`, playError);
+            }
+        }
     }
 };
 
@@ -292,11 +326,16 @@ const loadAudio = async (filename: string): Promise<HTMLAudioElement> => {
 };
 
 // Get or create audio with caching and error handling
-const getAudio = async (filename: string): Promise<HTMLAudioElement> => {
+const getAudio = async (filename: string): Promise<HTMLAudioElement | null> => {
     // Check cache first
     let audio = audioCache.get(filename);
     if (audio) {
         return audio;
+    }
+    
+    // If we've already failed to load this file, don't try again
+    if (audioCache.isFailed(filename)) {
+        return null;
     }
     
     try {
@@ -305,11 +344,11 @@ const getAudio = async (filename: string): Promise<HTMLAudioElement> => {
         audioCache.set(filename, audio);
         return audio;
     } catch (error) {
-        console.warn(`🔊 Failed to load ${filename}, using silent fallback`);
-        // Return silent fallback
-        const silentAudio = new Audio();
-        audioCache.set(filename, silentAudio);
-        return silentAudio;
+        // Mark as failed to prevent repeated attempts
+        audioCache.markFailed(filename);
+        // Only log once per file to reduce spam
+        console.warn(`🔊 Failed to load ${filename}, will skip future attempts`);
+        return null;
     }
 };
 
@@ -343,15 +382,21 @@ const playSpatialAudio = async (
     listenerY: number,
     baseVolume: number,
     maxDistance: number,
-    masterVolume: number = 1
+    masterVolume: number = 1,
+    pitchMultiplier: number = 1.0 // Pitch multiplier from server (default 1.0 for backward compatibility)
 ): Promise<void> => {
     try {
         const distance = calculateDistance(soundX, soundY, listenerX, listenerY);
         const volume = calculateSpatialVolume(distance, baseVolume, maxDistance) * masterVolume;
         if (volume <= 0.01) return; // Skip very quiet sounds
         
-        // Add random pitch variation (0.85 to 1.15 range for dramatic spatial variation)
-        const pitchVariation = 0.85 + Math.random() * SOUND_CONFIG.SPATIAL_PITCH_VARIATION;
+        // Apply server-provided pitch multiplier, then add random pitch variation
+        // Random variation is reduced when pitch multiplier is provided (for animal species-specific sounds)
+        const basePitch = pitchMultiplier;
+        const randomVariation = pitchMultiplier !== 1.0 
+            ? 0.05 // Smaller variation (±5%) when pitch multiplier is set (for animal sounds)
+            : SOUND_CONFIG.SPATIAL_PITCH_VARIATION; // Full variation for player sounds
+        const pitchVariation = basePitch * (0.95 + Math.random() * randomVariation);
         
         // Add slight random volume variation (±10% for subtle variety)
         const volumeVariation = 0.9 + Math.random() * SOUND_CONFIG.SPATIAL_VOLUME_VARIATION;
@@ -363,6 +408,10 @@ const playSpatialAudio = async (
         } else {
             // Use regular HTML Audio for normal volumes
             const audio = await getAudio(filename);
+            if (!audio) {
+                return; // Failed to load, skip playback
+            }
+            
             const audioClone = audio.cloneNode() as HTMLAudioElement;
             
             audioClone.playbackRate = pitchVariation;
@@ -382,7 +431,21 @@ const playSpatialAudio = async (
             audioClone.addEventListener('ended', cleanup, { once: true });
             audioClone.addEventListener('error', cleanup, { once: true });
             
-            await audioClone.play();
+            // Handle browser autoplay policies - play() can fail silently
+            try {
+                const playPromise = audioClone.play();
+                if (playPromise !== undefined) {
+                    await playPromise;
+                }
+            } catch (playError: any) {
+                // Browser blocked autoplay - this is normal and expected
+                // Don't log as error, just cleanup silently
+                cleanup();
+                // Only log if it's not an autoplay policy error
+                if (playError.name !== 'NotAllowedError' && playError.name !== 'NotSupportedError') {
+                    console.warn(`🔊 Spatial playback error for ${filename}:`, playError);
+                }
+            }
         }
         
     } catch (error) {
@@ -521,6 +584,10 @@ const playLocalSound = async (
         } else {
             // Use regular HTML Audio for normal volumes
             const audio = await getAudio(filename);
+            if (!audio) {
+                return; // Failed to load, skip playback
+            }
+            
             const audioClone = audio.cloneNode() as HTMLAudioElement;
             
             audioClone.playbackRate = pitchVariation;
@@ -538,7 +605,21 @@ const playLocalSound = async (
             audioClone.addEventListener('ended', cleanup, { once: true });
             audioClone.addEventListener('error', cleanup, { once: true });
             
-            await audioClone.play();
+            // Handle browser autoplay policies - play() can fail silently
+            try {
+                const playPromise = audioClone.play();
+                if (playPromise !== undefined) {
+                    await playPromise;
+                }
+            } catch (playError: any) {
+                // Browser blocked autoplay - this is normal and expected
+                // Don't log as error, just cleanup silently
+                cleanup();
+                // Only log if it's not an autoplay policy error
+                if (playError.name !== 'NotAllowedError' && playError.name !== 'NotSupportedError') {
+                    console.warn(`🔊 Playback error for ${soundType}:`, playError);
+                }
+            }
         }
         
     } catch (error) {
@@ -633,6 +714,11 @@ const createSeamlessLoopingSound = async (
         const audio1 = await getAudio(filename);
         const audio2 = await getAudio(filename);
         
+        if (!audio1 || !audio2) {
+            console.warn(`🎵 Failed to load audio for seamless looping: ${filename}`);
+            return false;
+        }
+        
         const primary = audio1.cloneNode() as HTMLAudioElement;
         const secondary = audio2.cloneNode() as HTMLAudioElement;
         
@@ -659,7 +745,18 @@ const createSeamlessLoopingSound = async (
         });
         
         // Start with primary audio
-        await primary.play();
+        try {
+            const playPromise = primary.play();
+            if (playPromise !== undefined) {
+                await playPromise;
+            }
+        } catch (playError: any) {
+            // Browser blocked autoplay - handle gracefully
+            if (playError.name !== 'NotAllowedError' && playError.name !== 'NotSupportedError') {
+                console.warn(`🎵 Failed to start seamless sound for object ${objectId}:`, playError);
+            }
+            throw playError; // Re-throw to be caught by outer try-catch
+        }
         // console.log(`🎵 Started seamless looping sound: ${filename} for object ${objectId} (duration: ${duration}s, overlap: ${overlapTime}s)`);
         
         // Set up error handlers
@@ -700,7 +797,12 @@ const updateSeamlessLoopingSounds = (masterVolume: number, environmentalVolume: 
                 nextAudio.volume = Math.min(1.0, volume * volumeVariation);
                 nextAudio.playbackRate = newPitchVariation;
                 nextAudio.currentTime = 0;
-                nextAudio.play();
+                // Handle browser autoplay policies
+                nextAudio.play().catch((playError: any) => {
+                    if (playError.name !== 'NotAllowedError' && playError.name !== 'NotSupportedError') {
+                        console.warn(`🎵 Failed to play next seamless audio for object ${objectId}:`, playError);
+                    }
+                });
                 
                 // Schedule the fade-out of the current audio and swap
                 const fadeOutTime = 500; // 500ms fade out
@@ -780,15 +882,28 @@ export const useSoundSystem = ({
         preloadAll();
     }, []);
     
+    // Track previous soundEvents to only process NEW events
+    const previousSoundEventsRef = useRef<Map<string, any>>(new Map());
+    
     // Process server sound events (for other players' actions)
     useEffect(() => {
         if (!localPlayerPosition || !localPlayerIdentity || !soundEvents) return;
         
+        // Only process NEW events that weren't in the previous map
+        const previousEvents = previousSoundEventsRef.current;
+        const newEvents: Array<[string, any]> = [];
+        
         soundEvents.forEach((soundEvent, eventId) => {
-            // Skip if already processed
-            if (processedSoundEventsRef.current.has(eventId)) return;
-            
-            // Mark as processed
+            // Skip if already processed OR if it was in the previous map (already handled)
+            if (processedSoundEventsRef.current.has(eventId) || previousEvents.has(eventId)) {
+                return;
+            }
+            newEvents.push([eventId, soundEvent]);
+        });
+        
+        // Process only NEW events
+        newEvents.forEach(([eventId, soundEvent]) => {
+            // Mark as processed immediately (before async operations)
             processedSoundEventsRef.current.add(eventId);
             
             // Skip our own sounds if they use PREDICT_CONFIRM strategy
@@ -824,6 +939,10 @@ export const useSoundSystem = ({
                 const playBandagingSound = async () => {
                     try {
                         const audio = await getAudio(soundEvent.filename);
+                        if (!audio) {
+                            return; // Failed to load, skip playback
+                        }
+                        
                         const audioClone = audio.cloneNode() as HTMLAudioElement;
                         
                         const distance = calculateDistance(
@@ -857,8 +976,20 @@ export const useSoundSystem = ({
                             audioClone.addEventListener('ended', cleanup, { once: true });
                             audioClone.addEventListener('error', cleanup, { once: true });
                             
-                            await audioClone.play();
-                            console.log(`🔊 Started bandaging sound for player ${playerKey} (non-looping, will end naturally)`);
+                            // Handle browser autoplay policies
+                            try {
+                                const playPromise = audioClone.play();
+                                if (playPromise !== undefined) {
+                                    await playPromise;
+                                }
+                                console.log(`🔊 Started bandaging sound for player ${playerKey} (non-looping, will end naturally)`);
+                            } catch (playError: any) {
+                                // Browser blocked autoplay - cleanup silently
+                                cleanup();
+                                if (playError.name !== 'NotAllowedError' && playError.name !== 'NotSupportedError') {
+                                    console.warn(`🔊 Failed to play bandaging sound for player ${playerKey}:`, playError);
+                                }
+                            }
                         }
                     } catch (error) {
                         console.warn(`🔊 Failed to play bandaging sound for player ${playerKey}:`, error);
@@ -872,6 +1003,8 @@ export const useSoundSystem = ({
             // All remaining sounds are SERVER_ONLY, so play all server sounds
             
             // Play spatial sound for other players or server-only sounds
+            // Use pitch multiplier from server (defaults to 1.0 if not present for backward compatibility)
+            const pitchMultiplier = (soundEvent as any).pitchMultiplier ?? 1.0;
             playSpatialAudio(
                 soundEvent.filename,
                 soundEvent.posX,
@@ -880,11 +1013,15 @@ export const useSoundSystem = ({
                 localPlayerPosition.y,
                 soundEvent.volume,
                 soundEvent.maxDistance,
-                masterVolume
+                masterVolume,
+                pitchMultiplier
             ).catch(err => {
                 console.warn(`🔊 Failed to play server sound: ${soundEvent.filename}`, err);
             });
         });
+        
+        // Update previous events ref AFTER processing (so we don't lose events if processing fails)
+        previousSoundEventsRef.current = new Map(soundEvents);
         
         // Cleanup old processed events
         if (processedSoundEventsRef.current.size > 100) {
@@ -1179,6 +1316,12 @@ export const useSoundSystem = ({
                     if (!useSeamlessLooping) {
                         // Use traditional looping for other sounds
                         const audio = await getAudio(continuousSound.filename);
+                        if (!audio) {
+                            // Failed to load, skip this sound
+                            pendingSoundCreationRef.current.delete(objectId);
+                            return;
+                        }
+                        
                         audioClone = audio.cloneNode() as HTMLAudioElement;
                         
                         // Configure for looping
@@ -1193,11 +1336,22 @@ export const useSoundSystem = ({
                         // Store the active sound BEFORE playing to prevent race conditions
                         activeLoopingSounds.set(objectId, audioClone);
                         
-                        // Start playing
-                        await audioClone.play();
-                        const soundTypeEmoji = continuousSound.filename.includes('campfire') ? '🔥' : 
-                                              continuousSound.filename.includes('lantern') ? '🏮' : '🔊';
-                        console.log(`${soundTypeEmoji} Successfully started traditional looping sound: ${continuousSound.filename} for object ${objectId} at volume ${volume.toFixed(3)}`);
+                        // Start playing - handle browser autoplay policies
+                        try {
+                            const playPromise = audioClone.play();
+                            if (playPromise !== undefined) {
+                                await playPromise;
+                            }
+                            const soundTypeEmoji = continuousSound.filename.includes('campfire') ? '🔥' : 
+                                                  continuousSound.filename.includes('lantern') ? '🏮' : '🔊';
+                            console.log(`${soundTypeEmoji} Successfully started traditional looping sound: ${continuousSound.filename} for object ${objectId} at volume ${volume.toFixed(3)}`);
+                        } catch (playError: any) {
+                            // Browser blocked autoplay - cleanup and remove from map
+                            activeLoopingSounds.delete(objectId);
+                            if (playError.name !== 'NotAllowedError' && playError.name !== 'NotSupportedError') {
+                                console.warn(`🔊 Failed to start looping sound for object ${objectId}:`, playError);
+                            }
+                        }
                     }
                     
                     // Clear pending creation flag (for both types)

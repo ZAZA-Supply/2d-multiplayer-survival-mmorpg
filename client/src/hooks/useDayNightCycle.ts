@@ -3,15 +3,17 @@ import {
     Campfire as SpacetimeDBCampfire,
     Lantern as SpacetimeDBLantern,
     Furnace as SpacetimeDBFurnace,
+    HomesteadHearth as SpacetimeDBHomesteadHearth, // ADDED: HomesteadHearth
     WorldState as SpacetimeDBWorldState,
     Player as SpacetimeDBPlayer,
     ActiveEquipment as SpacetimeDBActiveEquipment,
     ItemDefinition as SpacetimeDBItemDefinition,
 } from '../generated';
-import { CAMPFIRE_LIGHT_RADIUS_BASE, CAMPFIRE_FLICKER_AMOUNT, LANTERN_LIGHT_RADIUS_BASE, LANTERN_FLICKER_AMOUNT, FURNACE_LIGHT_RADIUS_BASE, FURNACE_FLICKER_AMOUNT } from '../utils/renderers/lightRenderingUtils';
+import { CAMPFIRE_LIGHT_RADIUS_BASE, CAMPFIRE_FLICKER_AMOUNT, LANTERN_LIGHT_RADIUS_BASE, LANTERN_FLICKER_AMOUNT, FURNACE_LIGHT_RADIUS_BASE, FURNACE_FLICKER_AMOUNT, HEARTH_LIGHT_RADIUS_BASE, HEARTH_FLICKER_AMOUNT } from '../utils/renderers/lightRenderingUtils';
 import { CAMPFIRE_HEIGHT } from '../utils/renderers/campfireRenderingUtils';
 import { LANTERN_HEIGHT } from '../utils/renderers/lanternRenderingUtils';
 import { FURNACE_HEIGHT, FURNACE_RENDER_Y_OFFSET } from '../utils/renderers/furnaceRenderingUtils';
+import { HEARTH_HEIGHT, HEARTH_RENDER_Y_OFFSET } from '../utils/renderers/hearthRenderingUtils'; // ADDED: Hearth constants
 
 export interface ColorPoint {
   r: number; g: number; b: number; a: number;
@@ -91,16 +93,17 @@ const REGULAR_CYCLE_KEYFRAMES: ColorAlphaKeyframe[] = [
   // Night (Server: 0.80 - 0.92) - Slightly lighter than midnight
   { progress: 0.85, rgb: [10, 15, 20],    alpha: 0.88 },   // Deep Night (lighter than midnight)
 
-  // Twilight Morning (Server: 0.92 - 0.97, pre-dawn twilight RIGHT BEFORE dawn)
-  // This wraps around - after 0.97 comes 0.0 (Dawn)
-  { progress: 0.92, rgb: [5, 5, 10],      alpha: 0.96 },   // Astronomical Dawn (darkest, matches TwilightEvening end)
-  { progress: 0.935, rgb: [80, 50, 90],    alpha: 0.80 },   // Nautical Dawn
-  { progress: 0.95, rgb: [150, 70, 100],  alpha: 0.65 },   // Civil Dawn
-  { progress: 0.965, rgb: [120, 70, 90],   alpha: 0.55 },   // Early morning purples (matches Dusk start)
-  { progress: 0.97, rgb: [30, 25, 65],    alpha: 0.85 },   // Transition to Dawn (matches Dawn start)
+  // Midnight (Server: 0.92 - 0.97) - Very dark, darkest part of night
+  { progress: 0.92, rgb: [defaultPeakMidnightColor.r, defaultPeakMidnightColor.g, defaultPeakMidnightColor.b],    alpha: defaultPeakMidnightColor.a },   // Deepest Midnight start
+  { progress: 0.945, rgb: [5, 5, 10],      alpha: 0.96 },   // Very dark (midnight peak)
+  { progress: 0.969, rgb: [defaultTransitionNightColor.r, defaultTransitionNightColor.g, defaultTransitionNightColor.b],    alpha: defaultTransitionNightColor.a },   // Transition from midnight to twilight (just before 0.97)
 
-  // End of cycle - wraps to 0.0
-  { progress: 1.0,  rgb: [defaultPeakMidnightColor.r, defaultPeakMidnightColor.g, defaultPeakMidnightColor.b],    alpha: defaultPeakMidnightColor.a },   // Deepest Midnight (wraps to 0.0)
+  // Twilight Morning (Server: 0.97 - 1.0, pre-dawn twilight RIGHT BEFORE dawn, wraps around)
+  // This wraps around - after 0.97 comes 0.0 (Dawn)
+  { progress: 0.97, rgb: [30, 25, 65],    alpha: 0.85 },   // Astronomical Dawn (darkest purple, matches TwilightEvening end)
+  { progress: 0.985, rgb: [80, 50, 90],    alpha: 0.80 },   // Nautical Dawn
+  { progress: 0.995, rgb: [150, 70, 100],  alpha: 0.65 },   // Civil Dawn
+  { progress: 1.0, rgb: [120, 70, 90],   alpha: 0.55 },   // Early morning purples (matches Dusk start, wraps to Dawn)
 ];
 
 const FULL_MOON_NIGHT_KEYFRAMES: ColorAlphaKeyframe[] = [
@@ -142,16 +145,17 @@ const FULL_MOON_NIGHT_KEYFRAMES: ColorAlphaKeyframe[] = [
   // Night (Full Moon, Server: 0.80 - 0.92)
   { progress: 0.85, rgb: [135, 155, 195], alpha: 0.39 },   // Deep Night
 
-  // Twilight Morning (Full Moon, Server: 0.92 - 0.97, pre-dawn twilight RIGHT BEFORE dawn)
-  // This wraps around - after 0.97 comes 0.0 (Dawn)
-  { progress: 0.92, rgb: [140, 150, 190], alpha: 0.38 },   // Astronomical Dawn (matches TwilightEvening end)
-  { progress: 0.935, rgb: [150, 150, 190], alpha: 0.35 },   // Nautical Dawn
-  { progress: 0.95, rgb: [170, 150, 180], alpha: 0.28 },   // Civil Dawn
-  { progress: 0.965, rgb: [200, 175, 165], alpha: 0.15 },   // Early morning silver-pink (matches Dusk start)
-  { progress: 0.97, rgb: [150, 160, 190], alpha: 0.32 },   // Transition to Dawn (matches Dawn start)
+  // Midnight (Full Moon, Server: 0.92 - 0.97) - Lighter than regular midnight but still dark
+  { progress: 0.92, rgb: [130, 150, 190], alpha: 0.40 },   // Full Moon Midnight start
+  { progress: 0.945, rgb: [135, 155, 195], alpha: 0.38 },   // Full Moon Midnight peak
+  { progress: 0.969, rgb: [140, 150, 190], alpha: 0.38 },   // Transition from midnight to twilight (just before 0.97)
 
-  // End of cycle - wraps to 0.0
-  { progress: 1.0,  rgb: [130, 150, 190], alpha: 0.40 },   // Lighter Midnight (wraps to 0.0)
+  // Twilight Morning (Full Moon, Server: 0.97 - 1.0, pre-dawn twilight RIGHT BEFORE dawn)
+  // This wraps around - after 0.97 comes 0.0 (Dawn)
+  { progress: 0.97, rgb: [150, 160, 190], alpha: 0.32 },   // Astronomical Dawn (matches Dawn start)
+  { progress: 0.985, rgb: [150, 150, 190], alpha: 0.35 },   // Nautical Dawn
+  { progress: 0.995, rgb: [170, 150, 180], alpha: 0.28 },   // Civil Dawn
+  { progress: 1.0, rgb: [200, 175, 165], alpha: 0.15 },   // Early morning silver-pink (matches Dusk start, wraps to Dawn)
 ];
 
 // Server's full moon cycle interval
@@ -205,7 +209,7 @@ function calculateOverlayRgbaString(
     // --- Default Interpolation (covers all other cases) ---
     const keyframesToUse = isCurrentlyFullMoon ? FULL_MOON_NIGHT_KEYFRAMES : REGULAR_CYCLE_KEYFRAMES;
     
-    // Handle wrap-around: TwilightMorning (0.92-0.97) wraps to Dawn (0.0-0.05)
+    // Handle wrap-around: TwilightMorning (0.97-1.0) wraps to Dawn (0.0-0.05)
     // If we're in the wrap-around zone (0.97-1.0), interpolate from last keyframe to first Dawn keyframe
     if (cycleProgress >= 0.97) {
         // Find the last keyframe (should be around 0.97 or 1.0)
@@ -266,6 +270,7 @@ interface UseDayNightCycleProps {
     campfires: Map<string, SpacetimeDBCampfire>;
     lanterns: Map<string, SpacetimeDBLantern>;
     furnaces: Map<string, SpacetimeDBFurnace>;
+    homesteadHearths: Map<string, SpacetimeDBHomesteadHearth>; // ADDED: HomesteadHearths
     players: Map<string, SpacetimeDBPlayer>;
     activeEquipments: Map<string, SpacetimeDBActiveEquipment>;
     itemDefinitions: Map<string, SpacetimeDBItemDefinition>;
@@ -288,6 +293,7 @@ export function useDayNightCycle({
     campfires,
     lanterns,
     furnaces,
+    homesteadHearths, // ADDED: HomesteadHearths
     players,
     activeEquipments,
     itemDefinitions,
@@ -481,6 +487,31 @@ export function useDayNightCycle({
             }
         });
 
+        // Render hearth light cutouts (always on, warm orange glow)
+        homesteadHearths.forEach(hearth => {
+            if (!hearth.isDestroyed) {
+                // Adjust Y position for the light source to be centered on the hearth flame
+                const visualCenterWorldY = hearth.posY - (HEARTH_HEIGHT / 2) - HEARTH_RENDER_Y_OFFSET;
+                
+                const screenX = hearth.posX + cameraOffsetX;
+                const screenY = visualCenterWorldY + cameraOffsetY;
+                
+                // HEARTH CUTOUT - Larger than campfire, warm orange glow (always on)
+                const flicker = (Math.random() - 0.5) * 2 * HEARTH_FLICKER_AMOUNT;
+                const lightRadius = Math.max(0, (HEARTH_LIGHT_RADIUS_BASE * 2.2) + flicker); // 2.2x radius for larger coverage
+                const maskGradient = maskCtx.createRadialGradient(screenX, screenY, lightRadius * 0.08, screenX, screenY, lightRadius);
+                maskGradient.addColorStop(0, 'rgba(0,0,0,1)'); // Full cutout at center
+                maskGradient.addColorStop(0.4, 'rgba(0,0,0,0.75)'); // Strong cutout zone
+                maskGradient.addColorStop(0.7, 'rgba(0,0,0,0.4)'); // Gradual transition
+                maskGradient.addColorStop(0.9, 'rgba(0,0,0,0.15)'); // Gentle fade
+                maskGradient.addColorStop(1, 'rgba(0,0,0,0)'); // Complete fade to darkness
+                maskCtx.fillStyle = maskGradient;
+                maskCtx.beginPath();
+                maskCtx.arc(screenX, screenY, lightRadius, 0, Math.PI * 2);
+                maskCtx.fill();
+            }
+        });
+
         // Render torch light cutouts
         players.forEach((player, playerId) => {
             if (!player || player.isDead) return;
@@ -533,7 +564,7 @@ export function useDayNightCycle({
         
         maskCtx.globalCompositeOperation = 'source-over';
 
-    }, [worldState, campfires, lanterns, furnaces, players, activeEquipments, itemDefinitions, cameraOffsetX, cameraOffsetY, canvasSize.width, canvasSize.height, torchLitStatesKey, lanternBurningStatesKey, localPlayerId, predictedPosition, remotePlayerInterpolation]);
+    }, [worldState, campfires, lanterns, furnaces, homesteadHearths, players, activeEquipments, itemDefinitions, cameraOffsetX, cameraOffsetY, canvasSize.width, canvasSize.height, torchLitStatesKey, lanternBurningStatesKey, localPlayerId, predictedPosition, remotePlayerInterpolation]);
 
     return { overlayRgba, maskCanvasRef };
 } 

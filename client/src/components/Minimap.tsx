@@ -201,13 +201,13 @@ interface MinimapProps {
 function getTerrainColor(colorValue: number): [number, number, number] {
   switch (colorValue) {
     case 0:   // Sea - Darker, more realistic ocean blue
-      return [19, 69, 139]; // Dark blue like Rust's ocean
+      return [19, 69, 139]; // Dark blue
     case 64:  // Beach - More muted sandy color
       return [194, 154, 108]; // Muted sand brown
     case 96:  // Sand - Slightly different from beach
       return [180, 142, 101]; // Darker sand
     case 128: // Grass - More realistic forest green  
-      return [76, 110, 72]; // Muted forest green like Rust
+      return [76, 110, 72]; // Muted forest green
     case 192: // Dirt - Realistic brown dirt
       return [101, 67, 33]; // Dark brown dirt
     case 224: // DirtRoad - Even darker brown for roads

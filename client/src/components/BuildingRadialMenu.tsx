@@ -125,15 +125,6 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
       reason: woodCount < 15 ? `Need 15 wood (have ${woodCount})` : undefined,
     },
     {
-      mode: BuildingMode.DoorFrame,
-      name: 'Door Frame',
-      icon: faDoorOpen,
-      description: 'Frame for door placement',
-      requirements: { wood: 0 },
-      available: false,
-      reason: 'Not implemented',
-    },
-    {
       mode: BuildingMode.Door,
       name: 'Door',
       icon: faDoorOpen,

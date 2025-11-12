@@ -52,6 +52,7 @@ pub enum EffectType {
     WaterDrinking, // Visual effect for drinking water containers
     Venom, // Damage over time from Cable Viper strikes
     Exhausted, // Movement speed penalty from low hunger/thirst/warmth
+    BuildingPrivilege, // Allows building structures near homestead hearths
 }
 
 // Table defining food poisoning risks for different food items
@@ -107,9 +108,9 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
             continue;
         }
 
-        // Skip cozy, tree cover, and exhausted effects - they are managed by the player stats system, not the effect tick system
+        // Skip cozy, tree cover, exhausted, and building privilege effects - they are managed by the player stats system, not the effect tick system
         // Wet effects are now processed normally like other effects
-        if effect.effect_type == EffectType::Cozy || effect.effect_type == EffectType::TreeCover || effect.effect_type == EffectType::Exhausted {
+        if effect.effect_type == EffectType::Cozy || effect.effect_type == EffectType::TreeCover || effect.effect_type == EffectType::Exhausted || effect.effect_type == EffectType::BuildingPrivilege {
             continue;
         }
 
@@ -152,7 +153,7 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
                         effect.target_player_id
                     },
                     // Other effect types shouldn't reach this code path, but we need to handle them
-                    EffectType::HealthRegen | EffectType::Burn | EffectType::Bleed | EffectType::Venom | EffectType::SeawaterPoisoning | EffectType::FoodPoisoning | EffectType::Cozy | EffectType::Wet | EffectType::TreeCover | EffectType::WaterDrinking | EffectType::Exhausted => {
+                    EffectType::HealthRegen | EffectType::Burn | EffectType::Bleed | EffectType::Venom | EffectType::SeawaterPoisoning | EffectType::FoodPoisoning | EffectType::Cozy | EffectType::Wet | EffectType::TreeCover | EffectType::WaterDrinking | EffectType::Exhausted | EffectType::BuildingPrivilege => {
                         log::warn!("[EffectTick] Unexpected effect type {:?} in bandage processing", effect.effect_type);
                         Some(effect.player_id)
                     }
@@ -378,12 +379,17 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
                             amount_this_tick = 0.0;
                         }
                         EffectType::Exhausted => {
-                        // Exhausted provides movement speed penalty (EXHAUSTED_SPEED_PENALTY = 0.75)
-                        // Applied when hunger OR thirst is below 20% (50/250)
-                        // The movement speed penalty is handled in player movement system
-                        // This effect doesn't consume amount_applied_so_far
-                        amount_this_tick = 0.0;
-        }
+                            // Exhausted provides movement speed penalty (EXHAUSTED_SPEED_PENALTY = 0.75)
+                            // Applied when hunger OR thirst is below 20% (50/250)
+                            // The movement speed penalty is handled in player movement system
+                            // This effect doesn't consume amount_applied_so_far
+                            amount_this_tick = 0.0;
+                        },
+                        EffectType::BuildingPrivilege => {
+                            // BuildingPrivilege allows building structures near homestead hearths
+                            // No health changes here, just a status flag
+                            amount_this_tick = 0.0;
+                        },
                     }
 
                     if (player_to_update.health - old_health).abs() > f32::EPSILON {
@@ -741,11 +747,12 @@ pub const COZY_HEALTH_REGEN_MULTIPLIER: f32 = 2.0; // Double passive health rege
 pub const COZY_FOOD_HEALING_MULTIPLIER: f32 = 1.5; // 50% bonus to food healing
 pub const COZY_EFFECT_CHECK_INTERVAL_SECONDS: u32 = 2; // Check cozy conditions every 2 seconds
 
-/// Checks if a player should have the cozy effect based on their proximity to campfires or owned shelters
+/// Checks if a player should have the cozy effect based on their proximity to campfires, owned shelters, or hearths (if they have building privilege)
 pub fn should_player_be_cozy(ctx: &ReducerContext, player_id: Identity, player_x: f32, player_y: f32) -> bool {
     // Import necessary traits
     use crate::campfire::{campfire as CampfireTableTrait, WARMTH_RADIUS_SQUARED};
     use crate::shelter::{shelter as ShelterTableTrait, is_player_inside_shelter};
+    use crate::homestead_hearth::{homestead_hearth as HomesteadHearthTableTrait, HEARTH_COZY_RADIUS_SQUARED, player_has_building_privilege};
     
     // Check for nearby burning campfires
     for campfire in ctx.db.campfire().iter() {
@@ -767,6 +774,23 @@ pub fn should_player_be_cozy(ctx: &ReducerContext, player_id: Identity, player_x
         if shelter.placed_by == player_id { // Only owned shelters provide cozy effect
             if is_player_inside_shelter(player_x, player_y, &shelter) {
                 log::debug!("Player {:?} is cozy inside their own shelter {}", player_id, shelter.id);
+                return true;
+            }
+        }
+    }
+    
+    // Check for hearths (only if player has building privilege)
+    if player_has_building_privilege(ctx, player_id) {
+        for hearth in ctx.db.homestead_hearth().iter() {
+            if hearth.is_destroyed {
+                continue;
+            }
+            let dx = player_x - hearth.pos_x;
+            let dy = player_y - hearth.pos_y;
+            let distance_squared = dx * dx + dy * dy;
+            
+            if distance_squared <= HEARTH_COZY_RADIUS_SQUARED {
+                log::debug!("Player {:?} is cozy near hearth {} (has building privilege)", player_id, hearth.id);
                 return true;
             }
         }

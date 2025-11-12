@@ -95,6 +95,7 @@ export interface SpacetimeTableStates {
     campfires: Map<string, SpacetimeDB.Campfire>;
     furnaces: Map<string, SpacetimeDB.Furnace>; // ADDED: Furnace support
     lanterns: Map<string, SpacetimeDB.Lantern>;
+    homesteadHearths: Map<string, SpacetimeDB.HomesteadHearth>; // ADDED: Homestead Hearth support
     harvestableResources: Map<string, SpacetimeDB.HarvestableResource>;
     itemDefinitions: Map<string, SpacetimeDB.ItemDefinition>;
     inventoryItems: Map<string, SpacetimeDB.InventoryItem>;
@@ -161,6 +162,7 @@ export const useSpacetimeTables = ({
     const [campfires, setCampfires] = useState<Map<string, SpacetimeDB.Campfire>>(() => new Map());
     const [furnaces, setFurnaces] = useState<Map<string, SpacetimeDB.Furnace>>(() => new Map()); // ADDED: Furnace state
     const [lanterns, setLanterns] = useState<Map<string, SpacetimeDB.Lantern>>(() => new Map());
+    const [homesteadHearths, setHomesteadHearths] = useState<Map<string, SpacetimeDB.HomesteadHearth>>(() => new Map()); // ADDED: Homestead Hearth state
     const [harvestableResources, setHarvestableResources] = useState<Map<string, SpacetimeDB.HarvestableResource>>(() => new Map());
     const [plantedSeeds, setPlantedSeeds] = useState<Map<string, SpacetimeDB.PlantedSeed>>(() => new Map());
     const [itemDefinitions, setItemDefinitions] = useState<Map<string, SpacetimeDB.ItemDefinition>>(() => new Map());
@@ -410,6 +412,7 @@ export const useSpacetimeTables = ({
                                     `SELECT * FROM campfire WHERE chunk_index = ${chunkIndex}`,
                                     `SELECT * FROM furnace WHERE chunk_index = ${chunkIndex}`, // ADDED: Furnace spatial subscription
                                     `SELECT * FROM lantern WHERE chunk_index = ${chunkIndex}`,
+                                    `SELECT * FROM homestead_hearth WHERE chunk_index = ${chunkIndex}`, // ADDED: Homestead Hearth spatial subscription
                                     `SELECT * FROM wooden_storage_box WHERE chunk_index = ${chunkIndex}`,
                                     `SELECT * FROM dropped_item WHERE chunk_index = ${chunkIndex}`,
                                     `SELECT * FROM rain_collector WHERE chunk_index = ${chunkIndex}`,
@@ -678,7 +681,15 @@ export const useSpacetimeTables = ({
             const handleLanternUpdate = (ctx: any, oldLantern: SpacetimeDB.Lantern, newLantern: SpacetimeDB.Lantern) => setLanterns(prev => new Map(prev).set(newLantern.id.toString(), newLantern));
             const handleLanternDelete = (ctx: any, lantern: SpacetimeDB.Lantern) => setLanterns(prev => { const newMap = new Map(prev); newMap.delete(lantern.id.toString()); return newMap; });
             
-            // --- Item Definition Subscriptions ---
+            // --- Homestead Hearth Subscriptions --- ADDED: Same pattern as campfire
+            const handleHomesteadHearthInsert = (ctx: any, hearth: SpacetimeDB.HomesteadHearth) => {
+                setHomesteadHearths(prev => new Map(prev).set(hearth.id.toString(), hearth));
+                if (connection.identity && hearth.placedBy.isEqual(connection.identity)) {
+                   cancelPlacementRef.current();
+               }
+            };
+            const handleHomesteadHearthUpdate = (ctx: any, oldHearth: SpacetimeDB.HomesteadHearth, newHearth: SpacetimeDB.HomesteadHearth) => setHomesteadHearths(prev => new Map(prev).set(newHearth.id.toString(), newHearth));
+            const handleHomesteadHearthDelete = (ctx: any, hearth: SpacetimeDB.HomesteadHearth) => setHomesteadHearths(prev => { const newMap = new Map(prev); newMap.delete(hearth.id.toString()); return newMap; });
             const handleItemDefInsert = (ctx: any, itemDef: SpacetimeDB.ItemDefinition) => {
                 if (itemDef.name === "Hunting Bow") {
                     // console.log("[DEBUG] Hunting Bow item definition loaded:", itemDef);
@@ -1224,6 +1235,7 @@ export const useSpacetimeTables = ({
             connection.db.campfire.onInsert(handleCampfireInsert); connection.db.campfire.onUpdate(handleCampfireUpdate); connection.db.campfire.onDelete(handleCampfireDelete);
             connection.db.furnace.onInsert(handleFurnaceInsert); connection.db.furnace.onUpdate(handleFurnaceUpdate); connection.db.furnace.onDelete(handleFurnaceDelete); // ADDED: Furnace event registration
             connection.db.lantern.onInsert(handleLanternInsert); connection.db.lantern.onUpdate(handleLanternUpdate); connection.db.lantern.onDelete(handleLanternDelete);
+            connection.db.homesteadHearth.onInsert(handleHomesteadHearthInsert); connection.db.homesteadHearth.onUpdate(handleHomesteadHearthUpdate); connection.db.homesteadHearth.onDelete(handleHomesteadHearthDelete); // ADDED: Homestead Hearth event registration
             connection.db.itemDefinition.onInsert(handleItemDefInsert); connection.db.itemDefinition.onUpdate(handleItemDefUpdate); connection.db.itemDefinition.onDelete(handleItemDefDelete);
             connection.db.inventoryItem.onInsert(handleInventoryInsert); connection.db.inventoryItem.onUpdate(handleInventoryUpdate); connection.db.inventoryItem.onDelete(handleInventoryDelete);
             connection.db.worldState.onInsert(handleWorldStateInsert); connection.db.worldState.onUpdate(handleWorldStateUpdate); connection.db.worldState.onDelete(handleWorldStateDelete);
@@ -1550,6 +1562,7 @@ export const useSpacetimeTables = ({
                                     `SELECT * FROM harvestable_resource WHERE chunk_index = ${chunkIndex}`, `SELECT * FROM campfire WHERE chunk_index = ${chunkIndex}`,
                                     `SELECT * FROM furnace WHERE chunk_index = ${chunkIndex}`, // ADDED: Furnace initial spatial subscription
                                     `SELECT * FROM lantern WHERE chunk_index = ${chunkIndex}`,
+                                    `SELECT * FROM homestead_hearth WHERE chunk_index = ${chunkIndex}`, // ADDED: Homestead Hearth initial spatial subscription
                                     `SELECT * FROM wooden_storage_box WHERE chunk_index = ${chunkIndex}`, `SELECT * FROM dropped_item WHERE chunk_index = ${chunkIndex}`,
                                     `SELECT * FROM rain_collector WHERE chunk_index = ${chunkIndex}`, `SELECT * FROM water_patch WHERE chunk_index = ${chunkIndex}`,
                                     // REMOVED: wild_animal - now subscribed globally like players to prevent disappearing
@@ -1652,7 +1665,7 @@ export const useSpacetimeTables = ({
                  currentChunksRef.current = [];
                  setLocalPlayerRegistered(false);
                  // Reset table states
-                 setPlayers(new Map()); setTrees(new Map()); setStones(new Map()); setCampfires(new Map()); setFurnaces(new Map()); setLanterns(new Map()); // ADDED: Furnace cleanup
+                 setPlayers(new Map()); setTrees(new Map()); setStones(new Map()); setCampfires(new Map()); setFurnaces(new Map()); setLanterns(new Map()); setHomesteadHearths(new Map()); // ADDED: Furnace and Hearth cleanup
                  setHarvestableResources(new Map());
                  setItemDefinitions(new Map()); setRecipes(new Map());
                  setInventoryItems(new Map()); setWorldState(null); setActiveEquipments(new Map());
@@ -1699,6 +1712,7 @@ export const useSpacetimeTables = ({
         campfires,
         furnaces, // ADDED: Furnace state
         lanterns,
+        homesteadHearths, // ADDED: Homestead Hearth state
         harvestableResources,
         itemDefinitions,
         inventoryItems,

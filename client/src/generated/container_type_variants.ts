@@ -35,4 +35,5 @@ export type PlayerCorpse = { tag: "PlayerCorpse" };
 export type Stash = { tag: "Stash" };
 export type Lantern = { tag: "Lantern" };
 export type RainCollector = { tag: "RainCollector" };
+export type HomesteadHearth = { tag: "HomesteadHearth" };
 

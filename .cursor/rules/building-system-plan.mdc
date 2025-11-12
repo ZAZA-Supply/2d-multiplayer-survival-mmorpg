@@ -27,7 +27,7 @@ Building a Rust-style building system (foundations, walls, doors) integrated wit
 
 #### Tables
 ```rust
-// Foundation cells (like Rust foundations)
+// Foundation cells
 #[spacetimedb::table(name = foundation_cell, public)]
 pub struct FoundationCell {
     #[primary_key]

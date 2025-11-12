@@ -6,7 +6,7 @@
  * drag-and-drop interactions, and context menus for these containers.        *
  ******************************************************************************/
 
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import styles from './InventoryUI.module.css'; // Reuse styles for now
 
 // Import Custom Components
@@ -25,7 +25,11 @@ import {
     Shelter as SpacetimeDBShelter,
     Tree as SpacetimeDBTree,
     RainCollector as SpacetimeDBRainCollector,
-    WorldState
+    HomesteadHearth as SpacetimeDBHomesteadHearth, // ADDED: HomesteadHearth import
+    HearthUpkeepQueryResult, // ADDED: For upkeep query results
+    WorldState,
+    Player,
+    ActiveConsumableEffect,
 } from '../generated';
 import { InteractionTarget } from '../hooks/useInteractionManager';
 import { DragSourceSlotInfo, DraggedItemInfo } from '../types/dragDropTypes';
@@ -47,6 +51,7 @@ interface ExternalContainerUIProps {
     playerCorpses: Map<string, PlayerCorpse>;
     stashes: Map<string, SpacetimeDBStash>;
     rainCollectors: Map<string, SpacetimeDBRainCollector>;
+    homesteadHearths: Map<string, SpacetimeDBHomesteadHearth>; // ADDED: HomesteadHearths
     shelters?: Map<string, SpacetimeDBShelter>;
     trees?: Map<string, SpacetimeDBTree>;
     currentStorageBox?: SpacetimeDBWoodenStorageBox | null;
@@ -58,6 +63,8 @@ interface ExternalContainerUIProps {
     onExternalItemMouseLeave: () => void;
     onExternalItemMouseMove: (event: React.MouseEvent<HTMLDivElement>) => void;
     worldState: WorldState | null;
+    players?: Map<string, Player>; // ADDED: Players for building privilege list
+    activeConsumableEffects?: Map<string, ActiveConsumableEffect>; // ADDED: For building privilege check
 }
 
 const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
@@ -71,6 +78,7 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
     playerCorpses,
     stashes,
     rainCollectors,
+    homesteadHearths, // ADDED: HomesteadHearths
     shelters,
     trees,
     currentStorageBox,
@@ -82,6 +90,8 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
     onExternalItemMouseLeave,
     onExternalItemMouseMove,
     worldState,
+    players,
+    activeConsumableEffects,
 }) => {
     // Add ref to track when drag operations complete
     const lastDragCompleteTime = useRef<number>(0);
@@ -104,6 +114,7 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
         playerCorpses,
         stashes,
         rainCollectors,
+        homesteadHearths,
         currentStorageBox,
         connection,
         lastDragCompleteTime
@@ -378,6 +389,132 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
         }
     }, [connection, container.containerId, container.containerEntity]);
 
+    // Handle grant building privilege for homestead hearth
+    const handleGrantBuildingPrivilege = useCallback(() => {
+        if (!connection?.reducers || container.containerId === null || !container.containerEntity) return;
+        
+        const hearthIdNum = typeof container.containerId === 'bigint' ? Number(container.containerId) : container.containerId;
+        try {
+            connection.reducers.grantBuildingPrivilegeFromHearth(hearthIdNum);
+        } catch (e: any) {
+            console.error("Error granting building privilege:", e);
+        }
+    }, [connection, container.containerId, container.containerEntity]);
+
+    // Get list of players with building privilege
+    const playersWithPrivilege = useMemo(() => {
+        if (!activeConsumableEffects || !players) return [];
+        
+        const privilegePlayers: Array<{ id: string; name: string | null }> = [];
+        
+        activeConsumableEffects.forEach((effect) => {
+            const effectTypeTag = effect.effectType ? (effect.effectType as any).tag : 'undefined';
+            if (effectTypeTag === 'BuildingPrivilege') {
+                const playerIdHex = effect.playerId.toHexString();
+                const player = players.get(playerIdHex);
+                if (player) {
+                    privilegePlayers.push({
+                        id: playerIdHex,
+                        name: player.username || null
+                    });
+                }
+            }
+        });
+        
+        return privilegePlayers;
+    }, [activeConsumableEffects, players]);
+
+    // Check if current player has building privilege
+    const currentPlayerHasPrivilege = useMemo(() => {
+        if (!activeConsumableEffects || !playerId) return false;
+        
+        return Array.from(activeConsumableEffects.values()).some((effect) => {
+            const effectTypeTag = effect.effectType ? (effect.effectType as any).tag : 'undefined';
+            const effectPlayerIdHex = effect.playerId.toHexString();
+            return effectTypeTag === 'BuildingPrivilege' && effectPlayerIdHex === playerId;
+        });
+    }, [activeConsumableEffects, playerId]);
+
+    // Upkeep costs state
+    const [upkeepCosts, setUpkeepCosts] = useState<{
+        requiredWood: number;
+        requiredStone: number;
+        requiredMetal: number;
+        availableWood: number;
+        availableStone: number;
+        availableMetal: number;
+    } | null>(null);
+
+    // Query upkeep costs when hearth is opened - subscribe to table instead of reducer callback
+    useEffect(() => {
+        if (container.containerType !== 'homestead_hearth' || !container.containerEntity || !connection) {
+            setUpkeepCosts(null);
+            return;
+        }
+
+        const hearth = container.containerEntity as SpacetimeDBHomesteadHearth;
+        const hearthId = typeof container.containerId === 'bigint' ? Number(container.containerId) : container.containerId;
+
+        // Early return if hearthId is null
+        if (hearthId === null || hearthId === undefined) {
+            setUpkeepCosts(null);
+            return;
+        }
+
+        // Call reducer to trigger update (reducer updates the table)
+        if (connection.reducers && typeof connection.reducers.queryHearthUpkeepCosts === 'function') {
+            connection.reducers.queryHearthUpkeepCosts(hearthId);
+        }
+
+        // Subscribe to table updates - use useCallback pattern to prevent recreating on every render
+        const handleUpkeepUpdate = (ctx: any, result: HearthUpkeepQueryResult) => {
+            if (result.hearthId === hearthId) {
+                setUpkeepCosts({
+                    requiredWood: result.requiredWood,
+                    requiredStone: result.requiredStone,
+                    requiredMetal: result.requiredMetal,
+                    availableWood: result.availableWood,
+                    availableStone: result.availableStone,
+                    availableMetal: result.availableMetal,
+                });
+            }
+        };
+
+        // Check for existing result (only once on mount, not on every render)
+        const existingResult = connection.db?.hearthUpkeepQueryResult?.hearthId?.find(hearthId);
+        if (existingResult) {
+            setUpkeepCosts({
+                requiredWood: existingResult.requiredWood,
+                requiredStone: existingResult.requiredStone,
+                requiredMetal: existingResult.requiredMetal,
+                availableWood: existingResult.availableWood,
+                availableStone: existingResult.availableStone,
+                availableMetal: existingResult.availableMetal,
+            });
+        }
+
+        // Register callbacks for table updates
+        if (connection.db?.hearthUpkeepQueryResult) {
+            connection.db.hearthUpkeepQueryResult.onInsert(handleUpkeepUpdate);
+            connection.db.hearthUpkeepQueryResult.onUpdate(handleUpkeepUpdate);
+            
+            // Refresh every 5 seconds by calling reducer again
+            const interval = setInterval(() => {
+                if (connection.reducers && typeof connection.reducers.queryHearthUpkeepCosts === 'function' && hearthId !== null && hearthId !== undefined) {
+                    connection.reducers.queryHearthUpkeepCosts(hearthId);
+                }
+            }, 5000);
+            
+            return () => {
+                clearInterval(interval);
+                if (connection.db?.hearthUpkeepQueryResult) {
+                    connection.db.hearthUpkeepQueryResult.removeOnInsert(handleUpkeepUpdate);
+                    connection.db.hearthUpkeepQueryResult.removeOnUpdate(handleUpkeepUpdate);
+                }
+            };
+        }
+    }, [container.containerType, container.containerEntity, container.containerId]); // Removed 'connection' to prevent infinite loops
+
     // Special lantern toggle handler (light/extinguish instead of toggle)
     const handleLanternToggle = useCallback(() => {
         if (!connection?.reducers || container.containerId === null || !container.containerEntity) return;
@@ -491,6 +628,138 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
                     </div>
                 </>
             )}
+
+                {/* Homestead hearth building privilege UI */}
+                {container.containerType === 'homestead_hearth' && (
+                    <>
+                        <div style={{ 
+                            marginTop: '12px', 
+                            marginBottom: '8px',
+                            padding: '8px',
+                            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(255, 255, 255, 0.1)'
+                        }}>
+                            <div style={{ 
+                                fontSize: '12px', 
+                                fontWeight: 'bold',
+                                color: '#87CEEB',
+                                marginBottom: '6px'
+                            }}>
+                                🏗️ Building Privilege
+                            </div>
+                            
+                            {playersWithPrivilege.length > 0 ? (
+                                <div style={{ fontSize: '11px', color: '#ffffff', marginBottom: '8px' }}>
+                                    <div style={{ marginBottom: '4px', fontWeight: 'bold' }}>Players with privilege:</div>
+                                    {playersWithPrivilege.map((p) => (
+                                        <div key={p.id} style={{ marginLeft: '8px', color: p.id === playerId ? '#00ff88' : '#cccccc' }}>
+                                            • {p.name || p.id.substring(0, 8)} {p.id === playerId && '(You)'}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div style={{ fontSize: '11px', color: '#aaaaaa', marginBottom: '8px', fontStyle: 'italic' }}>
+                                    No players with building privilege
+                                </div>
+                            )}
+                            
+                            <button
+                                onClick={handleGrantBuildingPrivilege}
+                                className={`${styles.interactionButton} ${currentPlayerHasPrivilege ? styles.extinguishButton : styles.lightFireButton}`}
+                                style={{ width: '100%', marginTop: '4px' }}
+                            >
+                                {currentPlayerHasPrivilege ? 'Revoke Building Privilege' : 'Grant Building Privilege'}
+                            </button>
+                            
+                            <div style={{ 
+                                marginTop: '6px', 
+                                fontSize: '10px', 
+                                color: '#87CEEB', 
+                                fontStyle: 'italic'
+                            }}>
+                                💡 Hold E near hearth to toggle privilege
+                            </div>
+                        </div>
+
+                        {/* Upkeep UI */}
+                        <div style={{ 
+                            marginTop: '12px', 
+                            marginBottom: '8px',
+                            padding: '8px',
+                            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(255, 255, 255, 0.1)'
+                        }}>
+                            <div style={{ 
+                                fontSize: '12px', 
+                                fontWeight: 'bold',
+                                color: '#ffa040',
+                                marginBottom: '6px'
+                            }}>
+                                ⚙️ Building Upkeep
+                            </div>
+                            
+                            {upkeepCosts ? (
+                                <>
+                                    <div style={{ fontSize: '11px', color: '#ffffff', marginBottom: '8px' }}>
+                                        <div style={{ marginBottom: '4px', fontWeight: 'bold' }}>Required per hour:</div>
+                                        <div style={{ marginLeft: '8px', marginBottom: '2px' }}>
+                                            🪵 Wood: <span style={{ color: upkeepCosts.availableWood >= upkeepCosts.requiredWood ? '#00ff88' : '#ff4444' }}>
+                                                {upkeepCosts.requiredWood} / {upkeepCosts.availableWood}
+                                            </span>
+                                        </div>
+                                        <div style={{ marginLeft: '8px', marginBottom: '2px' }}>
+                                            🪨 Stone: <span style={{ color: upkeepCosts.availableStone >= upkeepCosts.requiredStone ? '#00ff88' : '#ff4444' }}>
+                                                {upkeepCosts.requiredStone} / {upkeepCosts.availableStone}
+                                            </span>
+                                        </div>
+                                        <div style={{ marginLeft: '8px', marginBottom: '2px' }}>
+                                            ⚙️ Metal: <span style={{ color: upkeepCosts.availableMetal >= upkeepCosts.requiredMetal ? '#00ff88' : '#ff4444' }}>
+                                                {upkeepCosts.requiredMetal} / {upkeepCosts.availableMetal}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    {upkeepCosts.requiredWood === 0 && upkeepCosts.requiredStone === 0 && upkeepCosts.requiredMetal === 0 ? (
+                                        <div style={{ fontSize: '11px', color: '#00ff88', fontStyle: 'italic' }}>
+                                            ✓ No upkeep required (only twig buildings)
+                                        </div>
+                                    ) : (
+                                        <div style={{ 
+                                            fontSize: '11px', 
+                                            color: (upkeepCosts.availableWood >= upkeepCosts.requiredWood && 
+                                                   upkeepCosts.availableStone >= upkeepCosts.requiredStone && 
+                                                   upkeepCosts.availableMetal >= upkeepCosts.requiredMetal) 
+                                                ? '#00ff88' : '#ff4444',
+                                            fontWeight: 'bold',
+                                            marginTop: '4px'
+                                        }}>
+                                            {(upkeepCosts.availableWood >= upkeepCosts.requiredWood && 
+                                              upkeepCosts.availableStone >= upkeepCosts.requiredStone && 
+                                              upkeepCosts.availableMetal >= upkeepCosts.requiredMetal) 
+                                                ? '✓ Buildings Protected' 
+                                                : '⚠️ Insufficient Resources - Buildings Will Decay'}
+                                        </div>
+                                    )}
+                                    
+                                    <div style={{ 
+                                        marginTop: '6px', 
+                                        fontSize: '10px', 
+                                        color: '#87CEEB', 
+                                        fontStyle: 'italic'
+                                    }}>
+                                        💡 Resources consumed every hour. Deposit wood, stone, or metal to maintain buildings.
+                                    </div>
+                                </>
+                            ) : (
+                                <div style={{ fontSize: '11px', color: '#aaaaaa', fontStyle: 'italic' }}>
+                                    Loading upkeep information...
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
             </ContainerButtons>
 
             {/* Special handling for hidden stash - don't show slots */}

@@ -11,6 +11,7 @@ pub enum ContainerType {
     Stash,
     Lantern,
     RainCollector,
+    HomesteadHearth,
     // Other container types can be added here
 }
 
@@ -110,8 +111,8 @@ pub enum TargetType {
     Barrel, // ADDED Barrel TargetType
     Foundation, // ADDED: Building foundation target type
     Wall, // ADDED: Building wall target type
-    DoorFrame, // ADDED: Building doorframe target type
     Door, // ADDED: Building door target type
+    HomesteadHearth, // ADDED: Homestead Hearth target type
 }
 
 // Building system enums

@@ -5,7 +5,7 @@
  * Separate from item placement because:
  * - No item consumption (hammer must be equipped)
  * - Uses cell/tile coordinates instead of world pixel coordinates
- * - Has modes (foundation, wall, doorframe, door)
+ * - Has modes (foundation, wall, door)
  * - Has shape/edge/facing parameters that cycle with mouse wheel
  */
 
@@ -20,7 +20,6 @@ export enum BuildingMode {
   None = 'none',
   Foundation = 'foundation',
   Wall = 'wall',
-  DoorFrame = 'doorframe',
   Door = 'door',
 }
 
@@ -479,7 +478,7 @@ export const useBuildingManager = (
         foundationShapeRef.current = FoundationShape.Full;
         console.log('[BuildingManager] Set foundation shape to Full');
       }
-    } else if (newMode === BuildingMode.Wall || newMode === BuildingMode.DoorFrame) {
+    } else if (newMode === BuildingMode.Wall) {
       setBuildingEdge(BuildingEdge.N);
       setBuildingFacing(BuildingFacing.Exterior);
     }

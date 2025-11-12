@@ -12,6 +12,7 @@ export type SlotType =
     | 'player_corpse'
     | 'stash'
     | 'rain_collector'
+    | 'homestead_hearth'
     | 'split'
     // Add more types as needed (e.g., 'furnace_input', 'furnace_fuel', 'crafting_output')
 

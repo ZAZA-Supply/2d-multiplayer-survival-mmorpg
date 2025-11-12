@@ -194,6 +194,7 @@ pub struct SoundEvent {
     pub max_distance: f32,      // Maximum distance to hear sound
     pub triggered_by: Identity, // Player who triggered the sound
     pub timestamp: Timestamp,
+    pub pitch_multiplier: f32,  // Pitch multiplier for sound variation (default 1.0)
 }
 
 /// Continuous sound table - tracks active looping sounds (campfires, lanterns, etc.)
@@ -291,6 +292,7 @@ pub fn emit_sound_at_position_with_distance(
         max_distance,
         triggered_by,
         timestamp: ctx.timestamp,
+        pitch_multiplier: 1.0, // Default pitch multiplier
     };
 
     match ctx.db.sound_event().try_insert(sound_event) {
@@ -566,6 +568,52 @@ pub fn emit_walking_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, player_i
     let _ = emit_sound_at_position_with_distance(ctx, SoundType::Walking, pos_x, pos_y, 0.7, 400.0, player_id);
 }
 
+/// Emit walking/footstep sound for animals (with species-specific pitch variation)
+pub fn emit_animal_walking_sound(
+    ctx: &ReducerContext,
+    pos_x: f32,
+    pos_y: f32,
+    species: crate::wild_animal_npc::AnimalSpecies,
+) -> Result<(), String> {
+    use crate::wild_animal_npc::AnimalSpecies;
+    
+    // Species-specific pitch multipliers (lower = deeper sound)
+    let pitch_multiplier = match species {
+        AnimalSpecies::ArcticWalrus => 0.7,  // Deep, heavy footsteps
+        AnimalSpecies::TundraWolf => 0.9,    // Slightly lower than normal
+        AnimalSpecies::CinderFox => 1.1,     // Slightly higher, lighter footsteps
+        AnimalSpecies::CableViper => 1.0,    // Normal pitch
+    };
+    
+    let mut rng = ctx.rng();
+    let filename = SoundType::Walking.get_random_filename(&mut rng);
+    
+    let sound_event = SoundEvent {
+        id: 0, // Auto-incremented
+        sound_type: SoundType::Walking,
+        filename,
+        pos_x,
+        pos_y,
+        volume: 0.7,
+        max_distance: 400.0,
+        triggered_by: ctx.identity(), // Animals triggered by server/module
+        timestamp: ctx.timestamp,
+        pitch_multiplier,
+    };
+
+    match ctx.db.sound_event().try_insert(sound_event) {
+        Ok(inserted) => {
+            log::debug!("Animal walking sound {} emitted: {} at ({:.1}, {:.1}) for {:?} (pitch: {:.2})", 
+                       inserted.id, inserted.filename, pos_x, pos_y, species, pitch_multiplier);
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("Failed to emit animal walking sound: {:?}", e);
+            Err("Failed to emit animal walking sound".to_string())
+        }
+    }
+}
+
 /// Emit swimming sound (when player moves in water)
 pub fn emit_swimming_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, player_id: Identity) {
     let _ = emit_sound_at_position_with_distance(ctx, SoundType::Swimming, pos_x, pos_y, 0.8, 450.0, player_id);
@@ -621,6 +669,7 @@ pub fn emit_global_sound(
         max_distance: f32::MAX, // Infinite distance - heard everywhere
         triggered_by: ctx.identity(), // Triggered by the server/module itself
         timestamp: ctx.timestamp,
+        pitch_multiplier: 1.0, // Default pitch multiplier
     };
 
     match ctx.db.sound_event().try_insert(sound_event) {

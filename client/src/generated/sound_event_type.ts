@@ -42,6 +42,7 @@ export type SoundEvent = {
   maxDistance: number,
   triggeredBy: __Identity,
   timestamp: __Timestamp,
+  pitchMultiplier: number,
 };
 let _cached_SoundEvent_type_value: __AlgebraicTypeType | null = null;
 
@@ -66,6 +67,7 @@ export const SoundEvent = {
       { name: "maxDistance", algebraicType: __AlgebraicTypeValue.F32 },
       { name: "triggeredBy", algebraicType: __AlgebraicTypeValue.createIdentityType() },
       { name: "timestamp", algebraicType: __AlgebraicTypeValue.createTimestampType() },
+      { name: "pitchMultiplier", algebraicType: __AlgebraicTypeValue.F32 },
     );
     return _cached_SoundEvent_type_value;
   },

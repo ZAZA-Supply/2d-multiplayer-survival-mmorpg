@@ -72,6 +72,7 @@ import {
     ViperSpittle as SpacetimeDBViperSpittle,
     AnimalCorpse as SpacetimeDBAnimalCorpse,
     Barrel as SpacetimeDBBarrel, // ADDED Barrel import
+    HomesteadHearth as SpacetimeDBHomesteadHearth, // ADDED HomesteadHearth import
 } from '../generated';
 import { Identity } from 'spacetimedb';
 import { PlacementItemInfo, PlacementActions } from '../hooks/usePlacementManager';
@@ -120,6 +121,7 @@ interface GameScreenProps {
     animalCorpses: Map<string, SpacetimeDBAnimalCorpse>;
     barrels: Map<string, SpacetimeDBBarrel>; // ADDED barrels
     seaStacks: Map<string, any>; // ADDED sea stacks
+    homesteadHearths: Map<string, SpacetimeDBHomesteadHearth>; // ADDED homesteadHearths
     foundationCells: Map<string, any>; // ADDED: Building foundations
     wallCells: Map<string, any>; // ADDED: Building walls
     inventoryItems: Map<string, SpacetimeDBInventoryItem>;
@@ -412,7 +414,8 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
             // Handle Arrow keys for time debug cycler (only when menu is closed and not typing)
             else if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && currentMenu === null && !isChatting) {
                 event.preventDefault();
-                const timeOrder = ['TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening', 'Night', 'Midnight'];
+                // Correct cycle order: Night -> Midnight -> TwilightMorning -> Dawn -> Morning -> Noon -> Afternoon -> Dusk -> TwilightEvening -> Night
+                const timeOrder = ['Night', 'Midnight', 'TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening'];
                 const currentTimeOfDay = worldState?.timeOfDay?.tag || 'Noon';
                 const currentIndex = timeOrder.indexOf(currentTimeOfDay);
                 
@@ -596,7 +599,8 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                         <button 
                             onClick={(e) => {
                                 // Cycle forward through times
-                                const timeOrder = ['TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening', 'Night', 'Midnight'];
+                                // Correct cycle order: Night -> Midnight -> TwilightMorning -> Dawn -> Morning -> Noon -> Afternoon -> Dusk -> TwilightEvening -> Night
+                const timeOrder = ['Night', 'Midnight', 'TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening'];
                                 const currentTimeOfDay = worldState?.timeOfDay?.tag || 'Noon';
                                 const currentIndex = timeOrder.indexOf(currentTimeOfDay);
                                 const nextIndex = (currentIndex + 1) % timeOrder.length;
@@ -634,7 +638,8 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                             <button 
                                 onClick={(e) => {
                                     // Cycle backward through times
-                                    const timeOrder = ['TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening', 'Night', 'Midnight'];
+                                    // Correct cycle order: Night -> Midnight -> TwilightMorning -> Dawn -> Morning -> Noon -> Afternoon -> Dusk -> TwilightEvening -> Night
+                const timeOrder = ['Night', 'Midnight', 'TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening'];
                                     const currentTimeOfDay = worldState?.timeOfDay?.tag || 'Noon';
                                     const currentIndex = timeOrder.indexOf(currentTimeOfDay);
                                     const prevIndex = (currentIndex - 1 + timeOrder.length) % timeOrder.length;
@@ -666,7 +671,8 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                             <button 
                                 onClick={(e) => {
                                     // Cycle forward through times
-                                    const timeOrder = ['TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening', 'Night', 'Midnight'];
+                                    // Correct cycle order: Night -> Midnight -> TwilightMorning -> Dawn -> Morning -> Noon -> Afternoon -> Dusk -> TwilightEvening -> Night
+                const timeOrder = ['Night', 'Midnight', 'TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening'];
                                     const currentTimeOfDay = worldState?.timeOfDay?.tag || 'Noon';
                                     const currentIndex = timeOrder.indexOf(currentTimeOfDay);
                                     const nextIndex = (currentIndex + 1) % timeOrder.length;
@@ -890,6 +896,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 animalCorpses={animalCorpses}
                 barrels={props.barrels}
                 seaStacks={props.seaStacks}
+                homesteadHearths={props.homesteadHearths}
                 foundationCells={props.foundationCells}
                 wallCells={props.wallCells}
                 inventoryItems={inventoryItems}
@@ -961,6 +968,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 playerCorpses={playerCorpses}
                 stashes={stashes}
                 rainCollectors={rainCollectors}
+                homesteadHearths={props.homesteadHearths}
                 currentStorageBox={
                     interactingWith?.type === 'wooden_storage_box'
                         ? woodenStorageBoxes.get(interactingWith.id.toString()) || null

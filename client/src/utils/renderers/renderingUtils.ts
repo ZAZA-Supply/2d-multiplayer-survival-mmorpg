@@ -24,6 +24,7 @@ import {
     AnimalCorpse as SpacetimeDBAnimalCorpse,
     FoundationCell as SpacetimeDBFoundationCell, // ADDED: Building foundations
     WallCell as SpacetimeDBWallCell, // ADDED: Building walls
+    HomesteadHearth as SpacetimeDBHomesteadHearth, // ADDED: HomesteadHearth
 } from '../../generated';
 import { PlayerCorpse as SpacetimeDBPlayerCorpse } from '../../generated/player_corpse_type';
 import { gameConfig } from '../../config/gameConfig';
@@ -64,6 +65,8 @@ import { renderPlayerCorpse } from './playerCorpseRenderingUtils';
 import { renderBarrel } from './barrelRenderingUtils';
 // Import sea stack renderer
 import { renderSeaStackSingle } from './seaStackRenderingUtils';
+// Import hearth renderer
+import { renderHearth } from './hearthRenderingUtils';
 // Import grass renderer
 import { renderGrass } from './grassRenderingUtils';
 // Import dropped item renderer
@@ -1027,6 +1030,18 @@ export const renderYSortedEntities = ({
             const seaStack = entity as any; // Sea stack from SpacetimeDB
             // Render ONLY top half - bottom half is rendered separately before swimming players
             renderSeaStackSingle(ctx, seaStack, doodadImagesRef.current, cycleProgress, nowMs, 'top');
+        } else if (type === 'homestead_hearth') {
+            const hearth = entity as SpacetimeDBHomesteadHearth;
+            // Check if this hearth is the closest interactable target
+            const isTheClosestTarget = closestInteractableTarget?.type === 'homestead_hearth' && closestInteractableTarget?.id === hearth.id;
+            // Render hearth using imported function
+            renderHearth(ctx, hearth, nowMs, cycleProgress);
+            
+            // Draw outline only if this is THE closest interactable target
+            if (isTheClosestTarget) {
+                const outlineColor = getInteractionOutlineColor('open');
+                drawInteractionOutline(ctx, hearth.posX, hearth.posY - 48, 96, 96, cycleProgress, outlineColor);
+            }
         } else if (type === 'foundation_cell') {
             const foundation = entity as SpacetimeDBFoundationCell;
             // Foundations use cell coordinates directly - renderFoundation handles conversion
@@ -1104,6 +1119,8 @@ export const renderYSortedEntities = ({
             // Planted seeds are fully rendered in the first pass - no second pass needed
         } else if (type === 'rain_collector') {
             // Rain collectors are fully rendered in the first pass - no second pass needed
+        } else if (type === 'homestead_hearth') {
+            // Homestead hearths are fully rendered in the first pass - no second pass needed
         } else if (type === 'wild_animal') {
             // Wild animals are rendered separately in GameCanvas - no second pass needed
         } else if (type === 'viper_spittle') {

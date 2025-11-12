@@ -560,7 +560,7 @@ fn generate_lakes(config: &WorldGenConfig, noise: &Perlin, shore_distance: &[Vec
         }
     }
     
-    // Scale total lake count with map size - much more lakes like Rust
+    // Scale total lake count with map size
     let max_lakes = (35.0 * map_scale) as usize; // Significantly increased from 12
     lake_centers.truncate(max_lakes);
     

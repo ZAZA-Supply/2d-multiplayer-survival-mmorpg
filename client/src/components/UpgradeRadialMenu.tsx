@@ -1,7 +1,7 @@
 /**
  * Upgrade Radial Menu Component
  * 
- * Generic upgrade menu for any building tile type (foundations, walls, doorframes, etc.).
+ * Generic upgrade menu for any building tile type (foundations, walls, doors, etc.).
  * Shows a radial menu when right-clicking with Repair Hammer equipped on a building tile.
  * Allows selection of upgrade tiers (Wood, Stone, Metal) based on available resources.
  * Shows resource requirements and greys out unavailable options.
@@ -9,9 +9,9 @@
  * Styled with cyberpunk theme - cyan/blue colors, gradients, glows.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { BuildingTier } from '../hooks/useBuildingManager';
-import { DbConnection, InventoryItem, ItemDefinition } from '../generated';
+import { DbConnection, InventoryItem, ItemDefinition, ActiveConsumableEffect } from '../generated';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faTree, 
@@ -30,6 +30,7 @@ export interface UpgradableBuildingTile {
   isDestroyed?: boolean;
   // Optional: shape for cost multiplier (foundations have shape, walls don't)
   shape?: number; // FoundationShape enum (0-5)
+  owner?: any; // Identity of the player who placed this tile
 }
 
 interface UpgradeRadialMenuProps {
@@ -40,10 +41,12 @@ interface UpgradeRadialMenuProps {
   inventoryItems: Map<string, InventoryItem>;
   itemDefinitions: Map<string, ItemDefinition>;
   tile: UpgradableBuildingTile | null; // Generic building tile
-  tileType: 'foundation' | 'wall' | 'doorframe' | 'door'; // Tile type for cost calculation
+  tileType: 'foundation' | 'wall' | 'door'; // Tile type for cost calculation
   onSelect: (tier: BuildingTier) => void;
   onCancel: () => void;
   onDestroy?: () => void; // Destroy callback (only shown for Twig tier)
+  activeConsumableEffects?: Map<string, ActiveConsumableEffect>; // ADDED: For building privilege check
+  localPlayerId?: string | null; // ADDED: Local player ID for privilege check
 }
 
 interface UpgradeOption {
@@ -87,7 +90,7 @@ function getUpgradeCosts(tier: BuildingTier, tileType: string, multiplier: numbe
       if (tileType === 'wall') {
         return { wood: Math.ceil(20 * multiplier) };
       }
-      // Foundation, doorframe, door: 50 wood
+      // Foundation, door: 50 wood
       return { wood: Math.ceil(50 * multiplier) };
     
     case BuildingTier.Stone:
@@ -95,7 +98,7 @@ function getUpgradeCosts(tier: BuildingTier, tileType: string, multiplier: numbe
       if (tileType === 'wall') {
         return { stone: Math.ceil(20 * multiplier) };
       }
-      // Foundation, doorframe, door: 100 stone
+      // Foundation, door: 100 stone
       return { stone: Math.ceil(100 * multiplier) };
     
     case BuildingTier.Metal:
@@ -103,7 +106,7 @@ function getUpgradeCosts(tier: BuildingTier, tileType: string, multiplier: numbe
       if (tileType === 'wall') {
         return { metal: Math.ceil(20 * multiplier) };
       }
-      // Foundation, doorframe, door: 50 metal fragments
+      // Foundation, door: 50 metal fragments
       return { metal: Math.ceil(50 * multiplier) };
     
     default:
@@ -123,6 +126,8 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
   onSelect,
   onCancel,
   onDestroy,
+  activeConsumableEffects,
+  localPlayerId,
 }) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -130,7 +135,22 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const isSelectingRef = useRef(false);
 
-  // Get resource counts
+  // Check if player has building privilege
+  const hasBuildingPrivilege = useMemo(() => {
+    if (!activeConsumableEffects || !localPlayerId || !connection) return false;
+    
+    // Convert localPlayerId string to Identity for comparison
+    const localPlayerIdentity = connection.identity;
+    if (!localPlayerIdentity) return false;
+    
+    return Array.from(activeConsumableEffects.values()).some((effect) => {
+      const effectTypeTag = effect.effectType ? (effect.effectType as any).tag : 'undefined';
+      const effectPlayerId = effect.playerId;
+      return effectTypeTag === 'BuildingPrivilege' && effectPlayerId.isEqual(localPlayerIdentity);
+    });
+  }, [activeConsumableEffects, localPlayerId, connection]);
+
+  // Get resource counts (from inventory and hotbar)
   const getResourceCount = (resourceName: string): number => {
     if (!connection || !itemDefinitions) return 0;
     
@@ -164,13 +184,28 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
   // Calculate cost multiplier based on tile type and shape
   const costMultiplier = getCostMultiplier(tileType, tile?.shape);
 
+  // Check if player owns this tile (for destroy option)
+  // Note: We check ownership but still show the option - server will validate
+  const playerOwnsTile = useMemo(() => {
+    if (!tile?.owner || !connection) return false;
+    const localPlayerIdentity = connection.identity;
+    if (!localPlayerIdentity) return false;
+    try {
+      return tile.owner.isEqual(localPlayerIdentity);
+    } catch (e) {
+      console.warn('[UpgradeRadialMenu] Error checking ownership:', e);
+      return false;
+    }
+  }, [tile?.owner, connection]);
+
   // Define upgrade options (always show all 3 tiers, grey out unavailable ones)
   const upgradeOptions: UpgradeOption[] = [];
 
   // Wood upgrade (Twig -> Wood)
   const woodCosts = getUpgradeCosts(BuildingTier.Wood, tileType, costMultiplier);
   const requiredWood = woodCosts.wood || 0;
-  const canUpgradeToWood = currentTier < BuildingTier.Wood && woodCount >= requiredWood;
+  const hasResourcesForWood = woodCount >= requiredWood;
+  const canUpgradeToWood = currentTier < BuildingTier.Wood && hasBuildingPrivilege && hasResourcesForWood;
   upgradeOptions.push({
     tier: BuildingTier.Wood,
     name: 'Wood',
@@ -180,15 +215,18 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
     available: canUpgradeToWood,
     reason: currentTier >= BuildingTier.Wood 
       ? 'Already at or above this tier' 
-      : woodCount < requiredWood 
-        ? `Need ${requiredWood} wood (have ${woodCount})` 
-        : undefined,
+      : !hasBuildingPrivilege
+        ? 'Building privilege required'
+        : !hasResourcesForWood
+          ? `Need ${requiredWood} wood (have ${woodCount})` 
+          : undefined,
   });
 
   // Stone upgrade (-> Stone)
   const stoneCosts = getUpgradeCosts(BuildingTier.Stone, tileType, costMultiplier);
   const requiredStone = stoneCosts.stone || 0;
-  const canUpgradeToStone = currentTier < BuildingTier.Stone && stoneCount >= requiredStone;
+  const hasResourcesForStone = stoneCount >= requiredStone;
+  const canUpgradeToStone = currentTier < BuildingTier.Stone && hasBuildingPrivilege && hasResourcesForStone;
   upgradeOptions.push({
     tier: BuildingTier.Stone,
     name: 'Stone',
@@ -198,15 +236,18 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
     available: canUpgradeToStone,
     reason: currentTier >= BuildingTier.Stone 
       ? 'Already at or above this tier' 
-      : stoneCount < requiredStone 
-        ? `Need ${requiredStone} stone (have ${stoneCount})` 
-        : undefined,
+      : !hasBuildingPrivilege
+        ? 'Building privilege required'
+        : !hasResourcesForStone
+          ? `Need ${requiredStone} stone (have ${stoneCount})` 
+          : undefined,
   });
 
   // Metal upgrade (-> Metal)
   const metalCosts = getUpgradeCosts(BuildingTier.Metal, tileType, costMultiplier);
   const requiredMetal = metalCosts.metal || 0;
-  const canUpgradeToMetal = currentTier < BuildingTier.Metal && metalCount >= requiredMetal;
+  const hasResourcesForMetal = metalCount >= requiredMetal;
+  const canUpgradeToMetal = currentTier < BuildingTier.Metal && hasBuildingPrivilege && hasResourcesForMetal;
   upgradeOptions.push({
     tier: BuildingTier.Metal,
     name: 'Metal',
@@ -216,20 +257,31 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
     available: canUpgradeToMetal,
     reason: currentTier >= BuildingTier.Metal 
       ? 'Already at or above this tier' 
-      : metalCount < requiredMetal 
-        ? `Need ${requiredMetal} metal fragments (have ${metalCount})` 
-        : undefined,
+      : !hasBuildingPrivilege
+        ? 'Building privilege required'
+        : !hasResourcesForMetal
+          ? `Need ${requiredMetal} metal fragments (have ${metalCount})` 
+          : undefined,
   });
 
   // Destroy option (only for Twig tier)
+  // Always show the option - server will validate ownership
   if (currentTier === BuildingTier.Twig && onDestroy) {
+    // Debug logging for ownership check
+    if (tile?.owner && connection?.identity) {
+      console.log('[UpgradeRadialMenu] Destroy option - tile owner:', tile.owner, 'local identity:', connection.identity, 'owns:', playerOwnsTile);
+    } else {
+      console.log('[UpgradeRadialMenu] Destroy option - missing owner or connection:', { hasOwner: !!tile?.owner, hasConnection: !!connection, hasIdentity: !!connection?.identity });
+    }
+    
     upgradeOptions.push({
       tier: BuildingTier.Twig, // Not used for destroy
       name: 'Destroy',
       icon: faTrash,
       description: 'Destroy this building piece',
       requirements: {},
-      available: true,
+      available: true, // Always available - server validates ownership
+      reason: !playerOwnsTile ? 'You can only destroy buildings you built' : undefined,
     });
   }
 
@@ -593,6 +645,23 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
                 }}
               >
                 {upgradeOptions[hoveredIndex].requirements.metal} x Metal ({metalCount})
+              </div>
+            )}
+            {/* Show reason if unavailable */}
+            {upgradeOptions[hoveredIndex].reason && (
+              <div
+                style={{
+                  fontSize: '10px',
+                  fontFamily: '"Press Start 2P", cursive',
+                  color: '#ff6666',
+                  textShadow: '0 0 5px rgba(255, 102, 102, 0.8)',
+                  marginTop: '8px',
+                  padding: '4px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  borderRadius: '3px',
+                }}
+              >
+                ⚠ {upgradeOptions[hoveredIndex].reason}
               </div>
             )}
           </div>

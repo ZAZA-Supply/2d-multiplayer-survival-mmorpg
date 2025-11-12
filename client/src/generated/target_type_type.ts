@@ -47,8 +47,8 @@ export type TargetType = TargetTypeVariants.Tree |
   TargetTypeVariants.Barrel |
   TargetTypeVariants.Foundation |
   TargetTypeVariants.Wall |
-  TargetTypeVariants.DoorFrame |
-  TargetTypeVariants.Door;
+  TargetTypeVariants.Door |
+  TargetTypeVariants.HomesteadHearth;
 
 let _cached_TargetType_type_value: __AlgebraicTypeType | null = null;
 
@@ -77,8 +77,8 @@ export const TargetType = {
   Barrel: { tag: "Barrel" } as const,
   Foundation: { tag: "Foundation" } as const,
   Wall: { tag: "Wall" } as const,
-  DoorFrame: { tag: "DoorFrame" } as const,
   Door: { tag: "Door" } as const,
+  HomesteadHearth: { tag: "HomesteadHearth" } as const,
 
   getTypeScriptAlgebraicType(): __AlgebraicTypeType {
     if (_cached_TargetType_type_value) return _cached_TargetType_type_value;
@@ -101,8 +101,8 @@ export const TargetType = {
       { name: "Barrel", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "Foundation", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "Wall", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
-      { name: "DoorFrame", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "Door", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "HomesteadHearth", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
     );
     return _cached_TargetType_type_value;
   },

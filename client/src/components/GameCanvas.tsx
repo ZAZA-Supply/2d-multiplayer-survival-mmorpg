@@ -37,6 +37,7 @@ import {
   Barrel as SpacetimeDBBarrel,
   HarvestableResource as SpacetimeDBHarvestableResource,
   FoundationCell, // ADDED: Foundation cell type
+  HomesteadHearth as SpacetimeDBHomesteadHearth, // ADDED: HomesteadHearth type
 } from '../generated';
 
 // --- Core Hooks ---
@@ -82,7 +83,7 @@ import { drawMinimapOntoCanvas } from './Minimap';
 import { renderCampfire } from '../utils/renderers/campfireRenderingUtils';
 import { renderPlayerCorpse } from '../utils/renderers/playerCorpseRenderingUtils';
 import { renderStash } from '../utils/renderers/stashRenderingUtils';
-import { renderPlayerTorchLight, renderCampfireLight, renderLanternLight, renderFurnaceLight } from '../utils/renderers/lightRenderingUtils';
+import { renderPlayerTorchLight, renderCampfireLight, renderLanternLight, renderFurnaceLight, renderHearthLight } from '../utils/renderers/lightRenderingUtils';
 import { renderTree } from '../utils/renderers/treeRenderingUtils';
 import { renderCloudsDirectly } from '../utils/renderers/cloudRenderingUtils';
 import { useFallingTreeAnimations } from '../hooks/useFallingTreeAnimations';
@@ -179,6 +180,7 @@ interface GameCanvasProps {
     animalCorpses: Map<string, SpacetimeDBAnimalCorpse>; // Add viper spittles
   barrels: Map<string, SpacetimeDBBarrel>; // Add barrels
   seaStacks: Map<string, any>; // Add sea stacks
+  homesteadHearths: Map<string, SpacetimeDBHomesteadHearth>; // ADDED: HomesteadHearths
   foundationCells: Map<string, any>; // ADDED: Building foundations
   wallCells: Map<string, any>; // ADDED: Building walls
   setMusicPanelVisible: React.Dispatch<React.SetStateAction<boolean>>;
@@ -252,6 +254,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   animalCorpses,
   barrels,
   seaStacks,
+  homesteadHearths, // ADDED: HomesteadHearths destructuring
   foundationCells, // ADDED: Building foundations
   wallCells, // ADDED: Building walls
   setMusicPanelVisible,
@@ -422,6 +425,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     campfires,
     lanterns,
     furnaces, // Add furnaces for darkness cutouts
+    homesteadHearths, // ADDED: HomesteadHearths for light cutouts
     players, // Pass all players
     activeEquipments, // Pass all active equipments
     itemDefinitions, // Pass all item definitions
@@ -487,6 +491,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     visibleBarrelsMap,
     visibleSeaStacks,
     visibleSeaStacksMap,
+    visibleHomesteadHearths,
+    visibleHomesteadHearthsMap, // ADDED: Homestead Hearths map
   } = useEntityFiltering(
     players,
     trees,
@@ -494,6 +500,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     campfires,
     furnaces, // ADDED: Furnaces to useEntityFiltering
     lanterns,
+    homesteadHearths, // ADDED: HomesteadHearths (must match function signature order)
     harvestableResources,
     droppedItems,
     woodenStorageBoxes,
@@ -682,6 +689,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     localPlayer,
     campfires,
     furnaces, // ADDED: Furnaces to useInteractionFinder
+    lanterns,
+    homesteadHearths, // ADDED: HomesteadHearths to useInteractionFinder
     droppedItems,
     woodenStorageBoxes,
     playerCorpses,
@@ -690,7 +699,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     players,
     shelters,
     connection,
-    lanterns,
     inventoryItems,
     itemDefinitions,
     playerDrinkingCooldowns,
@@ -830,6 +838,44 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   // });
 
   // --- Effects ---
+  
+  // Register error handlers for destroy reducers
+  useEffect(() => {
+    if (!connection) return;
+
+    const handleDestroyFoundationResult = (ctx: any, foundationId: bigint) => {
+      console.log('[GameCanvas] destroyFoundation reducer result:', ctx.event?.status);
+      if (ctx.event?.status?.tag === 'Failed') {
+        const errorMsg = ctx.event.status.value || 'Failed to destroy foundation';
+        console.error('[GameCanvas] destroyFoundation failed:', errorMsg);
+        console.log('[GameCanvas] Failed destruction details:', { foundationId, errorMsg });
+        // TODO: Show error message to user (e.g., toast notification)
+      } else if (ctx.event?.status?.tag === 'Committed') {
+        console.log('[GameCanvas] destroyFoundation succeeded! Foundation', foundationId, 'destroyed');
+      }
+    };
+
+    const handleDestroyWallResult = (ctx: any, wallId: bigint) => {
+      console.log('[GameCanvas] destroyWall reducer result:', ctx.event?.status);
+      if (ctx.event?.status?.tag === 'Failed') {
+        const errorMsg = ctx.event.status.value || 'Failed to destroy wall';
+        console.error('[GameCanvas] destroyWall failed:', errorMsg);
+        console.log('[GameCanvas] Failed destruction details:', { wallId, errorMsg });
+        // TODO: Show error message to user (e.g., toast notification)
+      } else if (ctx.event?.status?.tag === 'Committed') {
+        console.log('[GameCanvas] destroyWall succeeded! Wall', wallId, 'destroyed');
+      }
+    };
+
+    connection.reducers.onDestroyFoundation(handleDestroyFoundationResult);
+    connection.reducers.onDestroyWall(handleDestroyWallResult);
+
+    return () => {
+      connection.reducers.removeOnDestroyFoundation(handleDestroyFoundationResult);
+      connection.reducers.removeOnDestroyWall(handleDestroyWallResult);
+    };
+  }, [connection]);
+
   useEffect(() => {
     // Iterate over all known icons in itemIconUtils.ts to ensure they are preloaded
     Object.entries(itemIcons).forEach(([assetName, iconSrc]) => {
@@ -1868,6 +1914,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       closestInteractableTarget: closestInteractableTarget as any,
       lanterns: visibleLanternsMap,
       rainCollectors: rainCollectors,
+      homesteadHearths: visibleHomesteadHearthsMap,
     });
     renderPlacementPreview({
       ctx, placementInfo, buildingState, itemImagesRef, shelterImageRef, worldMouseX: currentWorldMouseX,
@@ -1933,7 +1980,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     }
 
     // Interaction indicators - Draw only for visible entities that are interactable
-    const drawIndicatorIfNeeded = (entityType: 'campfire' | 'furnace' | 'lantern' | 'box' | 'stash' | 'corpse' | 'knocked_out_player' | 'water', entityId: number | bigint | string, entityPosX: number, entityPosY: number, entityHeight: number, isInView: boolean) => {
+    const drawIndicatorIfNeeded = (entityType: 'campfire' | 'furnace' | 'lantern' | 'box' | 'stash' | 'corpse' | 'knocked_out_player' | 'water' | 'homestead_hearth', entityId: number | bigint | string, entityPosX: number, entityPosY: number, entityHeight: number, isInView: boolean) => {
       // If holdInteractionProgress is null (meaning no interaction is even being tracked by the state object),
       // or if the entity is not in view, do nothing.
       if (!isInView || !holdInteractionProgress) {
@@ -2059,6 +2106,19 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         cameraOffsetX,
         cameraOffsetY,
       });
+    });
+
+    // Hearth Lights - Only draw for visible hearths (always on, warm orange glow)
+    visibleHomesteadHearthsMap.forEach((hearth: SpacetimeDBHomesteadHearth) => {
+      renderHearthLight({
+        ctx,
+        hearth: hearth,
+        cameraOffsetX,
+        cameraOffsetY,
+      });
+      
+      // Homestead hearth interaction indicators (for hold actions like grant building privilege)
+      drawIndicatorIfNeeded('homestead_hearth', hearth.id, hearth.posX, hearth.posY, 96, true); // 96px height for hearth
     });
 
     // --- Render Torch Light for ALL players (Local and Remote) ---
@@ -2468,6 +2528,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         />
       )}
 
+
       {/* Upgrade Radial Menu - for foundations */}
       {showUpgradeRadialMenu && upgradeMenuFoundationRef.current && (
         <UpgradeRadialMenu
@@ -2479,6 +2540,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           itemDefinitions={itemDefinitions}
           tile={upgradeMenuFoundationRef.current}
           tileType="foundation"
+          activeConsumableEffects={activeConsumableEffects}
+          localPlayerId={localPlayerId}
           onSelect={(tier: BuildingTier) => {
             if (connection && upgradeMenuFoundationRef.current) {
               console.log('[UpgradeRadialMenu] Upgrading foundation', upgradeMenuFoundationRef.current.id, 'to tier', tier);
@@ -2519,6 +2582,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           itemDefinitions={itemDefinitions}
           tile={upgradeMenuWallRef.current}
           tileType="wall"
+          activeConsumableEffects={activeConsumableEffects}
+          localPlayerId={localPlayerId}
           onSelect={(tier: BuildingTier) => {
             if (connection && upgradeMenuWallRef.current) {
               console.log('[UpgradeRadialMenu] Upgrading wall', upgradeMenuWallRef.current.id, 'to tier', tier);

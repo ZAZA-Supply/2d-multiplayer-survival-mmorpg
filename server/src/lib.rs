@@ -79,6 +79,8 @@ mod metadata_providers; // <<< ADDED: Provides plant/seed metadata to client
 mod sea_stack; // <<< ADDED: Sea stack decorative entities
 mod memory_grid; // <<< ADDED: Memory Grid tech tree system
 mod building; // <<< ADDED: Building system (foundations, walls, doors)
+mod homestead_hearth; // <<< ADDED: Homestead Hearth for building privilege system
+mod building_decay; // <<< ADDED: Building decay system
 
 // ADD: Re-export respawn reducer
 pub use respawn::respawn_randomly;
@@ -116,9 +118,6 @@ pub use water_patch::water_crops;
 // ADD: Re-export wild animal NPC reducers
 pub use wild_animal_npc::{spawn_wild_animal, damage_wild_animal, damage_wild_animal_by_animal, process_wild_animal_ai};
 
-// ADD: Re-export barrel reducers
-pub use barrel::attack_barrel;
-
 // ADD: Re-export unified harvestable resource reducer
 pub use harvestable_resource::interact_with_harvestable_resource;
 
@@ -130,6 +129,15 @@ pub use memory_grid::{purchase_memory_grid_node, initialize_player_memory_grid};
 
 // ADD: Re-export building reducers
 pub use building::place_foundation;
+
+// ADD: Re-export homestead hearth reducers for client bindings
+pub use homestead_hearth::{
+    place_homestead_hearth, grant_building_privilege_from_hearth,
+    move_item_to_hearth, move_item_from_hearth, move_item_within_hearth,
+    split_stack_into_hearth, split_stack_from_hearth, split_stack_within_hearth,
+    quick_move_from_hearth, quick_move_to_hearth,
+    drop_item_from_hearth_slot_to_world, split_and_drop_item_from_hearth_slot_to_world
+};
 
 // Define a constant for the /kill command cooldown (e.g., 5 minutes)
 pub const KILL_COMMAND_COOLDOWN_SECONDS: u64 = 300;
@@ -523,6 +531,15 @@ pub fn init_module(ctx: &ReducerContext) -> Result<(), String> {
     
     // ADD: Initialize viper spittle projectile system
     crate::wild_animal_npc::viper::init_viper_spittle_system(ctx)?;
+    
+    // ADD: Initialize building privilege distance check system
+    crate::homestead_hearth::init_building_privilege_check_schedule(ctx)?;
+    
+    // ADD: Initialize hearth upkeep processing system
+    crate::homestead_hearth::init_hearth_upkeep_schedule(ctx)?;
+    
+    // ADD: Initialize building decay processing system
+    crate::building_decay::init_building_decay_schedule(ctx)?;
     
     // ADD: Initialize barrel respawn system
     crate::barrel::init_barrel_system(ctx)?;

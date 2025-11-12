@@ -7,7 +7,7 @@
 
 import { 
     InventoryItem, ItemDefinition,
-    Campfire, Furnace, Lantern, WoodenStorageBox, PlayerCorpse, Stash, RainCollector
+    Campfire, Furnace, Lantern, WoodenStorageBox, PlayerCorpse, Stash, RainCollector, HomesteadHearth
 } from '../generated';
 import { PopulatedItem } from '../components/InventoryUI';
 import { DragSourceSlotInfo, DraggedItemInfo } from '../types/dragDropTypes';
@@ -15,9 +15,9 @@ import { DragSourceSlotInfo, DraggedItemInfo } from '../types/dragDropTypes';
 // Container type definitions based on actual usage
 export type ContainerType = 
     | 'campfire' | 'furnace' | 'lantern'           // Fuel containers
-    | 'wooden_storage_box' | 'player_corpse' | 'stash' | 'rain_collector'; // Storage containers
+    | 'wooden_storage_box' | 'player_corpse' | 'stash' | 'rain_collector' | 'homestead_hearth'; // Storage containers
 
-export type ContainerEntity = Campfire | Furnace | Lantern | WoodenStorageBox | PlayerCorpse | Stash | RainCollector;
+export type ContainerEntity = Campfire | Furnace | Lantern | WoodenStorageBox | PlayerCorpse | Stash | RainCollector | HomesteadHearth;
 
 // Container configurations - simple and focused on actual patterns
 export const CONTAINER_CONFIGS = {
@@ -30,7 +30,8 @@ export const CONTAINER_CONFIGS = {
     wooden_storage_box: { slots: 18, slotType: 'wooden_storage_box', fieldPrefix: 'slotInstanceId', hasToggle: false, hasLightExtinguish: false, gridCols: 6, special: false },
     player_corpse: { slots: 30, slotType: 'player_corpse', fieldPrefix: 'slotInstanceId', hasToggle: false, hasLightExtinguish: false, gridCols: 6, special: false },
     stash: { slots: 6, slotType: 'stash', fieldPrefix: 'slotInstanceId', hasToggle: false, hasLightExtinguish: false, gridCols: 6, special: false },
-    rain_collector: { slots: 1, slotType: 'rain_collector', fieldPrefix: 'slot0InstanceId', hasToggle: false, hasLightExtinguish: false, special: true, gridCols: 1 }
+    rain_collector: { slots: 1, slotType: 'rain_collector', fieldPrefix: 'slot0InstanceId', hasToggle: false, hasLightExtinguish: false, special: true, gridCols: 1 },
+    homestead_hearth: { slots: 20, slotType: 'homestead_hearth', fieldPrefix: 'slotInstanceId', hasToggle: false, hasLightExtinguish: false, gridCols: 6, special: false }
 } as const;
 
 /**
@@ -44,7 +45,8 @@ export function getReducerName(containerType: ContainerType, action: string): st
         wooden_storage_box: 'Box',
         player_corpse: 'Corpse',
         stash: 'Stash',
-        rain_collector: 'RainCollector'
+        rain_collector: 'RainCollector',
+        homestead_hearth: 'Hearth' // Note: Reducer is quickMoveFromHearth, not quickMoveFromHomesteadHearth
     };
     
     const typeName = typeMap[containerType];
@@ -71,7 +73,8 @@ export function getDragDropReducerNames(containerType: ContainerType) {
         wooden_storage_box: 'Box',
         player_corpse: 'Corpse',
         stash: 'Stash',
-        rain_collector: 'RainCollector'
+        rain_collector: 'RainCollector',
+        homestead_hearth: 'Hearth' // Note: Reducer is moveItemToHearth, not moveItemToHomesteadHearth
     };
     
     const typeName = typeMap[containerType];
@@ -85,18 +88,18 @@ export function getDragDropReducerNames(containerType: ContainerType) {
         splitDropToWorld: `splitAndDropItemFrom${typeName}SlotToWorld`,
         
         // Player <-> Container reducers - DIFFERENT PATTERNS
-        moveFromPlayer: `moveItemTo${typeName}`,  // Consistent: moveItemToCampfire, moveItemToBox, etc.
+        moveFromPlayer: `moveItemTo${typeName}`,  // Consistent: moveItemToCampfire, moveItemToBox, moveItemToHearth, etc.
         moveToPlayer: isFuelContainer 
             ? `moveItemFrom${typeName}ToPlayerSlot`  // Fuel: moveItemFromCampfireToPlayerSlot
-            : `moveItemFrom${typeName}`,             // Storage: moveItemFromBox
+            : `moveItemFrom${typeName}`,             // Storage: moveItemFromBox, moveItemFromHearth
         
         // Within container moves (consistent)  
-        moveWithin: `moveItemWithin${typeName}`,  // moveItemWithinCampfire, moveItemWithinBox, etc.
+        moveWithin: `moveItemWithin${typeName}`,  // moveItemWithinCampfire, moveItemWithinBox, moveItemWithinHearth, etc.
         
         // Split operations
-        splitFromPlayer: `splitStackInto${typeName}`,     // splitStackIntoCampfire, splitStackIntoBox
-        splitToPlayer: `splitStackFrom${typeName}`,       // splitStackFromCampfire, splitStackFromBox  
-        splitWithin: `splitStackWithin${typeName}`,       // splitStackWithinCampfire, splitStackWithinBox
+        splitFromPlayer: `splitStackInto${typeName}`,     // splitStackIntoCampfire, splitStackIntoBox, splitStackIntoHearth
+        splitToPlayer: `splitStackFrom${typeName}`,       // splitStackFromCampfire, splitStackFromBox, splitStackFromHearth
+        splitWithin: `splitStackWithin${typeName}`,       // splitStackWithinCampfire, splitStackWithinBox, splitStackWithinHearth
     };
 }
 
@@ -111,7 +114,8 @@ export function getContainerTypeFromSlotType(slotType: string): ContainerType | 
         'wooden_storage_box': 'wooden_storage_box',
         'player_corpse': 'player_corpse',
         'stash': 'stash',
-        'rain_collector': 'rain_collector'
+        'rain_collector': 'rain_collector',
+        'homestead_hearth': 'homestead_hearth'
     };
     
     return mapping[slotType] || null;
@@ -526,7 +530,7 @@ export function isFuelContainer(containerType: ContainerType): boolean {
  * Check if container type has storage slots  
  */
 export function isStorageContainer(containerType: ContainerType): boolean {
-    return ['wooden_storage_box', 'player_corpse', 'stash', 'rain_collector'].includes(containerType);
+    return ['wooden_storage_box', 'player_corpse', 'stash', 'rain_collector', 'homestead_hearth'].includes(containerType);
 }
 
 /**
@@ -547,7 +551,8 @@ export function getContainerDisplayName(containerType: ContainerType): string {
         wooden_storage_box: 'WOODEN STORAGE BOX',
         player_corpse: 'Player Corpse',
         stash: 'STASH',
-        rain_collector: 'RAIN COLLECTOR'
+        rain_collector: 'RAIN COLLECTOR',
+        homestead_hearth: 'HOMESTEAD HEARTH'
     };
     
     return nameMap[containerType];
@@ -567,6 +572,7 @@ export function getContainerEntity(
         playerCorpses?: Map<string, PlayerCorpse>;
         stashes?: Map<string, Stash>;
         rainCollectors?: Map<string, RainCollector>;
+        homesteadHearths?: Map<string, HomesteadHearth>;
     }
 ): ContainerEntity | null {
     if (containerId === null) return null;
@@ -581,6 +587,7 @@ export function getContainerEntity(
         case 'player_corpse': return containers.playerCorpses?.get(idStr) || null;
         case 'stash': return containers.stashes?.get(idStr) || null;
         case 'rain_collector': return containers.rainCollectors?.get(idStr) || null;
+        case 'homestead_hearth': return containers.homesteadHearths?.get(idStr) || null;
         default: return null;
     }
 }

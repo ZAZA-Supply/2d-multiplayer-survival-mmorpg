@@ -45,6 +45,6 @@ export type RainCollector = { tag: "RainCollector" };
 export type Barrel = { tag: "Barrel" };
 export type Foundation = { tag: "Foundation" };
 export type Wall = { tag: "Wall" };
-export type DoorFrame = { tag: "DoorFrame" };
 export type Door = { tag: "Door" };
+export type HomesteadHearth = { tag: "HomesteadHearth" };
 

@@ -40,6 +40,7 @@ use crate::active_equipment::active_equipment as ActiveEquipmentTableTrait;
 use crate::items::item_definition as ItemDefinitionTableTrait;
 use crate::campfire::campfire as CampfireTableTrait;
 use crate::dropped_item::dropped_item as DroppedItemTableTrait; // Add dropped item table trait
+use crate::building::foundation_cell as FoundationCellTableTrait; // ADDED: For foundation fear
 
 // Collision detection constants
 const ANIMAL_COLLISION_RADIUS: f32 = 32.0; // Animals maintain 32px distance from each other
@@ -51,6 +52,8 @@ const FIRE_FEAR_RADIUS: f32 = 200.0; // Animals fear fire within 200px (4 tiles)
 const FIRE_FEAR_RADIUS_SQUARED: f32 = FIRE_FEAR_RADIUS * FIRE_FEAR_RADIUS;
 const TORCH_FEAR_RADIUS: f32 = 120.0; // Smaller fear radius for torches
 const TORCH_FEAR_RADIUS_SQUARED: f32 = TORCH_FEAR_RADIUS * TORCH_FEAR_RADIUS;
+const FOUNDATION_FEAR_RADIUS: f32 = 100.0; // Animals fear foundations within 100px (smaller than fire)
+const FOUNDATION_FEAR_RADIUS_SQUARED: f32 = FOUNDATION_FEAR_RADIUS * FOUNDATION_FEAR_RADIUS;
 const GROUP_COURAGE_THRESHOLD: usize = 3; // 3+ animals = ignore fire fear
 const GROUP_DETECTION_RADIUS: f32 = 300.0; // Distance to count group members
 
@@ -76,6 +79,24 @@ pub const TAMING_PROTECT_RADIUS_SQUARED: f32 = TAMING_PROTECT_RADIUS * TAMING_PR
 pub const AI_TICK_INTERVAL_MS: u64 = 125; // AI processes 8 times per second (improved from 4fps)
 pub const MAX_ANIMALS_PER_CHUNK: u32 = 3;
 pub const ANIMAL_SPAWN_COOLDOWN_SECS: u64 = 120; // 2 minutes between spawns
+
+// === ANIMAL WALKING SOUND CONSTANTS ===
+const ANIMAL_WALKING_SOUND_DISTANCE_THRESHOLD: f32 = 80.0; // Minimum distance for a footstep (normal walking)
+const ANIMAL_SPRINTING_SOUND_DISTANCE_THRESHOLD: f32 = 110.0; // Distance for footstep when sprinting (faster cadence)
+const ANIMAL_WALKING_SOUND_MIN_TIME_MS: u64 = 300; // Minimum time between footsteps (normal walking)
+const ANIMAL_SPRINTING_SOUND_MIN_TIME_MS: u64 = 250; // Minimum time between footsteps when sprinting
+
+// Table to track walking sound cadence for each animal
+#[spacetimedb::table(name = animal_walking_sound_state, public)]
+#[derive(Clone, Debug)]
+pub struct AnimalWalkingSoundState {
+    #[primary_key]
+    animal_id: u64,
+    last_walking_sound_time_ms: u64,
+    total_distance_since_last_sound: f32, // Accumulated distance for cadence
+    last_pos_x: f32, // Track last position to calculate movement distance
+    last_pos_y: f32,
+}
 
 // --- Animal Types and Behaviors ---
 
@@ -666,6 +687,11 @@ fn execute_animal_movement(
 ) -> Result<(), String> {
     let dt = 0.125; // Updated to match new AI tick interval (8fps instead of 4fps)
     
+    // Store old position for movement distance calculation
+    let old_pos_x = animal.pos_x;
+    let old_pos_y = animal.pos_y;
+    let mut is_sprinting = false;
+    
     // Fire fear is now handled entirely in update_animal_ai_state() 
     // Movement system just executes whatever state the animal is in
     
@@ -686,6 +712,7 @@ fn execute_animal_movement(
                     // Normal chase behavior - fire fear logic handled above
                     if distance > stats.attack_range * 0.9 { // Start moving when slightly outside attack range
                         // Move directly toward player - no stopping short
+                        is_sprinting = true; // Chasing uses sprint speed
                         move_towards_target(ctx, animal, target_player.position_x, target_player.position_y, stats.sprint_speed, dt);
                     }
                     // If within 90% of attack range, stop moving and let attack system handle it
@@ -702,6 +729,7 @@ fn execute_animal_movement(
                     _ => stats.movement_speed * 1.2, // Slightly faster for other species
                 };
                 
+                is_sprinting = strafe_speed > stats.movement_speed * 1.1; // Consider sprinting if significantly faster
                 move_towards_target(ctx, animal, target_x, target_y, strafe_speed, dt);
                 
                 // Check if reached strafe position
@@ -715,6 +743,7 @@ fn execute_animal_movement(
         },
         
         AnimalState::Fleeing => {
+            is_sprinting = true; // Fleeing uses sprint speed
             behavior.execute_flee_logic(ctx, animal, stats, dt, current_time, rng);
         },
         
@@ -743,6 +772,67 @@ fn execute_animal_movement(
 
     // Keep animal within world bounds
     clamp_to_world_bounds(animal);
+    
+    // --- Animal Walking Sound Logic ---
+    // Only process sounds for meaningful movements
+    let movement_distance = get_distance_squared(old_pos_x, old_pos_y, animal.pos_x, animal.pos_y).sqrt();
+    
+    if movement_distance > 8.0 && // Only process sounds for larger movements
+       animal.health > 0.0 { // Only if animal is alive
+        
+        let walking_sound_states = ctx.db.animal_walking_sound_state();
+        let now_ms = (current_time.to_micros_since_unix_epoch() / 1000) as u64;
+        
+        // Get or create walking sound state for this animal
+        let mut walking_state = walking_sound_states.animal_id().find(&animal.id).unwrap_or_else(|| {
+            AnimalWalkingSoundState {
+                animal_id: animal.id,
+                last_walking_sound_time_ms: 0,
+                total_distance_since_last_sound: 0.0,
+                last_pos_x: old_pos_x,
+                last_pos_y: old_pos_y,
+            }
+        });
+        
+        // Add movement distance to accumulated total
+        walking_state.total_distance_since_last_sound += movement_distance;
+        
+        // Determine thresholds based on movement speed (sprinting)
+        let (distance_threshold, time_threshold_ms) = if is_sprinting {
+            (ANIMAL_SPRINTING_SOUND_DISTANCE_THRESHOLD, ANIMAL_SPRINTING_SOUND_MIN_TIME_MS)
+        } else {
+            (ANIMAL_WALKING_SOUND_DISTANCE_THRESHOLD, ANIMAL_WALKING_SOUND_MIN_TIME_MS)
+        };
+        
+        // Check if enough distance and time has passed for a footstep
+        let time_since_last_footstep = now_ms.saturating_sub(walking_state.last_walking_sound_time_ms);
+        
+        if walking_state.total_distance_since_last_sound >= distance_threshold && 
+           time_since_last_footstep >= time_threshold_ms {
+            
+            // Emit animal walking sound with species-specific pitch
+            if let Err(e) = crate::sound_events::emit_animal_walking_sound(ctx, animal.pos_x, animal.pos_y, animal.species) {
+                log::warn!("Failed to emit walking sound for animal {}: {}", animal.id, e);
+            }
+            
+            // Reset accumulated distance and update time
+            walking_state.total_distance_since_last_sound = 0.0;
+            walking_state.last_walking_sound_time_ms = now_ms;
+        }
+        
+        // Update last position
+        walking_state.last_pos_x = animal.pos_x;
+        walking_state.last_pos_y = animal.pos_y;
+        
+        // Update or insert the walking sound state
+        if walking_sound_states.animal_id().find(&animal.id).is_some() {
+            walking_sound_states.animal_id().update(walking_state);
+        } else {
+            if let Err(e) = walking_sound_states.try_insert(walking_state) {
+                log::warn!("Failed to insert walking sound state for animal {}: {}", animal.id, e);
+            }
+        }
+    }
     
     Ok(())
 }
@@ -1357,7 +1447,7 @@ pub fn is_position_in_shelter(ctx: &ReducerContext, x: f32, y: f32) -> bool {
 
 // Fire fear helper functions
 
-/// Check if there's a fire source (campfire or torch) within fear radius of an animal
+/// Check if there's a fire source (campfire or torch) or foundation within fear radius of an animal
 fn is_fire_nearby(ctx: &ReducerContext, animal_x: f32, animal_y: f32) -> bool {
     // Check for burning campfires
     for campfire in ctx.db.campfire().iter() {
@@ -1385,6 +1475,26 @@ fn is_fire_nearby(ctx: &ReducerContext, animal_x: f32, animal_y: f32) -> bool {
         let distance_sq = dx * dx + dy * dy;
         
         if distance_sq <= TORCH_FEAR_RADIUS_SQUARED {
+            return true;
+        }
+    }
+    
+    // Check for foundations (animals fear player structures)
+    use crate::building::FOUNDATION_TILE_SIZE_PX;
+    for foundation in ctx.db.foundation_cell().iter() {
+        if foundation.is_destroyed {
+            continue;
+        }
+        
+        // Convert foundation cell coordinates to world pixel coordinates (center of foundation cell)
+        let foundation_world_x = (foundation.cell_x as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+        let foundation_world_y = (foundation.cell_y as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+        
+        let dx = animal_x - foundation_world_x;
+        let dy = animal_y - foundation_world_y;
+        let distance_sq = dx * dx + dy * dy;
+        
+        if distance_sq <= FOUNDATION_FEAR_RADIUS_SQUARED {
             return true;
         }
     }
@@ -1447,6 +1557,27 @@ pub fn find_closest_fire_position(ctx: &ReducerContext, animal_x: f32, animal_y:
         if distance_sq < closest_distance_sq {
             closest_distance_sq = distance_sq;
             closest_fire_pos = Some((player.position_x, player.position_y));
+        }
+    }
+    
+    // Check foundations (animals fear player structures)
+    use crate::building::FOUNDATION_TILE_SIZE_PX;
+    for foundation in ctx.db.foundation_cell().iter() {
+        if foundation.is_destroyed {
+            continue;
+        }
+        
+        // Convert foundation cell coordinates to world pixel coordinates (center of foundation cell)
+        let foundation_world_x = (foundation.cell_x as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+        let foundation_world_y = (foundation.cell_y as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+        
+        let dx = animal_x - foundation_world_x;
+        let dy = animal_y - foundation_world_y;
+        let distance_sq = dx * dx + dy * dy;
+        
+        if distance_sq < closest_distance_sq {
+            closest_distance_sq = distance_sq;
+            closest_fire_pos = Some((foundation_world_x, foundation_world_y));
         }
     }
     

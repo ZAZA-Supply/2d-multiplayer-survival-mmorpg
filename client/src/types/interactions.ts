@@ -35,6 +35,7 @@ export type InteractionTargetType =
     | 'campfire' 
     | 'furnace'  // ADDED: Furnace support (same behavior as campfire)
     | 'lantern'
+    | 'homestead_hearth'  // ADDED: HomesteadHearth support
     | 'dropped_item' 
     | 'box'  // wooden_storage_box
     | 'corpse'  // player_corpse
@@ -88,6 +89,11 @@ export const INTERACTION_CONFIGS: Record<InteractionTargetType, InteractionConfi
         behavior: InteractionBehavior.INTERFACE,
         priority: 80,
         actionType: 'open_lantern'
+    },
+    homestead_hearth: {
+        behavior: InteractionBehavior.INTERFACE,
+        priority: 80,
+        actionType: 'open_hearth'
     },
     box: {
         behavior: InteractionBehavior.INTERFACE,
@@ -191,6 +197,9 @@ export function hasSpecialConditions(target: InteractableTarget): boolean {
         case 'furnace':
             // Special furnace conditions for toggle burning via hold (same as campfire)
             return true; // Furnaces can be toggled via hold
+        case 'homestead_hearth':
+            // Special hearth conditions for grant building privilege via hold
+            return true; // Hearths can grant building privilege via hold
         default:
             return false;
     }
@@ -211,6 +220,9 @@ export function getEffectiveInteractionBehavior(target: InteractableTarget): Int
             return InteractionBehavior.INTERFACE;
         case 'furnace':
             // Furnaces always open interface via tap (secondary hold action handles toggle)
+            return InteractionBehavior.INTERFACE;
+        case 'homestead_hearth':
+            // Hearths always open interface via tap (secondary hold action handles grant privilege)
             return InteractionBehavior.INTERFACE;
         case 'stash':
             // Stashes always open interface via tap (secondary hold action handles visibility toggle)  
@@ -233,6 +245,8 @@ export function hasSecondaryHoldAction(target: InteractableTarget): boolean {
             return true; // Always has toggle burning action
         case 'furnace':
             return true; // Always has toggle burning action (same as campfire)
+        case 'homestead_hearth':
+            return true; // Always has grant building privilege action via hold
         case 'stash':
             return true; // Always has toggle visibility action
         default:
@@ -251,6 +265,8 @@ export function getSecondaryHoldDuration(target: InteractableTarget): number {
             return 500; // 0.5 seconds to toggle campfire (quick action)
         case 'furnace':
             return 500; // 0.5 seconds to toggle furnace (quick action, same as campfire)
+        case 'homestead_hearth':
+            return 1000; // 1 second to grant building privilege (significant action)
         case 'stash':
             return 250; // 0.25 seconds to toggle stash visibility (very quick)
         default:

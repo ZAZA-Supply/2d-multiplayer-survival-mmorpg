@@ -228,7 +228,7 @@ function isWaterPlacementBlocked(connection: DbConnection | null, placementInfo:
   }
 
   // List of items that cannot be placed on water
-  const waterBlockedItems = ['Camp Fire', 'Furnace', 'Lantern', 'Wooden Storage Box', 'Sleeping Bag', 'Stash', 'Shelter', 'Reed Rain Collector']; // ADDED: Furnace
+  const waterBlockedItems = ['Camp Fire', 'Furnace', 'Lantern', 'Wooden Storage Box', 'Sleeping Bag', 'Stash', 'Shelter', 'Reed Rain Collector', 'Homestead Hearth']; // ADDED: Furnace, Homestead Hearth
   
   // Seeds that don't require water (most seeds) cannot be planted on water
   const isSeedButNotWaterSeed = isSeedItemValid(placementInfo.itemName) && !requiresWaterPlacement(placementInfo.itemName);
@@ -392,6 +392,12 @@ export const usePlacementManager = (connection: DbConnection | null): [Placement
           // console.log(`[PlacementManager] Calling placeRainCollector reducer with instance ID: ${placementInfo.instanceId}`);
           connection.reducers.placeRainCollector(placementInfo.instanceId, worldX, worldY);
           // Assume App.tsx will need a handleRainCollectorInsert callback to cancel placement on success
+          break;
+        case 'Homestead Hearth':
+          // console.log(`[PlacementManager] Calling placeHomesteadHearth reducer with instance ID: ${placementInfo.instanceId}`);
+          connection.reducers.placeHomesteadHearth(placementInfo.instanceId, worldX, worldY);
+          // Note: We don't call cancelPlacement here.
+          // App.tsx's handleHomesteadHearthInsert callback will call it upon success.
           break;
         default:
           // Check if it's a plantable seed using dynamic detection

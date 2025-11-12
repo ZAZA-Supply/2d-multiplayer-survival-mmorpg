@@ -31,8 +31,6 @@ import {
 } from "spacetimedb";
 
 // Import and reexport all reducer arg types
-import { AttackBarrel } from "./attack_barrel_reducer.ts";
-export { AttackBarrel };
 import { CancelAllCrafting } from "./cancel_all_crafting_reducer.ts";
 export { CancelAllCrafting };
 import { CancelCraftingItem } from "./cancel_crafting_item_reducer.ts";
@@ -41,6 +39,8 @@ import { CancelFishing } from "./cancel_fishing_reducer.ts";
 export { CancelFishing };
 import { CastFishingLine } from "./cast_fishing_line_reducer.ts";
 export { CastFishingLine };
+import { CheckBuildingPrivilegeDistance } from "./check_building_privilege_distance_reducer.ts";
+export { CheckBuildingPrivilegeDistance };
 import { CheckFinishedCrafting } from "./check_finished_crafting_reducer.ts";
 export { CheckFinishedCrafting };
 import { CheckPlantGrowth } from "./check_plant_growth_reducer.ts";
@@ -91,6 +91,8 @@ import { DropItemFromCorpseSlotToWorld } from "./drop_item_from_corpse_slot_to_w
 export { DropItemFromCorpseSlotToWorld };
 import { DropItemFromFurnaceSlotToWorld } from "./drop_item_from_furnace_slot_to_world_reducer.ts";
 export { DropItemFromFurnaceSlotToWorld };
+import { DropItemFromHearthSlotToWorld } from "./drop_item_from_hearth_slot_to_world_reducer.ts";
+export { DropItemFromHearthSlotToWorld };
 import { DropItemFromLanternSlotToWorld } from "./drop_item_from_lantern_slot_to_world_reducer.ts";
 export { DropItemFromLanternSlotToWorld };
 import { DropItemFromStashSlotToWorld } from "./drop_item_from_stash_slot_to_world_reducer.ts";
@@ -119,6 +121,8 @@ import { GetKnockedOutStatus } from "./get_knocked_out_status_reducer.ts";
 export { GetKnockedOutStatus };
 import { GetMinimapData } from "./get_minimap_data_reducer.ts";
 export { GetMinimapData };
+import { GrantBuildingPrivilegeFromHearth } from "./grant_building_privilege_from_hearth_reducer.ts";
+export { GrantBuildingPrivilegeFromHearth };
 import { IdentityConnected } from "./identity_connected_reducer.ts";
 export { IdentityConnected };
 import { IdentityDisconnected } from "./identity_disconnected_reducer.ts";
@@ -157,6 +161,8 @@ import { MoveItemFromCorpse } from "./move_item_from_corpse_reducer.ts";
 export { MoveItemFromCorpse };
 import { MoveItemFromFurnaceToPlayerSlot } from "./move_item_from_furnace_to_player_slot_reducer.ts";
 export { MoveItemFromFurnaceToPlayerSlot };
+import { MoveItemFromHearth } from "./move_item_from_hearth_reducer.ts";
+export { MoveItemFromHearth };
 import { MoveItemFromLanternToPlayerSlot } from "./move_item_from_lantern_to_player_slot_reducer.ts";
 export { MoveItemFromLanternToPlayerSlot };
 import { MoveItemFromRainCollector } from "./move_item_from_rain_collector_reducer.ts";
@@ -171,6 +177,8 @@ import { MoveItemToCorpse } from "./move_item_to_corpse_reducer.ts";
 export { MoveItemToCorpse };
 import { MoveItemToFurnace } from "./move_item_to_furnace_reducer.ts";
 export { MoveItemToFurnace };
+import { MoveItemToHearth } from "./move_item_to_hearth_reducer.ts";
+export { MoveItemToHearth };
 import { MoveItemToHotbar } from "./move_item_to_hotbar_reducer.ts";
 export { MoveItemToHotbar };
 import { MoveItemToInventory } from "./move_item_to_inventory_reducer.ts";
@@ -189,6 +197,8 @@ import { MoveItemWithinCorpse } from "./move_item_within_corpse_reducer.ts";
 export { MoveItemWithinCorpse };
 import { MoveItemWithinFurnace } from "./move_item_within_furnace_reducer.ts";
 export { MoveItemWithinFurnace };
+import { MoveItemWithinHearth } from "./move_item_within_hearth_reducer.ts";
+export { MoveItemWithinHearth };
 import { MoveItemWithinLantern } from "./move_item_within_lantern_reducer.ts";
 export { MoveItemWithinLantern };
 import { MoveItemWithinStash } from "./move_item_within_stash_reducer.ts";
@@ -207,6 +217,8 @@ import { PlaceFoundation } from "./place_foundation_reducer.ts";
 export { PlaceFoundation };
 import { PlaceFurnace } from "./place_furnace_reducer.ts";
 export { PlaceFurnace };
+import { PlaceHomesteadHearth } from "./place_homestead_hearth_reducer.ts";
+export { PlaceHomesteadHearth };
 import { PlaceLantern } from "./place_lantern_reducer.ts";
 export { PlaceLantern };
 import { PlaceRainCollector } from "./place_rain_collector_reducer.ts";
@@ -225,6 +237,8 @@ import { PlantSeed } from "./plant_seed_reducer.ts";
 export { PlantSeed };
 import { ProcessActiveConsumableEffectsTick } from "./process_active_consumable_effects_tick_reducer.ts";
 export { ProcessActiveConsumableEffectsTick };
+import { ProcessBuildingDecay } from "./process_building_decay_reducer.ts";
+export { ProcessBuildingDecay };
 import { ProcessCampfireLogicScheduled } from "./process_campfire_logic_scheduled_reducer.ts";
 export { ProcessCampfireLogicScheduled };
 import { ProcessCorpseDespawn } from "./process_corpse_despawn_reducer.ts";
@@ -235,6 +249,8 @@ import { ProcessGlobalTick } from "./process_global_tick_reducer.ts";
 export { ProcessGlobalTick };
 import { ProcessGrassRespawn } from "./process_grass_respawn_reducer.ts";
 export { ProcessGrassRespawn };
+import { ProcessHearthUpkeep } from "./process_hearth_upkeep_reducer.ts";
+export { ProcessHearthUpkeep };
 import { ProcessKnockedOutRecovery } from "./process_knocked_out_recovery_reducer.ts";
 export { ProcessKnockedOutRecovery };
 import { ProcessLanternLogicScheduled } from "./process_lantern_logic_scheduled_reducer.ts";
@@ -245,6 +261,8 @@ import { ProcessWildAnimalAi } from "./process_wild_animal_ai_reducer.ts";
 export { ProcessWildAnimalAi };
 import { PurchaseMemoryGridNode } from "./purchase_memory_grid_node_reducer.ts";
 export { PurchaseMemoryGridNode };
+import { QueryHearthUpkeepCosts } from "./query_hearth_upkeep_costs_reducer.ts";
+export { QueryHearthUpkeepCosts };
 import { QuickMoveFromBox } from "./quick_move_from_box_reducer.ts";
 export { QuickMoveFromBox };
 import { QuickMoveFromCampfire } from "./quick_move_from_campfire_reducer.ts";
@@ -253,6 +271,8 @@ import { QuickMoveFromCorpse } from "./quick_move_from_corpse_reducer.ts";
 export { QuickMoveFromCorpse };
 import { QuickMoveFromFurnace } from "./quick_move_from_furnace_reducer.ts";
 export { QuickMoveFromFurnace };
+import { QuickMoveFromHearth } from "./quick_move_from_hearth_reducer.ts";
+export { QuickMoveFromHearth };
 import { QuickMoveFromLantern } from "./quick_move_from_lantern_reducer.ts";
 export { QuickMoveFromLantern };
 import { QuickMoveFromRainCollector } from "./quick_move_from_rain_collector_reducer.ts";
@@ -267,6 +287,8 @@ import { QuickMoveToCorpse } from "./quick_move_to_corpse_reducer.ts";
 export { QuickMoveToCorpse };
 import { QuickMoveToFurnace } from "./quick_move_to_furnace_reducer.ts";
 export { QuickMoveToFurnace };
+import { QuickMoveToHearth } from "./quick_move_to_hearth_reducer.ts";
+export { QuickMoveToHearth };
 import { QuickMoveToLantern } from "./quick_move_to_lantern_reducer.ts";
 export { QuickMoveToLantern };
 import { QuickMoveToStash } from "./quick_move_to_stash_reducer.ts";
@@ -315,6 +337,8 @@ import { SplitAndDropItemFromCorpseSlotToWorld } from "./split_and_drop_item_fro
 export { SplitAndDropItemFromCorpseSlotToWorld };
 import { SplitAndDropItemFromFurnaceSlotToWorld } from "./split_and_drop_item_from_furnace_slot_to_world_reducer.ts";
 export { SplitAndDropItemFromFurnaceSlotToWorld };
+import { SplitAndDropItemFromHearthSlotToWorld } from "./split_and_drop_item_from_hearth_slot_to_world_reducer.ts";
+export { SplitAndDropItemFromHearthSlotToWorld };
 import { SplitAndDropItemFromLanternSlotToWorld } from "./split_and_drop_item_from_lantern_slot_to_world_reducer.ts";
 export { SplitAndDropItemFromLanternSlotToWorld };
 import { SplitAndDropItemFromStashSlotToWorld } from "./split_and_drop_item_from_stash_slot_to_world_reducer.ts";
@@ -333,6 +357,8 @@ import { SplitStackFromCorpse } from "./split_stack_from_corpse_reducer.ts";
 export { SplitStackFromCorpse };
 import { SplitStackFromFurnace } from "./split_stack_from_furnace_reducer.ts";
 export { SplitStackFromFurnace };
+import { SplitStackFromHearth } from "./split_stack_from_hearth_reducer.ts";
+export { SplitStackFromHearth };
 import { SplitStackFromLantern } from "./split_stack_from_lantern_reducer.ts";
 export { SplitStackFromLantern };
 import { SplitStackFromStash } from "./split_stack_from_stash_reducer.ts";
@@ -345,6 +371,8 @@ import { SplitStackIntoCorpse } from "./split_stack_into_corpse_reducer.ts";
 export { SplitStackIntoCorpse };
 import { SplitStackIntoFurnace } from "./split_stack_into_furnace_reducer.ts";
 export { SplitStackIntoFurnace };
+import { SplitStackIntoHearth } from "./split_stack_into_hearth_reducer.ts";
+export { SplitStackIntoHearth };
 import { SplitStackIntoLantern } from "./split_stack_into_lantern_reducer.ts";
 export { SplitStackIntoLantern };
 import { SplitStackIntoStash } from "./split_stack_into_stash_reducer.ts";
@@ -357,6 +385,8 @@ import { SplitStackWithinCorpse } from "./split_stack_within_corpse_reducer.ts";
 export { SplitStackWithinCorpse };
 import { SplitStackWithinFurnace } from "./split_stack_within_furnace_reducer.ts";
 export { SplitStackWithinFurnace };
+import { SplitStackWithinHearth } from "./split_stack_within_hearth_reducer.ts";
+export { SplitStackWithinHearth };
 import { SplitStackWithinLantern } from "./split_stack_within_lantern_reducer.ts";
 export { SplitStackWithinLantern };
 import { SplitStackWithinStash } from "./split_stack_within_stash_reducer.ts";
@@ -411,12 +441,18 @@ import { ActiveEquipmentTableHandle } from "./active_equipment_table.ts";
 export { ActiveEquipmentTableHandle };
 import { AnimalCorpseTableHandle } from "./animal_corpse_table.ts";
 export { AnimalCorpseTableHandle };
+import { AnimalWalkingSoundStateTableHandle } from "./animal_walking_sound_state_table.ts";
+export { AnimalWalkingSoundStateTableHandle };
 import { ArrowBreakEventTableHandle } from "./arrow_break_event_table.ts";
 export { ArrowBreakEventTableHandle };
 import { BarrelTableHandle } from "./barrel_table.ts";
 export { BarrelTableHandle };
 import { BarrelRespawnScheduleTableHandle } from "./barrel_respawn_schedule_table.ts";
 export { BarrelRespawnScheduleTableHandle };
+import { BuildingDecayScheduleTableHandle } from "./building_decay_schedule_table.ts";
+export { BuildingDecayScheduleTableHandle };
+import { BuildingPrivilegeCheckScheduleTableHandle } from "./building_privilege_check_schedule_table.ts";
+export { BuildingPrivilegeCheckScheduleTableHandle };
 import { CampfireTableHandle } from "./campfire_table.ts";
 export { CampfireTableHandle };
 import { CampfireProcessingScheduleTableHandle } from "./campfire_processing_schedule_table.ts";
@@ -461,6 +497,12 @@ import { GrassRespawnScheduleTableHandle } from "./grass_respawn_schedule_table.
 export { GrassRespawnScheduleTableHandle };
 import { HarvestableResourceTableHandle } from "./harvestable_resource_table.ts";
 export { HarvestableResourceTableHandle };
+import { HearthUpkeepQueryResultTableHandle } from "./hearth_upkeep_query_result_table.ts";
+export { HearthUpkeepQueryResultTableHandle };
+import { HearthUpkeepScheduleTableHandle } from "./hearth_upkeep_schedule_table.ts";
+export { HearthUpkeepScheduleTableHandle };
+import { HomesteadHearthTableHandle } from "./homestead_hearth_table.ts";
+export { HomesteadHearthTableHandle };
 import { InventoryItemTableHandle } from "./inventory_item_table.ts";
 export { InventoryItemTableHandle };
 import { ItemDefinitionTableHandle } from "./item_definition_table.ts";
@@ -577,12 +619,18 @@ import { AnimalSpecies } from "./animal_species_type.ts";
 export { AnimalSpecies };
 import { AnimalState } from "./animal_state_type.ts";
 export { AnimalState };
+import { AnimalWalkingSoundState } from "./animal_walking_sound_state_type.ts";
+export { AnimalWalkingSoundState };
 import { ArrowBreakEvent } from "./arrow_break_event_type.ts";
 export { ArrowBreakEvent };
 import { Barrel } from "./barrel_type.ts";
 export { Barrel };
 import { BarrelRespawnSchedule } from "./barrel_respawn_schedule_type.ts";
 export { BarrelRespawnSchedule };
+import { BuildingDecaySchedule } from "./building_decay_schedule_type.ts";
+export { BuildingDecaySchedule };
+import { BuildingPrivilegeCheckSchedule } from "./building_privilege_check_schedule_type.ts";
+export { BuildingPrivilegeCheckSchedule };
 import { Campfire } from "./campfire_type.ts";
 export { Campfire };
 import { CampfireProcessingSchedule } from "./campfire_processing_schedule_type.ts";
@@ -651,6 +699,12 @@ import { GrassRespawnSchedule } from "./grass_respawn_schedule_type.ts";
 export { GrassRespawnSchedule };
 import { HarvestableResource } from "./harvestable_resource_type.ts";
 export { HarvestableResource };
+import { HearthUpkeepQueryResult } from "./hearth_upkeep_query_result_type.ts";
+export { HearthUpkeepQueryResult };
+import { HearthUpkeepSchedule } from "./hearth_upkeep_schedule_type.ts";
+export { HearthUpkeepSchedule };
+import { HomesteadHearth } from "./homestead_hearth_type.ts";
+export { HomesteadHearth };
 import { HotbarLocationData } from "./hotbar_location_data_type.ts";
 export { HotbarLocationData };
 import { InventoryItem } from "./inventory_item_type.ts";
@@ -824,6 +878,15 @@ const REMOTE_MODULE = {
         colType: (AnimalCorpse.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
       },
     },
+    animal_walking_sound_state: {
+      tableName: "animal_walking_sound_state" as const,
+      rowType: AnimalWalkingSoundState.getTypeScriptAlgebraicType(),
+      primaryKey: "animalId",
+      primaryKeyInfo: {
+        colName: "animalId",
+        colType: (AnimalWalkingSoundState.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
+      },
+    },
     arrow_break_event: {
       tableName: "arrow_break_event" as const,
       rowType: ArrowBreakEvent.getTypeScriptAlgebraicType(),
@@ -849,6 +912,24 @@ const REMOTE_MODULE = {
       primaryKeyInfo: {
         colName: "id",
         colType: (BarrelRespawnSchedule.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
+      },
+    },
+    building_decay_schedule: {
+      tableName: "building_decay_schedule" as const,
+      rowType: BuildingDecaySchedule.getTypeScriptAlgebraicType(),
+      primaryKey: "id",
+      primaryKeyInfo: {
+        colName: "id",
+        colType: (BuildingDecaySchedule.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
+      },
+    },
+    building_privilege_check_schedule: {
+      tableName: "building_privilege_check_schedule" as const,
+      rowType: BuildingPrivilegeCheckSchedule.getTypeScriptAlgebraicType(),
+      primaryKey: "id",
+      primaryKeyInfo: {
+        colName: "id",
+        colType: (BuildingPrivilegeCheckSchedule.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
       },
     },
     campfire: {
@@ -1047,6 +1128,33 @@ const REMOTE_MODULE = {
       primaryKeyInfo: {
         colName: "id",
         colType: (HarvestableResource.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
+      },
+    },
+    hearth_upkeep_query_result: {
+      tableName: "hearth_upkeep_query_result" as const,
+      rowType: HearthUpkeepQueryResult.getTypeScriptAlgebraicType(),
+      primaryKey: "hearthId",
+      primaryKeyInfo: {
+        colName: "hearthId",
+        colType: (HearthUpkeepQueryResult.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
+      },
+    },
+    hearth_upkeep_schedule: {
+      tableName: "hearth_upkeep_schedule" as const,
+      rowType: HearthUpkeepSchedule.getTypeScriptAlgebraicType(),
+      primaryKey: "id",
+      primaryKeyInfo: {
+        colName: "id",
+        colType: (HearthUpkeepSchedule.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
+      },
+    },
+    homestead_hearth: {
+      tableName: "homestead_hearth" as const,
+      rowType: HomesteadHearth.getTypeScriptAlgebraicType(),
+      primaryKey: "id",
+      primaryKeyInfo: {
+        colName: "id",
+        colType: (HomesteadHearth.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
       },
     },
     inventory_item: {
@@ -1510,10 +1618,6 @@ const REMOTE_MODULE = {
     },
   },
   reducers: {
-    attack_barrel: {
-      reducerName: "attack_barrel",
-      argsType: AttackBarrel.getTypeScriptAlgebraicType(),
-    },
     cancel_all_crafting: {
       reducerName: "cancel_all_crafting",
       argsType: CancelAllCrafting.getTypeScriptAlgebraicType(),
@@ -1529,6 +1633,10 @@ const REMOTE_MODULE = {
     cast_fishing_line: {
       reducerName: "cast_fishing_line",
       argsType: CastFishingLine.getTypeScriptAlgebraicType(),
+    },
+    check_building_privilege_distance: {
+      reducerName: "check_building_privilege_distance",
+      argsType: CheckBuildingPrivilegeDistance.getTypeScriptAlgebraicType(),
     },
     check_finished_crafting: {
       reducerName: "check_finished_crafting",
@@ -1630,6 +1738,10 @@ const REMOTE_MODULE = {
       reducerName: "drop_item_from_furnace_slot_to_world",
       argsType: DropItemFromFurnaceSlotToWorld.getTypeScriptAlgebraicType(),
     },
+    drop_item_from_hearth_slot_to_world: {
+      reducerName: "drop_item_from_hearth_slot_to_world",
+      argsType: DropItemFromHearthSlotToWorld.getTypeScriptAlgebraicType(),
+    },
     drop_item_from_lantern_slot_to_world: {
       reducerName: "drop_item_from_lantern_slot_to_world",
       argsType: DropItemFromLanternSlotToWorld.getTypeScriptAlgebraicType(),
@@ -1685,6 +1797,10 @@ const REMOTE_MODULE = {
     get_minimap_data: {
       reducerName: "get_minimap_data",
       argsType: GetMinimapData.getTypeScriptAlgebraicType(),
+    },
+    grant_building_privilege_from_hearth: {
+      reducerName: "grant_building_privilege_from_hearth",
+      argsType: GrantBuildingPrivilegeFromHearth.getTypeScriptAlgebraicType(),
     },
     identity_connected: {
       reducerName: "identity_connected",
@@ -1762,6 +1878,10 @@ const REMOTE_MODULE = {
       reducerName: "move_item_from_furnace_to_player_slot",
       argsType: MoveItemFromFurnaceToPlayerSlot.getTypeScriptAlgebraicType(),
     },
+    move_item_from_hearth: {
+      reducerName: "move_item_from_hearth",
+      argsType: MoveItemFromHearth.getTypeScriptAlgebraicType(),
+    },
     move_item_from_lantern_to_player_slot: {
       reducerName: "move_item_from_lantern_to_player_slot",
       argsType: MoveItemFromLanternToPlayerSlot.getTypeScriptAlgebraicType(),
@@ -1789,6 +1909,10 @@ const REMOTE_MODULE = {
     move_item_to_furnace: {
       reducerName: "move_item_to_furnace",
       argsType: MoveItemToFurnace.getTypeScriptAlgebraicType(),
+    },
+    move_item_to_hearth: {
+      reducerName: "move_item_to_hearth",
+      argsType: MoveItemToHearth.getTypeScriptAlgebraicType(),
     },
     move_item_to_hotbar: {
       reducerName: "move_item_to_hotbar",
@@ -1826,6 +1950,10 @@ const REMOTE_MODULE = {
       reducerName: "move_item_within_furnace",
       argsType: MoveItemWithinFurnace.getTypeScriptAlgebraicType(),
     },
+    move_item_within_hearth: {
+      reducerName: "move_item_within_hearth",
+      argsType: MoveItemWithinHearth.getTypeScriptAlgebraicType(),
+    },
     move_item_within_lantern: {
       reducerName: "move_item_within_lantern",
       argsType: MoveItemWithinLantern.getTypeScriptAlgebraicType(),
@@ -1861,6 +1989,10 @@ const REMOTE_MODULE = {
     place_furnace: {
       reducerName: "place_furnace",
       argsType: PlaceFurnace.getTypeScriptAlgebraicType(),
+    },
+    place_homestead_hearth: {
+      reducerName: "place_homestead_hearth",
+      argsType: PlaceHomesteadHearth.getTypeScriptAlgebraicType(),
     },
     place_lantern: {
       reducerName: "place_lantern",
@@ -1898,6 +2030,10 @@ const REMOTE_MODULE = {
       reducerName: "process_active_consumable_effects_tick",
       argsType: ProcessActiveConsumableEffectsTick.getTypeScriptAlgebraicType(),
     },
+    process_building_decay: {
+      reducerName: "process_building_decay",
+      argsType: ProcessBuildingDecay.getTypeScriptAlgebraicType(),
+    },
     process_campfire_logic_scheduled: {
       reducerName: "process_campfire_logic_scheduled",
       argsType: ProcessCampfireLogicScheduled.getTypeScriptAlgebraicType(),
@@ -1917,6 +2053,10 @@ const REMOTE_MODULE = {
     process_grass_respawn: {
       reducerName: "process_grass_respawn",
       argsType: ProcessGrassRespawn.getTypeScriptAlgebraicType(),
+    },
+    process_hearth_upkeep: {
+      reducerName: "process_hearth_upkeep",
+      argsType: ProcessHearthUpkeep.getTypeScriptAlgebraicType(),
     },
     process_knocked_out_recovery: {
       reducerName: "process_knocked_out_recovery",
@@ -1938,6 +2078,10 @@ const REMOTE_MODULE = {
       reducerName: "purchase_memory_grid_node",
       argsType: PurchaseMemoryGridNode.getTypeScriptAlgebraicType(),
     },
+    query_hearth_upkeep_costs: {
+      reducerName: "query_hearth_upkeep_costs",
+      argsType: QueryHearthUpkeepCosts.getTypeScriptAlgebraicType(),
+    },
     quick_move_from_box: {
       reducerName: "quick_move_from_box",
       argsType: QuickMoveFromBox.getTypeScriptAlgebraicType(),
@@ -1953,6 +2097,10 @@ const REMOTE_MODULE = {
     quick_move_from_furnace: {
       reducerName: "quick_move_from_furnace",
       argsType: QuickMoveFromFurnace.getTypeScriptAlgebraicType(),
+    },
+    quick_move_from_hearth: {
+      reducerName: "quick_move_from_hearth",
+      argsType: QuickMoveFromHearth.getTypeScriptAlgebraicType(),
     },
     quick_move_from_lantern: {
       reducerName: "quick_move_from_lantern",
@@ -1981,6 +2129,10 @@ const REMOTE_MODULE = {
     quick_move_to_furnace: {
       reducerName: "quick_move_to_furnace",
       argsType: QuickMoveToFurnace.getTypeScriptAlgebraicType(),
+    },
+    quick_move_to_hearth: {
+      reducerName: "quick_move_to_hearth",
+      argsType: QuickMoveToHearth.getTypeScriptAlgebraicType(),
     },
     quick_move_to_lantern: {
       reducerName: "quick_move_to_lantern",
@@ -2078,6 +2230,10 @@ const REMOTE_MODULE = {
       reducerName: "split_and_drop_item_from_furnace_slot_to_world",
       argsType: SplitAndDropItemFromFurnaceSlotToWorld.getTypeScriptAlgebraicType(),
     },
+    split_and_drop_item_from_hearth_slot_to_world: {
+      reducerName: "split_and_drop_item_from_hearth_slot_to_world",
+      argsType: SplitAndDropItemFromHearthSlotToWorld.getTypeScriptAlgebraicType(),
+    },
     split_and_drop_item_from_lantern_slot_to_world: {
       reducerName: "split_and_drop_item_from_lantern_slot_to_world",
       argsType: SplitAndDropItemFromLanternSlotToWorld.getTypeScriptAlgebraicType(),
@@ -2114,6 +2270,10 @@ const REMOTE_MODULE = {
       reducerName: "split_stack_from_furnace",
       argsType: SplitStackFromFurnace.getTypeScriptAlgebraicType(),
     },
+    split_stack_from_hearth: {
+      reducerName: "split_stack_from_hearth",
+      argsType: SplitStackFromHearth.getTypeScriptAlgebraicType(),
+    },
     split_stack_from_lantern: {
       reducerName: "split_stack_from_lantern",
       argsType: SplitStackFromLantern.getTypeScriptAlgebraicType(),
@@ -2138,6 +2298,10 @@ const REMOTE_MODULE = {
       reducerName: "split_stack_into_furnace",
       argsType: SplitStackIntoFurnace.getTypeScriptAlgebraicType(),
     },
+    split_stack_into_hearth: {
+      reducerName: "split_stack_into_hearth",
+      argsType: SplitStackIntoHearth.getTypeScriptAlgebraicType(),
+    },
     split_stack_into_lantern: {
       reducerName: "split_stack_into_lantern",
       argsType: SplitStackIntoLantern.getTypeScriptAlgebraicType(),
@@ -2161,6 +2325,10 @@ const REMOTE_MODULE = {
     split_stack_within_furnace: {
       reducerName: "split_stack_within_furnace",
       argsType: SplitStackWithinFurnace.getTypeScriptAlgebraicType(),
+    },
+    split_stack_within_hearth: {
+      reducerName: "split_stack_within_hearth",
+      argsType: SplitStackWithinHearth.getTypeScriptAlgebraicType(),
     },
     split_stack_within_lantern: {
       reducerName: "split_stack_within_lantern",
@@ -2280,11 +2448,11 @@ const REMOTE_MODULE = {
 
 // A type representing all the possible variants of a reducer.
 export type Reducer = never
-| { name: "AttackBarrel", args: AttackBarrel }
 | { name: "CancelAllCrafting", args: CancelAllCrafting }
 | { name: "CancelCraftingItem", args: CancelCraftingItem }
 | { name: "CancelFishing", args: CancelFishing }
 | { name: "CastFishingLine", args: CastFishingLine }
+| { name: "CheckBuildingPrivilegeDistance", args: CheckBuildingPrivilegeDistance }
 | { name: "CheckFinishedCrafting", args: CheckFinishedCrafting }
 | { name: "CheckPlantGrowth", args: CheckPlantGrowth }
 | { name: "CheckResourceRespawns", args: CheckResourceRespawns }
@@ -2310,6 +2478,7 @@ export type Reducer = never
 | { name: "DropItemFromCampfireSlotToWorld", args: DropItemFromCampfireSlotToWorld }
 | { name: "DropItemFromCorpseSlotToWorld", args: DropItemFromCorpseSlotToWorld }
 | { name: "DropItemFromFurnaceSlotToWorld", args: DropItemFromFurnaceSlotToWorld }
+| { name: "DropItemFromHearthSlotToWorld", args: DropItemFromHearthSlotToWorld }
 | { name: "DropItemFromLanternSlotToWorld", args: DropItemFromLanternSlotToWorld }
 | { name: "DropItemFromStashSlotToWorld", args: DropItemFromStashSlotToWorld }
 | { name: "EquipArmor", args: EquipArmor }
@@ -2324,6 +2493,7 @@ export type Reducer = never
 | { name: "GenerateWorld", args: GenerateWorld }
 | { name: "GetKnockedOutStatus", args: GetKnockedOutStatus }
 | { name: "GetMinimapData", args: GetMinimapData }
+| { name: "GrantBuildingPrivilegeFromHearth", args: GrantBuildingPrivilegeFromHearth }
 | { name: "IdentityConnected", args: IdentityConnected }
 | { name: "IdentityDisconnected", args: IdentityDisconnected }
 | { name: "InitProjectileSystem", args: InitProjectileSystem }
@@ -2343,6 +2513,7 @@ export type Reducer = never
 | { name: "MoveItemFromCampfireToPlayerSlot", args: MoveItemFromCampfireToPlayerSlot }
 | { name: "MoveItemFromCorpse", args: MoveItemFromCorpse }
 | { name: "MoveItemFromFurnaceToPlayerSlot", args: MoveItemFromFurnaceToPlayerSlot }
+| { name: "MoveItemFromHearth", args: MoveItemFromHearth }
 | { name: "MoveItemFromLanternToPlayerSlot", args: MoveItemFromLanternToPlayerSlot }
 | { name: "MoveItemFromRainCollector", args: MoveItemFromRainCollector }
 | { name: "MoveItemFromStash", args: MoveItemFromStash }
@@ -2350,6 +2521,7 @@ export type Reducer = never
 | { name: "MoveItemToCampfire", args: MoveItemToCampfire }
 | { name: "MoveItemToCorpse", args: MoveItemToCorpse }
 | { name: "MoveItemToFurnace", args: MoveItemToFurnace }
+| { name: "MoveItemToHearth", args: MoveItemToHearth }
 | { name: "MoveItemToHotbar", args: MoveItemToHotbar }
 | { name: "MoveItemToInventory", args: MoveItemToInventory }
 | { name: "MoveItemToLantern", args: MoveItemToLantern }
@@ -2359,6 +2531,7 @@ export type Reducer = never
 | { name: "MoveItemWithinCampfire", args: MoveItemWithinCampfire }
 | { name: "MoveItemWithinCorpse", args: MoveItemWithinCorpse }
 | { name: "MoveItemWithinFurnace", args: MoveItemWithinFurnace }
+| { name: "MoveItemWithinHearth", args: MoveItemWithinHearth }
 | { name: "MoveItemWithinLantern", args: MoveItemWithinLantern }
 | { name: "MoveItemWithinStash", args: MoveItemWithinStash }
 | { name: "MoveToFirstAvailableHotbarSlot", args: MoveToFirstAvailableHotbarSlot }
@@ -2368,6 +2541,7 @@ export type Reducer = never
 | { name: "PlaceCampfire", args: PlaceCampfire }
 | { name: "PlaceFoundation", args: PlaceFoundation }
 | { name: "PlaceFurnace", args: PlaceFurnace }
+| { name: "PlaceHomesteadHearth", args: PlaceHomesteadHearth }
 | { name: "PlaceLantern", args: PlaceLantern }
 | { name: "PlaceRainCollector", args: PlaceRainCollector }
 | { name: "PlaceShelter", args: PlaceShelter }
@@ -2377,20 +2551,24 @@ export type Reducer = never
 | { name: "PlaceWoodenStorageBox", args: PlaceWoodenStorageBox }
 | { name: "PlantSeed", args: PlantSeed }
 | { name: "ProcessActiveConsumableEffectsTick", args: ProcessActiveConsumableEffectsTick }
+| { name: "ProcessBuildingDecay", args: ProcessBuildingDecay }
 | { name: "ProcessCampfireLogicScheduled", args: ProcessCampfireLogicScheduled }
 | { name: "ProcessCorpseDespawn", args: ProcessCorpseDespawn }
 | { name: "ProcessFurnaceLogicScheduled", args: ProcessFurnaceLogicScheduled }
 | { name: "ProcessGlobalTick", args: ProcessGlobalTick }
 | { name: "ProcessGrassRespawn", args: ProcessGrassRespawn }
+| { name: "ProcessHearthUpkeep", args: ProcessHearthUpkeep }
 | { name: "ProcessKnockedOutRecovery", args: ProcessKnockedOutRecovery }
 | { name: "ProcessLanternLogicScheduled", args: ProcessLanternLogicScheduled }
 | { name: "ProcessPlayerStats", args: ProcessPlayerStats }
 | { name: "ProcessWildAnimalAi", args: ProcessWildAnimalAi }
 | { name: "PurchaseMemoryGridNode", args: PurchaseMemoryGridNode }
+| { name: "QueryHearthUpkeepCosts", args: QueryHearthUpkeepCosts }
 | { name: "QuickMoveFromBox", args: QuickMoveFromBox }
 | { name: "QuickMoveFromCampfire", args: QuickMoveFromCampfire }
 | { name: "QuickMoveFromCorpse", args: QuickMoveFromCorpse }
 | { name: "QuickMoveFromFurnace", args: QuickMoveFromFurnace }
+| { name: "QuickMoveFromHearth", args: QuickMoveFromHearth }
 | { name: "QuickMoveFromLantern", args: QuickMoveFromLantern }
 | { name: "QuickMoveFromRainCollector", args: QuickMoveFromRainCollector }
 | { name: "QuickMoveFromStash", args: QuickMoveFromStash }
@@ -2398,6 +2576,7 @@ export type Reducer = never
 | { name: "QuickMoveToCampfire", args: QuickMoveToCampfire }
 | { name: "QuickMoveToCorpse", args: QuickMoveToCorpse }
 | { name: "QuickMoveToFurnace", args: QuickMoveToFurnace }
+| { name: "QuickMoveToHearth", args: QuickMoveToHearth }
 | { name: "QuickMoveToLantern", args: QuickMoveToLantern }
 | { name: "QuickMoveToStash", args: QuickMoveToStash }
 | { name: "RegenerateCompressedChunks", args: RegenerateCompressedChunks }
@@ -2422,6 +2601,7 @@ export type Reducer = never
 | { name: "SplitAndDropItemFromCampfireSlotToWorld", args: SplitAndDropItemFromCampfireSlotToWorld }
 | { name: "SplitAndDropItemFromCorpseSlotToWorld", args: SplitAndDropItemFromCorpseSlotToWorld }
 | { name: "SplitAndDropItemFromFurnaceSlotToWorld", args: SplitAndDropItemFromFurnaceSlotToWorld }
+| { name: "SplitAndDropItemFromHearthSlotToWorld", args: SplitAndDropItemFromHearthSlotToWorld }
 | { name: "SplitAndDropItemFromLanternSlotToWorld", args: SplitAndDropItemFromLanternSlotToWorld }
 | { name: "SplitAndDropItemFromStashSlotToWorld", args: SplitAndDropItemFromStashSlotToWorld }
 | { name: "SplitAndMoveFromCampfire", args: SplitAndMoveFromCampfire }
@@ -2431,18 +2611,21 @@ export type Reducer = never
 | { name: "SplitStackFromCampfire", args: SplitStackFromCampfire }
 | { name: "SplitStackFromCorpse", args: SplitStackFromCorpse }
 | { name: "SplitStackFromFurnace", args: SplitStackFromFurnace }
+| { name: "SplitStackFromHearth", args: SplitStackFromHearth }
 | { name: "SplitStackFromLantern", args: SplitStackFromLantern }
 | { name: "SplitStackFromStash", args: SplitStackFromStash }
 | { name: "SplitStackIntoBox", args: SplitStackIntoBox }
 | { name: "SplitStackIntoCampfire", args: SplitStackIntoCampfire }
 | { name: "SplitStackIntoCorpse", args: SplitStackIntoCorpse }
 | { name: "SplitStackIntoFurnace", args: SplitStackIntoFurnace }
+| { name: "SplitStackIntoHearth", args: SplitStackIntoHearth }
 | { name: "SplitStackIntoLantern", args: SplitStackIntoLantern }
 | { name: "SplitStackIntoStash", args: SplitStackIntoStash }
 | { name: "SplitStackWithinBox", args: SplitStackWithinBox }
 | { name: "SplitStackWithinCampfire", args: SplitStackWithinCampfire }
 | { name: "SplitStackWithinCorpse", args: SplitStackWithinCorpse }
 | { name: "SplitStackWithinFurnace", args: SplitStackWithinFurnace }
+| { name: "SplitStackWithinHearth", args: SplitStackWithinHearth }
 | { name: "SplitStackWithinLantern", args: SplitStackWithinLantern }
 | { name: "SplitStackWithinStash", args: SplitStackWithinStash }
 | { name: "StartCrafting", args: StartCrafting }
@@ -2469,22 +2652,6 @@ export type Reducer = never
 
 export class RemoteReducers {
   constructor(private connection: __DbConnectionImpl, private setCallReducerFlags: SetReducerFlags) {}
-
-  attackBarrel(barrelId: bigint) {
-    const __args = { barrelId };
-    let __writer = new __BinaryWriter(1024);
-    AttackBarrel.serialize(__writer, __args);
-    let __argsBuffer = __writer.getBuffer();
-    this.connection.callReducer("attack_barrel", __argsBuffer, this.setCallReducerFlags.attackBarrelFlags);
-  }
-
-  onAttackBarrel(callback: (ctx: ReducerEventContext, barrelId: bigint) => void) {
-    this.connection.onReducer("attack_barrel", callback);
-  }
-
-  removeOnAttackBarrel(callback: (ctx: ReducerEventContext, barrelId: bigint) => void) {
-    this.connection.offReducer("attack_barrel", callback);
-  }
 
   cancelAllCrafting() {
     this.connection.callReducer("cancel_all_crafting", new Uint8Array(0), this.setCallReducerFlags.cancelAllCraftingFlags);
@@ -2540,6 +2707,22 @@ export class RemoteReducers {
 
   removeOnCastFishingLine(callback: (ctx: ReducerEventContext, targetX: number, targetY: number) => void) {
     this.connection.offReducer("cast_fishing_line", callback);
+  }
+
+  checkBuildingPrivilegeDistance(schedule: BuildingPrivilegeCheckSchedule) {
+    const __args = { schedule };
+    let __writer = new __BinaryWriter(1024);
+    CheckBuildingPrivilegeDistance.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("check_building_privilege_distance", __argsBuffer, this.setCallReducerFlags.checkBuildingPrivilegeDistanceFlags);
+  }
+
+  onCheckBuildingPrivilegeDistance(callback: (ctx: ReducerEventContext, schedule: BuildingPrivilegeCheckSchedule) => void) {
+    this.connection.onReducer("check_building_privilege_distance", callback);
+  }
+
+  removeOnCheckBuildingPrivilegeDistance(callback: (ctx: ReducerEventContext, schedule: BuildingPrivilegeCheckSchedule) => void) {
+    this.connection.offReducer("check_building_privilege_distance", callback);
   }
 
   checkFinishedCrafting(schedule: CraftingFinishSchedule) {
@@ -2926,6 +3109,22 @@ export class RemoteReducers {
     this.connection.offReducer("drop_item_from_furnace_slot_to_world", callback);
   }
 
+  dropItemFromHearthSlotToWorld(hearthId: number, slotIndex: number) {
+    const __args = { hearthId, slotIndex };
+    let __writer = new __BinaryWriter(1024);
+    DropItemFromHearthSlotToWorld.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("drop_item_from_hearth_slot_to_world", __argsBuffer, this.setCallReducerFlags.dropItemFromHearthSlotToWorldFlags);
+  }
+
+  onDropItemFromHearthSlotToWorld(callback: (ctx: ReducerEventContext, hearthId: number, slotIndex: number) => void) {
+    this.connection.onReducer("drop_item_from_hearth_slot_to_world", callback);
+  }
+
+  removeOnDropItemFromHearthSlotToWorld(callback: (ctx: ReducerEventContext, hearthId: number, slotIndex: number) => void) {
+    this.connection.offReducer("drop_item_from_hearth_slot_to_world", callback);
+  }
+
   dropItemFromLanternSlotToWorld(lanternId: number, slotIndex: number) {
     const __args = { lanternId, slotIndex };
     let __writer = new __BinaryWriter(1024);
@@ -3140,6 +3339,22 @@ export class RemoteReducers {
 
   removeOnGetMinimapData(callback: (ctx: ReducerEventContext) => void) {
     this.connection.offReducer("get_minimap_data", callback);
+  }
+
+  grantBuildingPrivilegeFromHearth(hearthId: number) {
+    const __args = { hearthId };
+    let __writer = new __BinaryWriter(1024);
+    GrantBuildingPrivilegeFromHearth.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("grant_building_privilege_from_hearth", __argsBuffer, this.setCallReducerFlags.grantBuildingPrivilegeFromHearthFlags);
+  }
+
+  onGrantBuildingPrivilegeFromHearth(callback: (ctx: ReducerEventContext, hearthId: number) => void) {
+    this.connection.onReducer("grant_building_privilege_from_hearth", callback);
+  }
+
+  removeOnGrantBuildingPrivilegeFromHearth(callback: (ctx: ReducerEventContext, hearthId: number) => void) {
+    this.connection.offReducer("grant_building_privilege_from_hearth", callback);
   }
 
   onIdentityConnected(callback: (ctx: ReducerEventContext) => void) {
@@ -3410,6 +3625,22 @@ export class RemoteReducers {
     this.connection.offReducer("move_item_from_furnace_to_player_slot", callback);
   }
 
+  moveItemFromHearth(hearthId: number, sourceSlotIndex: number, targetSlotType: string, targetSlotIndex: number) {
+    const __args = { hearthId, sourceSlotIndex, targetSlotType, targetSlotIndex };
+    let __writer = new __BinaryWriter(1024);
+    MoveItemFromHearth.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("move_item_from_hearth", __argsBuffer, this.setCallReducerFlags.moveItemFromHearthFlags);
+  }
+
+  onMoveItemFromHearth(callback: (ctx: ReducerEventContext, hearthId: number, sourceSlotIndex: number, targetSlotType: string, targetSlotIndex: number) => void) {
+    this.connection.onReducer("move_item_from_hearth", callback);
+  }
+
+  removeOnMoveItemFromHearth(callback: (ctx: ReducerEventContext, hearthId: number, sourceSlotIndex: number, targetSlotType: string, targetSlotIndex: number) => void) {
+    this.connection.offReducer("move_item_from_hearth", callback);
+  }
+
   moveItemFromLanternToPlayerSlot(lanternId: number, sourceSlotIndex: number, targetSlotType: string, targetSlotIndex: number) {
     const __args = { lanternId, sourceSlotIndex, targetSlotType, targetSlotIndex };
     let __writer = new __BinaryWriter(1024);
@@ -3520,6 +3751,22 @@ export class RemoteReducers {
 
   removeOnMoveItemToFurnace(callback: (ctx: ReducerEventContext, furnaceId: number, targetSlotIndex: number, itemInstanceId: bigint) => void) {
     this.connection.offReducer("move_item_to_furnace", callback);
+  }
+
+  moveItemToHearth(hearthId: number, targetSlotIndex: number, itemInstanceId: bigint) {
+    const __args = { hearthId, targetSlotIndex, itemInstanceId };
+    let __writer = new __BinaryWriter(1024);
+    MoveItemToHearth.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("move_item_to_hearth", __argsBuffer, this.setCallReducerFlags.moveItemToHearthFlags);
+  }
+
+  onMoveItemToHearth(callback: (ctx: ReducerEventContext, hearthId: number, targetSlotIndex: number, itemInstanceId: bigint) => void) {
+    this.connection.onReducer("move_item_to_hearth", callback);
+  }
+
+  removeOnMoveItemToHearth(callback: (ctx: ReducerEventContext, hearthId: number, targetSlotIndex: number, itemInstanceId: bigint) => void) {
+    this.connection.offReducer("move_item_to_hearth", callback);
   }
 
   moveItemToHotbar(itemInstanceId: bigint, targetHotbarSlot: number) {
@@ -3666,6 +3913,22 @@ export class RemoteReducers {
     this.connection.offReducer("move_item_within_furnace", callback);
   }
 
+  moveItemWithinHearth(hearthId: number, sourceSlotIndex: number, targetSlotIndex: number) {
+    const __args = { hearthId, sourceSlotIndex, targetSlotIndex };
+    let __writer = new __BinaryWriter(1024);
+    MoveItemWithinHearth.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("move_item_within_hearth", __argsBuffer, this.setCallReducerFlags.moveItemWithinHearthFlags);
+  }
+
+  onMoveItemWithinHearth(callback: (ctx: ReducerEventContext, hearthId: number, sourceSlotIndex: number, targetSlotIndex: number) => void) {
+    this.connection.onReducer("move_item_within_hearth", callback);
+  }
+
+  removeOnMoveItemWithinHearth(callback: (ctx: ReducerEventContext, hearthId: number, sourceSlotIndex: number, targetSlotIndex: number) => void) {
+    this.connection.offReducer("move_item_within_hearth", callback);
+  }
+
   moveItemWithinLantern(lanternId: number, sourceSlotIndex: number, targetSlotIndex: number) {
     const __args = { lanternId, sourceSlotIndex, targetSlotIndex };
     let __writer = new __BinaryWriter(1024);
@@ -3808,6 +4071,22 @@ export class RemoteReducers {
 
   removeOnPlaceFurnace(callback: (ctx: ReducerEventContext, itemInstanceId: bigint, worldX: number, worldY: number) => void) {
     this.connection.offReducer("place_furnace", callback);
+  }
+
+  placeHomesteadHearth(itemInstanceId: bigint, worldX: number, worldY: number) {
+    const __args = { itemInstanceId, worldX, worldY };
+    let __writer = new __BinaryWriter(1024);
+    PlaceHomesteadHearth.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("place_homestead_hearth", __argsBuffer, this.setCallReducerFlags.placeHomesteadHearthFlags);
+  }
+
+  onPlaceHomesteadHearth(callback: (ctx: ReducerEventContext, itemInstanceId: bigint, worldX: number, worldY: number) => void) {
+    this.connection.onReducer("place_homestead_hearth", callback);
+  }
+
+  removeOnPlaceHomesteadHearth(callback: (ctx: ReducerEventContext, itemInstanceId: bigint, worldX: number, worldY: number) => void) {
+    this.connection.offReducer("place_homestead_hearth", callback);
   }
 
   placeLantern(itemInstanceId: bigint, worldX: number, worldY: number) {
@@ -3954,6 +4233,22 @@ export class RemoteReducers {
     this.connection.offReducer("process_active_consumable_effects_tick", callback);
   }
 
+  processBuildingDecay(schedule: BuildingDecaySchedule) {
+    const __args = { schedule };
+    let __writer = new __BinaryWriter(1024);
+    ProcessBuildingDecay.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("process_building_decay", __argsBuffer, this.setCallReducerFlags.processBuildingDecayFlags);
+  }
+
+  onProcessBuildingDecay(callback: (ctx: ReducerEventContext, schedule: BuildingDecaySchedule) => void) {
+    this.connection.onReducer("process_building_decay", callback);
+  }
+
+  removeOnProcessBuildingDecay(callback: (ctx: ReducerEventContext, schedule: BuildingDecaySchedule) => void) {
+    this.connection.offReducer("process_building_decay", callback);
+  }
+
   processCampfireLogicScheduled(scheduleArgs: CampfireProcessingSchedule) {
     const __args = { scheduleArgs };
     let __writer = new __BinaryWriter(1024);
@@ -4032,6 +4327,22 @@ export class RemoteReducers {
 
   removeOnProcessGrassRespawn(callback: (ctx: ReducerEventContext, scheduleEntry: GrassRespawnSchedule) => void) {
     this.connection.offReducer("process_grass_respawn", callback);
+  }
+
+  processHearthUpkeep(schedule: HearthUpkeepSchedule) {
+    const __args = { schedule };
+    let __writer = new __BinaryWriter(1024);
+    ProcessHearthUpkeep.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("process_hearth_upkeep", __argsBuffer, this.setCallReducerFlags.processHearthUpkeepFlags);
+  }
+
+  onProcessHearthUpkeep(callback: (ctx: ReducerEventContext, schedule: HearthUpkeepSchedule) => void) {
+    this.connection.onReducer("process_hearth_upkeep", callback);
+  }
+
+  removeOnProcessHearthUpkeep(callback: (ctx: ReducerEventContext, schedule: HearthUpkeepSchedule) => void) {
+    this.connection.offReducer("process_hearth_upkeep", callback);
   }
 
   processKnockedOutRecovery(args: KnockedOutRecoverySchedule) {
@@ -4114,6 +4425,22 @@ export class RemoteReducers {
     this.connection.offReducer("purchase_memory_grid_node", callback);
   }
 
+  queryHearthUpkeepCosts(hearthId: number) {
+    const __args = { hearthId };
+    let __writer = new __BinaryWriter(1024);
+    QueryHearthUpkeepCosts.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("query_hearth_upkeep_costs", __argsBuffer, this.setCallReducerFlags.queryHearthUpkeepCostsFlags);
+  }
+
+  onQueryHearthUpkeepCosts(callback: (ctx: ReducerEventContext, hearthId: number) => void) {
+    this.connection.onReducer("query_hearth_upkeep_costs", callback);
+  }
+
+  removeOnQueryHearthUpkeepCosts(callback: (ctx: ReducerEventContext, hearthId: number) => void) {
+    this.connection.offReducer("query_hearth_upkeep_costs", callback);
+  }
+
   quickMoveFromBox(boxId: number, sourceSlotIndex: number) {
     const __args = { boxId, sourceSlotIndex };
     let __writer = new __BinaryWriter(1024);
@@ -4176,6 +4503,22 @@ export class RemoteReducers {
 
   removeOnQuickMoveFromFurnace(callback: (ctx: ReducerEventContext, furnaceId: number, sourceSlotIndex: number) => void) {
     this.connection.offReducer("quick_move_from_furnace", callback);
+  }
+
+  quickMoveFromHearth(hearthId: number, sourceSlotIndex: number) {
+    const __args = { hearthId, sourceSlotIndex };
+    let __writer = new __BinaryWriter(1024);
+    QuickMoveFromHearth.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("quick_move_from_hearth", __argsBuffer, this.setCallReducerFlags.quickMoveFromHearthFlags);
+  }
+
+  onQuickMoveFromHearth(callback: (ctx: ReducerEventContext, hearthId: number, sourceSlotIndex: number) => void) {
+    this.connection.onReducer("quick_move_from_hearth", callback);
+  }
+
+  removeOnQuickMoveFromHearth(callback: (ctx: ReducerEventContext, hearthId: number, sourceSlotIndex: number) => void) {
+    this.connection.offReducer("quick_move_from_hearth", callback);
   }
 
   quickMoveFromLantern(lanternId: number, sourceSlotIndex: number) {
@@ -4288,6 +4631,22 @@ export class RemoteReducers {
 
   removeOnQuickMoveToFurnace(callback: (ctx: ReducerEventContext, furnaceId: number, itemInstanceId: bigint) => void) {
     this.connection.offReducer("quick_move_to_furnace", callback);
+  }
+
+  quickMoveToHearth(hearthId: number, itemInstanceId: bigint) {
+    const __args = { hearthId, itemInstanceId };
+    let __writer = new __BinaryWriter(1024);
+    QuickMoveToHearth.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("quick_move_to_hearth", __argsBuffer, this.setCallReducerFlags.quickMoveToHearthFlags);
+  }
+
+  onQuickMoveToHearth(callback: (ctx: ReducerEventContext, hearthId: number, itemInstanceId: bigint) => void) {
+    this.connection.onReducer("quick_move_to_hearth", callback);
+  }
+
+  removeOnQuickMoveToHearth(callback: (ctx: ReducerEventContext, hearthId: number, itemInstanceId: bigint) => void) {
+    this.connection.offReducer("quick_move_to_hearth", callback);
   }
 
   quickMoveToLantern(lanternId: number, itemInstanceId: bigint) {
@@ -4642,6 +5001,22 @@ export class RemoteReducers {
     this.connection.offReducer("split_and_drop_item_from_furnace_slot_to_world", callback);
   }
 
+  splitAndDropItemFromHearthSlotToWorld(hearthId: number, slotIndex: number, quantityToSplit: number) {
+    const __args = { hearthId, slotIndex, quantityToSplit };
+    let __writer = new __BinaryWriter(1024);
+    SplitAndDropItemFromHearthSlotToWorld.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("split_and_drop_item_from_hearth_slot_to_world", __argsBuffer, this.setCallReducerFlags.splitAndDropItemFromHearthSlotToWorldFlags);
+  }
+
+  onSplitAndDropItemFromHearthSlotToWorld(callback: (ctx: ReducerEventContext, hearthId: number, slotIndex: number, quantityToSplit: number) => void) {
+    this.connection.onReducer("split_and_drop_item_from_hearth_slot_to_world", callback);
+  }
+
+  removeOnSplitAndDropItemFromHearthSlotToWorld(callback: (ctx: ReducerEventContext, hearthId: number, slotIndex: number, quantityToSplit: number) => void) {
+    this.connection.offReducer("split_and_drop_item_from_hearth_slot_to_world", callback);
+  }
+
   splitAndDropItemFromLanternSlotToWorld(lanternId: number, slotIndex: number, quantityToSplit: number) {
     const __args = { lanternId, slotIndex, quantityToSplit };
     let __writer = new __BinaryWriter(1024);
@@ -4786,6 +5161,22 @@ export class RemoteReducers {
     this.connection.offReducer("split_stack_from_furnace", callback);
   }
 
+  splitStackFromHearth(hearthId: number, sourceSlotIndex: number, quantityToSplit: number, targetSlotType: string, targetSlotIndex: number) {
+    const __args = { hearthId, sourceSlotIndex, quantityToSplit, targetSlotType, targetSlotIndex };
+    let __writer = new __BinaryWriter(1024);
+    SplitStackFromHearth.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("split_stack_from_hearth", __argsBuffer, this.setCallReducerFlags.splitStackFromHearthFlags);
+  }
+
+  onSplitStackFromHearth(callback: (ctx: ReducerEventContext, hearthId: number, sourceSlotIndex: number, quantityToSplit: number, targetSlotType: string, targetSlotIndex: number) => void) {
+    this.connection.onReducer("split_stack_from_hearth", callback);
+  }
+
+  removeOnSplitStackFromHearth(callback: (ctx: ReducerEventContext, hearthId: number, sourceSlotIndex: number, quantityToSplit: number, targetSlotType: string, targetSlotIndex: number) => void) {
+    this.connection.offReducer("split_stack_from_hearth", callback);
+  }
+
   splitStackFromLantern(sourceLanternId: number, sourceSlotIndex: number, quantityToSplit: number, targetSlotType: string, targetSlotIndex: number) {
     const __args = { sourceLanternId, sourceSlotIndex, quantityToSplit, targetSlotType, targetSlotIndex };
     let __writer = new __BinaryWriter(1024);
@@ -4882,6 +5273,22 @@ export class RemoteReducers {
     this.connection.offReducer("split_stack_into_furnace", callback);
   }
 
+  splitStackIntoHearth(sourceItemInstanceId: bigint, quantityToSplit: number, targetHearthId: number, targetSlotIndex: number) {
+    const __args = { sourceItemInstanceId, quantityToSplit, targetHearthId, targetSlotIndex };
+    let __writer = new __BinaryWriter(1024);
+    SplitStackIntoHearth.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("split_stack_into_hearth", __argsBuffer, this.setCallReducerFlags.splitStackIntoHearthFlags);
+  }
+
+  onSplitStackIntoHearth(callback: (ctx: ReducerEventContext, sourceItemInstanceId: bigint, quantityToSplit: number, targetHearthId: number, targetSlotIndex: number) => void) {
+    this.connection.onReducer("split_stack_into_hearth", callback);
+  }
+
+  removeOnSplitStackIntoHearth(callback: (ctx: ReducerEventContext, sourceItemInstanceId: bigint, quantityToSplit: number, targetHearthId: number, targetSlotIndex: number) => void) {
+    this.connection.offReducer("split_stack_into_hearth", callback);
+  }
+
   splitStackIntoLantern(sourceItemInstanceId: bigint, quantityToSplit: number, targetLanternId: number, targetSlotIndex: number) {
     const __args = { sourceItemInstanceId, quantityToSplit, targetLanternId, targetSlotIndex };
     let __writer = new __BinaryWriter(1024);
@@ -4976,6 +5383,22 @@ export class RemoteReducers {
 
   removeOnSplitStackWithinFurnace(callback: (ctx: ReducerEventContext, furnaceId: number, sourceSlotIndex: number, quantityToSplit: number, targetSlotIndex: number) => void) {
     this.connection.offReducer("split_stack_within_furnace", callback);
+  }
+
+  splitStackWithinHearth(hearthId: number, sourceSlotIndex: number, targetSlotIndex: number, quantityToSplit: number) {
+    const __args = { hearthId, sourceSlotIndex, targetSlotIndex, quantityToSplit };
+    let __writer = new __BinaryWriter(1024);
+    SplitStackWithinHearth.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("split_stack_within_hearth", __argsBuffer, this.setCallReducerFlags.splitStackWithinHearthFlags);
+  }
+
+  onSplitStackWithinHearth(callback: (ctx: ReducerEventContext, hearthId: number, sourceSlotIndex: number, targetSlotIndex: number, quantityToSplit: number) => void) {
+    this.connection.onReducer("split_stack_within_hearth", callback);
+  }
+
+  removeOnSplitStackWithinHearth(callback: (ctx: ReducerEventContext, hearthId: number, sourceSlotIndex: number, targetSlotIndex: number, quantityToSplit: number) => void) {
+    this.connection.offReducer("split_stack_within_hearth", callback);
   }
 
   splitStackWithinLantern(lanternId: number, sourceSlotIndex: number, quantityToSplit: number, targetSlotIndex: number) {
@@ -5321,11 +5744,6 @@ export class RemoteReducers {
 }
 
 export class SetReducerFlags {
-  attackBarrelFlags: __CallReducerFlags = 'FullUpdate';
-  attackBarrel(flags: __CallReducerFlags) {
-    this.attackBarrelFlags = flags;
-  }
-
   cancelAllCraftingFlags: __CallReducerFlags = 'FullUpdate';
   cancelAllCrafting(flags: __CallReducerFlags) {
     this.cancelAllCraftingFlags = flags;
@@ -5344,6 +5762,11 @@ export class SetReducerFlags {
   castFishingLineFlags: __CallReducerFlags = 'FullUpdate';
   castFishingLine(flags: __CallReducerFlags) {
     this.castFishingLineFlags = flags;
+  }
+
+  checkBuildingPrivilegeDistanceFlags: __CallReducerFlags = 'FullUpdate';
+  checkBuildingPrivilegeDistance(flags: __CallReducerFlags) {
+    this.checkBuildingPrivilegeDistanceFlags = flags;
   }
 
   checkFinishedCraftingFlags: __CallReducerFlags = 'FullUpdate';
@@ -5471,6 +5894,11 @@ export class SetReducerFlags {
     this.dropItemFromFurnaceSlotToWorldFlags = flags;
   }
 
+  dropItemFromHearthSlotToWorldFlags: __CallReducerFlags = 'FullUpdate';
+  dropItemFromHearthSlotToWorld(flags: __CallReducerFlags) {
+    this.dropItemFromHearthSlotToWorldFlags = flags;
+  }
+
   dropItemFromLanternSlotToWorldFlags: __CallReducerFlags = 'FullUpdate';
   dropItemFromLanternSlotToWorld(flags: __CallReducerFlags) {
     this.dropItemFromLanternSlotToWorldFlags = flags;
@@ -5539,6 +5967,11 @@ export class SetReducerFlags {
   getMinimapDataFlags: __CallReducerFlags = 'FullUpdate';
   getMinimapData(flags: __CallReducerFlags) {
     this.getMinimapDataFlags = flags;
+  }
+
+  grantBuildingPrivilegeFromHearthFlags: __CallReducerFlags = 'FullUpdate';
+  grantBuildingPrivilegeFromHearth(flags: __CallReducerFlags) {
+    this.grantBuildingPrivilegeFromHearthFlags = flags;
   }
 
   initProjectileSystemFlags: __CallReducerFlags = 'FullUpdate';
@@ -5626,6 +6059,11 @@ export class SetReducerFlags {
     this.moveItemFromFurnaceToPlayerSlotFlags = flags;
   }
 
+  moveItemFromHearthFlags: __CallReducerFlags = 'FullUpdate';
+  moveItemFromHearth(flags: __CallReducerFlags) {
+    this.moveItemFromHearthFlags = flags;
+  }
+
   moveItemFromLanternToPlayerSlotFlags: __CallReducerFlags = 'FullUpdate';
   moveItemFromLanternToPlayerSlot(flags: __CallReducerFlags) {
     this.moveItemFromLanternToPlayerSlotFlags = flags;
@@ -5659,6 +6097,11 @@ export class SetReducerFlags {
   moveItemToFurnaceFlags: __CallReducerFlags = 'FullUpdate';
   moveItemToFurnace(flags: __CallReducerFlags) {
     this.moveItemToFurnaceFlags = flags;
+  }
+
+  moveItemToHearthFlags: __CallReducerFlags = 'FullUpdate';
+  moveItemToHearth(flags: __CallReducerFlags) {
+    this.moveItemToHearthFlags = flags;
   }
 
   moveItemToHotbarFlags: __CallReducerFlags = 'FullUpdate';
@@ -5706,6 +6149,11 @@ export class SetReducerFlags {
     this.moveItemWithinFurnaceFlags = flags;
   }
 
+  moveItemWithinHearthFlags: __CallReducerFlags = 'FullUpdate';
+  moveItemWithinHearth(flags: __CallReducerFlags) {
+    this.moveItemWithinHearthFlags = flags;
+  }
+
   moveItemWithinLanternFlags: __CallReducerFlags = 'FullUpdate';
   moveItemWithinLantern(flags: __CallReducerFlags) {
     this.moveItemWithinLanternFlags = flags;
@@ -5749,6 +6197,11 @@ export class SetReducerFlags {
   placeFurnaceFlags: __CallReducerFlags = 'FullUpdate';
   placeFurnace(flags: __CallReducerFlags) {
     this.placeFurnaceFlags = flags;
+  }
+
+  placeHomesteadHearthFlags: __CallReducerFlags = 'FullUpdate';
+  placeHomesteadHearth(flags: __CallReducerFlags) {
+    this.placeHomesteadHearthFlags = flags;
   }
 
   placeLanternFlags: __CallReducerFlags = 'FullUpdate';
@@ -5796,6 +6249,11 @@ export class SetReducerFlags {
     this.processActiveConsumableEffectsTickFlags = flags;
   }
 
+  processBuildingDecayFlags: __CallReducerFlags = 'FullUpdate';
+  processBuildingDecay(flags: __CallReducerFlags) {
+    this.processBuildingDecayFlags = flags;
+  }
+
   processCampfireLogicScheduledFlags: __CallReducerFlags = 'FullUpdate';
   processCampfireLogicScheduled(flags: __CallReducerFlags) {
     this.processCampfireLogicScheduledFlags = flags;
@@ -5819,6 +6277,11 @@ export class SetReducerFlags {
   processGrassRespawnFlags: __CallReducerFlags = 'FullUpdate';
   processGrassRespawn(flags: __CallReducerFlags) {
     this.processGrassRespawnFlags = flags;
+  }
+
+  processHearthUpkeepFlags: __CallReducerFlags = 'FullUpdate';
+  processHearthUpkeep(flags: __CallReducerFlags) {
+    this.processHearthUpkeepFlags = flags;
   }
 
   processKnockedOutRecoveryFlags: __CallReducerFlags = 'FullUpdate';
@@ -5846,6 +6309,11 @@ export class SetReducerFlags {
     this.purchaseMemoryGridNodeFlags = flags;
   }
 
+  queryHearthUpkeepCostsFlags: __CallReducerFlags = 'FullUpdate';
+  queryHearthUpkeepCosts(flags: __CallReducerFlags) {
+    this.queryHearthUpkeepCostsFlags = flags;
+  }
+
   quickMoveFromBoxFlags: __CallReducerFlags = 'FullUpdate';
   quickMoveFromBox(flags: __CallReducerFlags) {
     this.quickMoveFromBoxFlags = flags;
@@ -5864,6 +6332,11 @@ export class SetReducerFlags {
   quickMoveFromFurnaceFlags: __CallReducerFlags = 'FullUpdate';
   quickMoveFromFurnace(flags: __CallReducerFlags) {
     this.quickMoveFromFurnaceFlags = flags;
+  }
+
+  quickMoveFromHearthFlags: __CallReducerFlags = 'FullUpdate';
+  quickMoveFromHearth(flags: __CallReducerFlags) {
+    this.quickMoveFromHearthFlags = flags;
   }
 
   quickMoveFromLanternFlags: __CallReducerFlags = 'FullUpdate';
@@ -5899,6 +6372,11 @@ export class SetReducerFlags {
   quickMoveToFurnaceFlags: __CallReducerFlags = 'FullUpdate';
   quickMoveToFurnace(flags: __CallReducerFlags) {
     this.quickMoveToFurnaceFlags = flags;
+  }
+
+  quickMoveToHearthFlags: __CallReducerFlags = 'FullUpdate';
+  quickMoveToHearth(flags: __CallReducerFlags) {
+    this.quickMoveToHearthFlags = flags;
   }
 
   quickMoveToLanternFlags: __CallReducerFlags = 'FullUpdate';
@@ -6021,6 +6499,11 @@ export class SetReducerFlags {
     this.splitAndDropItemFromFurnaceSlotToWorldFlags = flags;
   }
 
+  splitAndDropItemFromHearthSlotToWorldFlags: __CallReducerFlags = 'FullUpdate';
+  splitAndDropItemFromHearthSlotToWorld(flags: __CallReducerFlags) {
+    this.splitAndDropItemFromHearthSlotToWorldFlags = flags;
+  }
+
   splitAndDropItemFromLanternSlotToWorldFlags: __CallReducerFlags = 'FullUpdate';
   splitAndDropItemFromLanternSlotToWorld(flags: __CallReducerFlags) {
     this.splitAndDropItemFromLanternSlotToWorldFlags = flags;
@@ -6066,6 +6549,11 @@ export class SetReducerFlags {
     this.splitStackFromFurnaceFlags = flags;
   }
 
+  splitStackFromHearthFlags: __CallReducerFlags = 'FullUpdate';
+  splitStackFromHearth(flags: __CallReducerFlags) {
+    this.splitStackFromHearthFlags = flags;
+  }
+
   splitStackFromLanternFlags: __CallReducerFlags = 'FullUpdate';
   splitStackFromLantern(flags: __CallReducerFlags) {
     this.splitStackFromLanternFlags = flags;
@@ -6096,6 +6584,11 @@ export class SetReducerFlags {
     this.splitStackIntoFurnaceFlags = flags;
   }
 
+  splitStackIntoHearthFlags: __CallReducerFlags = 'FullUpdate';
+  splitStackIntoHearth(flags: __CallReducerFlags) {
+    this.splitStackIntoHearthFlags = flags;
+  }
+
   splitStackIntoLanternFlags: __CallReducerFlags = 'FullUpdate';
   splitStackIntoLantern(flags: __CallReducerFlags) {
     this.splitStackIntoLanternFlags = flags;
@@ -6124,6 +6617,11 @@ export class SetReducerFlags {
   splitStackWithinFurnaceFlags: __CallReducerFlags = 'FullUpdate';
   splitStackWithinFurnace(flags: __CallReducerFlags) {
     this.splitStackWithinFurnaceFlags = flags;
+  }
+
+  splitStackWithinHearthFlags: __CallReducerFlags = 'FullUpdate';
+  splitStackWithinHearth(flags: __CallReducerFlags) {
+    this.splitStackWithinHearthFlags = flags;
   }
 
   splitStackWithinLanternFlags: __CallReducerFlags = 'FullUpdate';
@@ -6261,6 +6759,11 @@ export class RemoteTables {
     return new AnimalCorpseTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<AnimalCorpse>(REMOTE_MODULE.tables.animal_corpse));
   }
 
+  get animalWalkingSoundState(): AnimalWalkingSoundStateTableHandle<'animal_walking_sound_state'> {
+    // clientCache is a private property
+    return new AnimalWalkingSoundStateTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<AnimalWalkingSoundState>(REMOTE_MODULE.tables.animal_walking_sound_state));
+  }
+
   get arrowBreakEvent(): ArrowBreakEventTableHandle<'arrow_break_event'> {
     // clientCache is a private property
     return new ArrowBreakEventTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<ArrowBreakEvent>(REMOTE_MODULE.tables.arrow_break_event));
@@ -6274,6 +6777,16 @@ export class RemoteTables {
   get barrelRespawnSchedule(): BarrelRespawnScheduleTableHandle<'barrel_respawn_schedule'> {
     // clientCache is a private property
     return new BarrelRespawnScheduleTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<BarrelRespawnSchedule>(REMOTE_MODULE.tables.barrel_respawn_schedule));
+  }
+
+  get buildingDecaySchedule(): BuildingDecayScheduleTableHandle<'building_decay_schedule'> {
+    // clientCache is a private property
+    return new BuildingDecayScheduleTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<BuildingDecaySchedule>(REMOTE_MODULE.tables.building_decay_schedule));
+  }
+
+  get buildingPrivilegeCheckSchedule(): BuildingPrivilegeCheckScheduleTableHandle<'building_privilege_check_schedule'> {
+    // clientCache is a private property
+    return new BuildingPrivilegeCheckScheduleTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<BuildingPrivilegeCheckSchedule>(REMOTE_MODULE.tables.building_privilege_check_schedule));
   }
 
   get campfire(): CampfireTableHandle<'campfire'> {
@@ -6384,6 +6897,21 @@ export class RemoteTables {
   get harvestableResource(): HarvestableResourceTableHandle<'harvestable_resource'> {
     // clientCache is a private property
     return new HarvestableResourceTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<HarvestableResource>(REMOTE_MODULE.tables.harvestable_resource));
+  }
+
+  get hearthUpkeepQueryResult(): HearthUpkeepQueryResultTableHandle<'hearth_upkeep_query_result'> {
+    // clientCache is a private property
+    return new HearthUpkeepQueryResultTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<HearthUpkeepQueryResult>(REMOTE_MODULE.tables.hearth_upkeep_query_result));
+  }
+
+  get hearthUpkeepSchedule(): HearthUpkeepScheduleTableHandle<'hearth_upkeep_schedule'> {
+    // clientCache is a private property
+    return new HearthUpkeepScheduleTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<HearthUpkeepSchedule>(REMOTE_MODULE.tables.hearth_upkeep_schedule));
+  }
+
+  get homesteadHearth(): HomesteadHearthTableHandle<'homestead_hearth'> {
+    // clientCache is a private property
+    return new HomesteadHearthTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<HomesteadHearth>(REMOTE_MODULE.tables.homestead_hearth));
   }
 
   get inventoryItem(): InventoryItemTableHandle<'inventory_item'> {

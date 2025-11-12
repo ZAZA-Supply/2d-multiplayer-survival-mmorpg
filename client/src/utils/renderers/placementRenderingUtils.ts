@@ -7,6 +7,7 @@ import { LANTERN_WIDTH_PREVIEW, LANTERN_HEIGHT_PREVIEW } from './lanternRenderin
 import { SLEEPING_BAG_WIDTH, SLEEPING_BAG_HEIGHT } from './sleepingBagRenderingUtils';
 import { STASH_WIDTH, STASH_HEIGHT } from './stashRenderingUtils';
 import { SHELTER_RENDER_WIDTH, SHELTER_RENDER_HEIGHT } from './shelterRenderingUtils';
+import { HEARTH_WIDTH, HEARTH_HEIGHT, HEARTH_RENDER_Y_OFFSET } from './hearthRenderingUtils'; // ADDED: Hearth dimensions
 import { TILE_SIZE, FOUNDATION_TILE_SIZE, worldPixelsToFoundationCell, foundationCellToWorldCenter } from '../../config/gameConfig';
 import { DbConnection } from '../../generated';
 import { isSeedItemValid, requiresWaterPlacement } from '../plantsUtils';
@@ -713,7 +714,7 @@ export function renderPlacementPreview({
         // For shelters, use the shelter image from doodads folder
         previewImg = shelterImageRef.current;
     } else {
-        // For other items, use the item images
+        // For other items, use the item images (including hearth.png)
         previewImg = itemImagesRef.current?.get(placementInfo.iconAssetName);
     }
 
@@ -745,6 +746,10 @@ export function renderPlacementPreview({
         // Rain collector should match the actual sprite dimensions
         drawWidth = 96;  // Doubled from 48
         drawHeight = 128; // Doubled from 64
+    } else if (placementInfo.iconAssetName === 'hearth.png') {
+        // Homestead hearth preview dimensions (matches actual rendering)
+        drawWidth = HEARTH_WIDTH;  // 96px
+        drawHeight = HEARTH_HEIGHT; // 96px
     } else if (isSeedPlacement) {
         // Seeds should match the actual planted seed size (48x48)
         drawWidth = 48;  
@@ -773,8 +778,14 @@ export function renderPlacementPreview({
     }
 
     // Calculate the centered position (perfectly centered on cursor)
+    // For hearth, match the actual rendering position exactly (including Y offset)
     const adjustedX = worldMouseX - drawWidth / 2;
-    const adjustedY = worldMouseY - drawHeight / 2;
+    let adjustedY = worldMouseY - drawHeight / 2;
+    
+    // Apply hearth-specific Y offset to match actual rendering position
+    if (placementInfo.iconAssetName === 'hearth.png') {
+        adjustedY = worldMouseY - drawHeight - HEARTH_RENDER_Y_OFFSET;
+    }
 
     // Draw the preview image or fallback
     if (previewImg && previewImg.complete && previewImg.naturalHeight !== 0) {

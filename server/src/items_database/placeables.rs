@@ -91,6 +91,18 @@ pub fn get_placeable_definitions() -> Vec<ItemDefinition> {
 
         // === UTILITY STRUCTURES ===
 
+        // Homestead Hearth - Building privilege and material storage
+        ItemBuilder::new("Homestead Hearth", "A central hearth that grants building privilege to those who tend it. Stores building materials and provides warmth to those with building privilege. Hold E to gain building privilege, press E to access inventory.", ItemCategory::Placeable)
+            .icon("hearth.png")
+            .crafting_cost(vec![
+                CostIngredient { item_name: "Stone".to_string(), quantity: 200 },
+                CostIngredient { item_name: "Wood".to_string(), quantity: 150 },
+                CostIngredient { item_name: "Cloth".to_string(), quantity: 20 },
+            ])
+            .crafting_output(1, 45)
+            .respawn_time(600)
+            .build(),
+
         // Reed Rain Collector - Water collection system
         ItemBuilder::new("Reed Rain Collector", "A small water collection device crafted from hollow reed stalks. Collects rainwater automatically during storms. Capacity: 40L.", ItemCategory::Placeable)
             .icon("reed_rain_collector.png")

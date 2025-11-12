@@ -392,6 +392,11 @@ export const useInputHandler = ({
                             connection.reducers.toggleStashVisibility(Number(holdTarget.targetId));
                             actionTaken = true;
                             break;
+                        case 'homestead_hearth':
+                            console.log('[E-Hold ACTION] Attempting to grant building privilege from hearth:', holdTarget.targetId);
+                            connection.reducers.grantBuildingPrivilegeFromHearth(Number(holdTarget.targetId));
+                            actionTaken = true;
+                            break;
                         default:
                             console.log('[E-Hold FAILED] Unknown target type:', holdTarget.targetType);
                     }
@@ -959,6 +964,11 @@ export const useInputHandler = ({
                                     case 'rain_collector':
                                         // console.log('[E-Tap ACTION] Opening rain collector interface:', currentTarget.id);
                                         onSetInteractingWith({ type: 'rain_collector', id: currentTarget.id });
+                                        tapActionTaken = true;
+                                        break;
+                                    case 'homestead_hearth':
+                                        // console.log('[E-Tap ACTION] Opening hearth interface:', currentTarget.id);
+                                        onSetInteractingWith({ type: 'homestead_hearth', id: currentTarget.id });
                                         tapActionTaken = true;
                                         break;
                                 }

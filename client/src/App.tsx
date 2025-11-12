@@ -209,6 +209,7 @@ function AppContent() {
       animalCorpses, // <<< ADD animalCorpses HERE (NON-SPATIAL)
       barrels, // <<< ADD barrels HERE
       seaStacks, // <<< ADD sea stacks HERE
+      homesteadHearths, // <<< ADD homesteadHearths HERE
       foundationCells, // ADDED: Building foundations
       wallCells, // ADDED: Building walls
       playerDodgeRollStates,
@@ -372,6 +373,9 @@ function AppContent() {
         VIEWPORT_UPDATE_DEBOUNCE_MS
     );
 
+    // Track previous player state to detect respawns
+    const prevPlayerStateRef = useRef<{ isDead: boolean; positionX: number; positionY: number } | null>(null);
+
     // --- Effect to Update Viewport Based on Player Position ---
     useEffect(() => {
         const localPlayer = connection?.identity ? players.get(connection.identity.toHexString()) : undefined;
@@ -382,15 +386,28 @@ function AppContent() {
              if (currentViewport) setCurrentViewport(null);
              // Consider if we need to tell the server the viewport is invalid?
              // Server might time out old viewports anyway.
+             prevPlayerStateRef.current = localPlayer ? { isDead: localPlayer.isDead, positionX: localPlayer.positionX, positionY: localPlayer.positionY } : null;
              return;
         }
 
         const playerCenterX = localPlayer.positionX;
         const playerCenterY = localPlayer.positionY;
 
+        // Detect respawn: player was dead and is now alive, or position changed dramatically
+        const prevState = prevPlayerStateRef.current;
+        const wasDead = prevState?.isDead ?? false;
+        const isAlive = !localPlayer.isDead;
+        const respawnDetected = wasDead && isAlive;
+        
+        // Check for dramatic position change (likely respawn)
+        const positionChangedDramatically = prevState && 
+            ((playerCenterX - prevState.positionX)**2 + (playerCenterY - prevState.positionY)**2 > 10000); // 100px threshold
+
         // Check if viewport center moved significantly enough
         const lastSentCenter = lastSentViewportCenterRef.current;
         const shouldUpdate = !lastSentCenter ||
+            respawnDetected || // Force update on respawn
+            positionChangedDramatically || // Force update on dramatic position change
             (playerCenterX - lastSentCenter.x)**2 + (playerCenterY - lastSentCenter.y)**2 > VIEWPORT_UPDATE_THRESHOLD_SQ;
 
         if (shouldUpdate) {
@@ -403,7 +420,15 @@ function AppContent() {
             // console.log(`[App] Viewport needs update. Triggering debounced call.`);
             setCurrentViewport(newViewport); // Update local state immediately for useSpacetimeTables
             debouncedUpdateViewport(newViewport); // Call debounced server update
+            
+            // Reset lastSentCenter on respawn to force immediate update
+            if (respawnDetected || positionChangedDramatically) {
+                lastSentViewportCenterRef.current = null;
+            }
         }
+        
+        // Update previous state tracking
+        prevPlayerStateRef.current = { isDead: localPlayer.isDead, positionX: playerCenterX, positionY: playerCenterY };
     // Depend on the players map (specifically the local player's position), connection identity, and app connected status.
     }, [players, connection?.identity, debouncedUpdateViewport]); // Removed currentViewport dependency to avoid loops
 
@@ -831,6 +856,7 @@ function AppContent() {
                             animalCorpses={animalCorpses}
                             barrels={barrels}
                             seaStacks={seaStacks}
+                            homesteadHearths={homesteadHearths}
                             foundationCells={foundationCells}
                             wallCells={wallCells}
                             inventoryItems={inventoryItems}

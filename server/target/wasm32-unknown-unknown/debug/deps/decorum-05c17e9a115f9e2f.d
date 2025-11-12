@@ -1,0 +1,11 @@
+C:\Users\Asus\OneDrive\Documents\BrothBullets\vibe-coding-starter-pack-2d-multiplayer-survival\server\target\wasm32-unknown-unknown\debug\deps\decorum-05c17e9a115f9e2f.d: C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\lib.rs C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\canonical.rs C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\cmp.rs C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\constraint.rs C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\hash.rs C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\primitive.rs C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\proxy.rs
+
+C:\Users\Asus\OneDrive\Documents\BrothBullets\vibe-coding-starter-pack-2d-multiplayer-survival\server\target\wasm32-unknown-unknown\debug\deps\libdecorum-05c17e9a115f9e2f.rmeta: C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\lib.rs C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\canonical.rs C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\cmp.rs C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\constraint.rs C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\hash.rs C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\primitive.rs C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\proxy.rs
+
+C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\lib.rs:
+C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\canonical.rs:
+C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\cmp.rs:
+C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\constraint.rs:
+C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\hash.rs:
+C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\primitive.rs:
+C:\Users\Asus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\decorum-0.3.1\src\proxy.rs:

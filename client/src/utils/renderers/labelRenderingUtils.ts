@@ -8,7 +8,8 @@ import {
     Stash as SpacetimeDBStash,
     SleepingBag as SpacetimeDBSleepingBag,
     Player as SpacetimeDBPlayer,
-    RainCollector as SpacetimeDBRainCollector
+    RainCollector as SpacetimeDBRainCollector,
+    HomesteadHearth as SpacetimeDBHomesteadHearth // ADDED: Homestead Hearth
 } from '../../generated';
 
 // Import visual heights from useInteractionFinder.ts
@@ -27,7 +28,7 @@ const RAIN_COLLECTOR_HEIGHT = 128; // Doubled from 64
 
 // Define the single target type for labels
 interface InteractableTarget {
-    type: 'harvestable_resource' | 'campfire' | 'furnace' | 'lantern' | 'dropped_item' | 'box' | 'corpse' | 'stash' | 'sleeping_bag' | 'knocked_out_player' | 'water' | 'rain_collector'; // ADDED: furnace
+    type: 'harvestable_resource' | 'campfire' | 'furnace' | 'lantern' | 'dropped_item' | 'box' | 'corpse' | 'stash' | 'sleeping_bag' | 'knocked_out_player' | 'water' | 'rain_collector' | 'homestead_hearth'; // ADDED: homestead_hearth
     id: bigint | number | string;
     position: { x: number; y: number };
     distance: number;
@@ -46,6 +47,7 @@ interface RenderLabelsParams {
     stashes: Map<string, SpacetimeDBStash>;
     sleepingBags: Map<string, SpacetimeDBSleepingBag>;
     rainCollectors: Map<string, SpacetimeDBRainCollector>;
+    homesteadHearths: Map<string, SpacetimeDBHomesteadHearth>; // ADDED: Homestead Hearths
     players: Map<string, SpacetimeDBPlayer>;
     itemDefinitions: Map<string, SpacetimeDBItemDefinition>;
     // Single unified target - replaces individual harvestable resource IDs
@@ -206,6 +208,7 @@ export function renderInteractionLabels({
     stashes,
     sleepingBags,
     rainCollectors,
+    homesteadHearths, // ADDED: Homestead Hearths
     players,
     itemDefinitions,
     closestInteractableTarget,
@@ -332,6 +335,17 @@ export function renderInteractionLabels({
                 const visualCenterY = rainCollector.posY - (RAIN_COLLECTOR_HEIGHT / 2);
                 textX = rainCollector.posX;
                 textY = visualCenterY - 5;
+                renderStyledInteractionLabel(ctx, text, textX, textY);
+            }
+            break;
+        }
+        case 'homestead_hearth': {
+            const hearth = homesteadHearths.get(closestInteractableTarget.id.toString());
+            if (hearth) {
+                const HEARTH_HEIGHT = 96; // Approximate height
+                const visualCenterY = hearth.posY - (HEARTH_HEIGHT / 2);
+                textX = hearth.posX;
+                textY = visualCenterY - 50;
                 renderStyledInteractionLabel(ctx, text, textX, textY);
             }
             break;

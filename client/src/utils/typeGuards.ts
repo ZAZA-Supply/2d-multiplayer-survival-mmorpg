@@ -15,6 +15,7 @@ import {
   AnimalCorpse as SpacetimeDBAnimalCorpse, // ADDED AnimalCorpse type
   Barrel as SpacetimeDBBarrel, // ADDED Barrel type
   SeaStack, // ADDED SeaStack type
+  HomesteadHearth as SpacetimeDBHomesteadHearth, // ADDED HomesteadHearth type
   Player,
   Tree,
   Stone,
@@ -32,7 +33,8 @@ import {
   RainCollector,
   WildAnimal,
   AnimalCorpse,
-  Barrel
+  Barrel,
+  HomesteadHearth
 } from '../generated'; // Import necessary types
 import { InterpolatedGrassData } from '../hooks/useGrassInterpolation';
 import { isHarvestableResource } from '../types/resourceTypes';
@@ -276,6 +278,29 @@ export function isSeaStack(entity: any): entity is SeaStack {
            typeof entity.animalSpecies === 'undefined'; // Not an AnimalCorpse
 }
 
+// Type guard for HomesteadHearth
+export function isHomesteadHearth(entity: any): entity is HomesteadHearth {
+    return entity && 
+           typeof entity.posX === 'number' && 
+           typeof entity.posY === 'number' && 
+           typeof entity.id !== 'undefined' &&
+           typeof entity.chunkIndex === 'number' &&
+           typeof entity.health === 'number' &&
+           typeof entity.maxHealth === 'number' &&
+           typeof entity.isDestroyed === 'boolean' &&
+           typeof entity.placedBy !== 'undefined' && // Has placedBy like other placed items
+           typeof entity.slot_instance_id_0 !== 'undefined' && // Has inventory slots
+           // Ensure it doesn't match other types
+           typeof entity.identity === 'undefined' && // Not a Player
+           typeof entity.treeType === 'undefined' && // Not a Tree
+           typeof entity.isBurning === 'undefined' && // Not a Campfire
+           typeof entity.itemDefId === 'undefined' && // Not a DroppedItem
+           typeof entity.ownerIdentity === 'undefined' && // Not a PlayerCorpse or Stash
+           typeof entity.species === 'undefined' && // Not a WildAnimal
+           typeof entity.animalSpecies === 'undefined' && // Not an AnimalCorpse
+           typeof entity.variant === 'undefined'; // Not a Barrel
+}
+
 // Re-export harvestable resource type guards from resourceTypes
 export { 
   isHarvestableResource, 
@@ -295,7 +320,8 @@ export function isInteractableEntity(entity: any): boolean {
          isShelter(entity) || 
          isGrass(entity) || 
          isWildAnimal(entity) || 
-         isPlayerCorpse(entity);
+         isPlayerCorpse(entity) ||
+         isHomesteadHearth(entity);
 }
 
 // Helper function to get entity type string
@@ -322,6 +348,7 @@ export function getEntityTypeString(entity: any): string {
   if (isBarrel(entity)) return 'barrel';
   if (isAnimalCorpse(entity)) return 'animal_corpse';
   if (isSeaStack(entity)) return 'sea_stack';
+  if (isHomesteadHearth(entity)) return 'homestead_hearth';
   
   return 'unknown';
 } 

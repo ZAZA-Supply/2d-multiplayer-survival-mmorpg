@@ -41,8 +41,9 @@ pub const MIN_BARREL_DISTANCE_SQ: f32 = 60.0 * 60.0; // Minimum distance between
 pub const BARREL_RESPAWN_TIME_SECONDS: u32 = 600; // 10 minutes respawn time
 
 // Damage constants
-pub const BARREL_DAMAGE_PER_HIT: f32 = 25.0; // 2 hits to destroy
-pub const BARREL_ATTACK_COOLDOWN_MS: u64 = 1000; // 1 second between attacks
+// Note: Damage is determined by weapon type through the combat system
+// No fixed damage constant needed - weapons define their own damage via pvp_damage_min/max
+pub const BARREL_ATTACK_COOLDOWN_MS: u64 = 1000; // 1 second between attacks (used by damage_barrel for cooldown checks)
 
 /// Density of barrel clusters per map tile. Used to scale clusters with map size.
 /// Baseline: 500x500 tiles (250,000) -> 250000 * 0.00008 = 20 clusters.
@@ -334,85 +335,8 @@ pub fn damage_barrel(
     Ok(())
 }
 
-// --- Reducers ---
-
-/// Reducer for players to attack barrels
-#[spacetimedb::reducer]
-pub fn attack_barrel(ctx: &ReducerContext, barrel_id: u64) -> Result<(), String> {
-    let sender_id = ctx.sender;
-    let players = ctx.db.player();
-    let barrels = ctx.db.barrel();
-    
-    log::info!("[AttackBarrel] Player {:?} attacking barrel {}", sender_id, barrel_id);
-    
-    // Find the player
-    let player = players.identity().find(sender_id)
-        .ok_or_else(|| "Player not found.".to_string())?;
-    
-    if player.is_dead {
-        return Err("Cannot attack while dead.".to_string());
-    }
-    
-    // Find the barrel
-    let mut barrel = barrels.id().find(barrel_id)
-        .ok_or_else(|| format!("Barrel with ID {} not found.", barrel_id))?;
-    
-    if barrel.health <= 0.0 {
-        return Err("Barrel is already destroyed.".to_string());
-    }
-    
-    // Check distance
-    let distance_sq = get_distance_squared(
-        player.position_x, 
-        player.position_y, 
-        barrel.pos_x, 
-        barrel.pos_y - BARREL_COLLISION_Y_OFFSET
-    );
-    
-    if distance_sq > PLAYER_BARREL_INTERACTION_DISTANCE_SQUARED {
-        return Err("Too far away from barrel.".to_string());
-    }
-    
-    // Check attack cooldown
-    if let Some(last_hit) = barrel.last_hit_time {
-        let elapsed_ms = (ctx.timestamp.to_micros_since_unix_epoch() - last_hit.to_micros_since_unix_epoch()) / 1000;
-        if elapsed_ms < (BARREL_ATTACK_COOLDOWN_MS * 1000) as i64 { // Convert to microseconds and cast to i64
-            return Err("Barrel was hit too recently.".to_string());
-        }
-    }
-    
-    // Apply damage
-    barrel.health -= BARREL_DAMAGE_PER_HIT;
-    barrel.last_hit_time = Some(ctx.timestamp);
-    
-    if barrel.health <= 0.0 {
-        barrel.health = 0.0;
-        // Set respawn timer
-        let respawn_time = ctx.timestamp.to_micros_since_unix_epoch() + (BARREL_RESPAWN_TIME_SECONDS as i64 * 1_000_000);
-        barrel.respawn_at = Some(Timestamp::from_micros_since_unix_epoch(respawn_time));
-        
-        log::info!("[AttackBarrel] Barrel {} destroyed by player {:?}, will respawn in {} seconds", 
-                  barrel_id, sender_id, BARREL_RESPAWN_TIME_SECONDS);
-        
-        // Generate loot drops
-        if let Err(e) = generate_barrel_loot_drops(ctx, barrel.pos_x, barrel.pos_y) {
-            log::error!("[AttackBarrel] Failed to generate loot for barrel {}: {}", barrel_id, e);
-        }
-        
-        // Emit destruction sound
-        crate::sound_events::emit_barrel_destroyed_sound(ctx, barrel.pos_x, barrel.pos_y, sender_id);
-    } else {
-        log::info!("[AttackBarrel] Barrel {} damaged, health: {:.1}", barrel_id, barrel.health);
-        
-        // Emit hit sound
-        crate::sound_events::emit_barrel_hit_sound(ctx, barrel.pos_x, barrel.pos_y, sender_id);
-    }
-    
-    // Update the barrel
-    barrels.id().update(barrel);
-    
-    Ok(())
-}
+// Note: There is no attack_barrel reducer - damage is handled through the combat system
+// which calls damage_barrel() with weapon-based damage calculated from pvp_damage_min/max
 
 /// Scheduled reducer to respawn destroyed barrels
 #[spacetimedb::reducer]

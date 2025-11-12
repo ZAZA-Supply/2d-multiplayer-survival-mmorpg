@@ -36,7 +36,8 @@ export type ContainerType = ContainerTypeVariants.Campfire |
   ContainerTypeVariants.PlayerCorpse |
   ContainerTypeVariants.Stash |
   ContainerTypeVariants.Lantern |
-  ContainerTypeVariants.RainCollector;
+  ContainerTypeVariants.RainCollector |
+  ContainerTypeVariants.HomesteadHearth;
 
 let _cached_ContainerType_type_value: __AlgebraicTypeType | null = null;
 
@@ -55,6 +56,7 @@ export const ContainerType = {
   Stash: { tag: "Stash" } as const,
   Lantern: { tag: "Lantern" } as const,
   RainCollector: { tag: "RainCollector" } as const,
+  HomesteadHearth: { tag: "HomesteadHearth" } as const,
 
   getTypeScriptAlgebraicType(): __AlgebraicTypeType {
     if (_cached_ContainerType_type_value) return _cached_ContainerType_type_value;
@@ -67,6 +69,7 @@ export const ContainerType = {
       { name: "Stash", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "Lantern", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "RainCollector", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "HomesteadHearth", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
     );
     return _cached_ContainerType_type_value;
   },

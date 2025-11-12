@@ -79,6 +79,7 @@ use crate::wild_animal_npc::wild_animal as WildAnimalTableTrait;
 use crate::wild_animal_npc::animal_corpse::{AnimalCorpse, ANIMAL_CORPSE_COLLISION_Y_OFFSET, animal_corpse as AnimalCorpseTableTrait};
 // Import barrel types
 use crate::barrel::{Barrel, BARREL_COLLISION_Y_OFFSET, barrel as BarrelTableTrait};
+use crate::homestead_hearth::{HomesteadHearth, HEARTH_COLLISION_Y_OFFSET, homestead_hearth as HomesteadHearthTableTrait};
 // --- Game Balance Constants ---
 /// Time in milliseconds before a dead player can respawn
 pub const RESPAWN_TIME_MS: u64 = 5000; // 5 seconds
@@ -106,6 +107,7 @@ pub enum TargetId {
     WildAnimal(u64), // ADDED: Wild animal target
     AnimalCorpse(u32), // ADDED: Animal corpse target
     Barrel(u64), // ADDED: Barrel target
+    HomesteadHearth(u32), // ADDED: Homestead Hearth target
 }
 
 /// Represents a potential target within attack range
@@ -802,6 +804,53 @@ pub fn find_targets_in_cone(
         }
     }
     
+    // Check Homestead Hearth
+    for hearth in ctx.db.homestead_hearth().iter() {
+        // Skip destroyed hearths
+        if hearth.is_destroyed {
+            continue;
+        }
+        
+        let dx = hearth.pos_x - player.position_x;
+        let target_y = hearth.pos_y - HEARTH_COLLISION_Y_OFFSET;
+        let dy = target_y - player.position_y;
+        let dist_sq = dx * dx + dy * dy;
+        
+        if dist_sq < (attack_range * attack_range) && dist_sq > 0.0 {
+            let distance = dist_sq.sqrt();
+            let target_vec_x = dx / distance;
+            let target_vec_y = dy / distance;
+
+            let dot_product = forward_x * target_vec_x + forward_y * target_vec_y;
+            let angle_rad = dot_product.acos();
+
+            if angle_rad <= half_attack_angle_rad {
+                // Check if line of sight is blocked by shelter walls
+                if is_line_blocked_by_shelter(
+                    ctx,
+                    player.identity,
+                    None, // No target player ID for hearths
+                    player.position_x,
+                    player.position_y,
+                    hearth.pos_x,
+                    target_y,
+                ) {
+                    log::debug!(
+                        "Player {:?} cannot attack Hearth {}: line of sight blocked by shelter",
+                        player.identity, hearth.id
+                    );
+                    continue; // Skip this target - blocked by shelter
+                }
+                
+                targets.push(Target {
+                    target_type: TargetType::HomesteadHearth,
+                    id: TargetId::HomesteadHearth(hearth.id),
+                    distance_sq: dist_sq,
+                });
+            }
+        }
+    }
+    
     // Check Shelters - delegate to shelter module
     crate::shelter::add_shelter_targets_to_cone(ctx, player, attack_range, half_attack_angle_rad, forward_x, forward_y, &mut targets);
     
@@ -862,7 +911,8 @@ fn is_destructible_deployable(target_type: TargetType) -> bool {
         TargetType::Shelter |
         TargetType::RainCollector |
         TargetType::Furnace |
-        TargetType::Barrel // Includes barrels and other destructible deployables
+        TargetType::Barrel | // Includes barrels and other destructible deployables
+        TargetType::HomesteadHearth // ADDED: Homestead Hearth is destructible
     )
 }
 
@@ -2300,6 +2350,13 @@ pub fn process_attack(
                 return Err("Target barrel not found".to_string());
             }
         },
+        TargetId::HomesteadHearth(hearth_id) => {
+            if let Some(hearth) = ctx.db.homestead_hearth().id().find(hearth_id) {
+                (hearth.pos_x, hearth.pos_y - HEARTH_COLLISION_Y_OFFSET, None)
+            } else {
+                return Err("Target hearth not found".to_string());
+            }
+        },
     };
 
     // Get attacker position
@@ -2402,6 +2459,15 @@ pub fn process_attack(
                 .map(|_| AttackResult {
                     hit: true,
                     target_type: Some(TargetType::Barrel),
+                    resource_granted: None,
+                })
+        },
+        TargetId::HomesteadHearth(hearth_id) => {
+            // Use the damage_hearth helper function (called from combat system)
+            crate::homestead_hearth::damage_hearth(ctx, attacker_id, *hearth_id, damage, timestamp)
+                .map(|_| AttackResult {
+                    hit: true,
+                    target_type: Some(TargetType::HomesteadHearth),
                     resource_granted: None,
                 })
         },

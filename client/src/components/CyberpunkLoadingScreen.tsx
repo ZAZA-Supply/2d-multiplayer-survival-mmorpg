@@ -85,10 +85,9 @@ const saveAudioPreference = (enabled: boolean): void => {
 // Function to load audio from the correct path
 const tryLoadAudio = async (filename: string): Promise<HTMLAudioElement | null> => {
     // SOVA sounds are in the public/sounds/ directory
-    // Vite serves public directory files directly from the root
+    // Vite serves public directory files directly from the root (use /sounds/ not /public/sounds/)
     const possiblePaths = [
-        `/sounds/${filename}`,            // Primary path: public/sounds/
-        `/public/sounds/${filename}`,     // Alternative public path
+        `/sounds/${filename}`,            // Primary path: public/sounds/ (served from root)
         `./sounds/${filename}`,           // Relative path fallback
     ];
 

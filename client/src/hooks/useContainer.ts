@@ -19,7 +19,7 @@ import {
 import { 
     InventoryItem, 
     ItemDefinition,
-    Campfire, Furnace, Lantern, WoodenStorageBox, PlayerCorpse, Stash, RainCollector
+    Campfire, Furnace, Lantern, WoodenStorageBox, PlayerCorpse, Stash, RainCollector, HomesteadHearth
 } from '../generated';
 import { PopulatedItem } from '../components/InventoryUI';
 import { InteractionTarget } from '../hooks/useInteractionManager';
@@ -37,6 +37,7 @@ interface UseContainerProps {
     playerCorpses: Map<string, PlayerCorpse>;
     stashes: Map<string, Stash>;
     rainCollectors: Map<string, RainCollector>;
+    homesteadHearths: Map<string, HomesteadHearth>;
     
     // Current storage box for special case
     currentStorageBox?: WoodenStorageBox | null;
@@ -82,6 +83,7 @@ export function useContainer(props: UseContainerProps): UseContainerResult {
         playerCorpses,
         stashes,
         rainCollectors,
+        homesteadHearths,
         currentStorageBox,
         connection,
         lastDragCompleteTime
@@ -98,7 +100,8 @@ export function useContainer(props: UseContainerProps): UseContainerResult {
             'wooden_storage_box': 'wooden_storage_box',
             'player_corpse': 'player_corpse',
             'stash': 'stash',
-            'rain_collector': 'rain_collector'
+            'rain_collector': 'rain_collector',
+            'homestead_hearth': 'homestead_hearth'
         };
         
         const containerType = typeMap[interactionTarget.type];
@@ -130,9 +133,10 @@ export function useContainer(props: UseContainerProps): UseContainerResult {
             woodenStorageBoxes,
             playerCorpses,
             stashes,
-            rainCollectors
+            rainCollectors,
+            homesteadHearths
         });
-    }, [containerType, containerId, campfires, furnaces, lanterns, woodenStorageBoxes, playerCorpses, stashes, rainCollectors, currentStorageBox]);
+    }, [containerType, containerId, campfires, furnaces, lanterns, woodenStorageBoxes, playerCorpses, stashes, rainCollectors, homesteadHearths, currentStorageBox]);
     
     // Get container configuration
     const config = useMemo(() => {

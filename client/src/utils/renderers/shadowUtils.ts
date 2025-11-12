@@ -65,10 +65,10 @@ export function applyStandardDropShadow(
   const minNightAlpha = 0.15; // Subtle night shadows (increased from 0.0)
 
   // Day: 0.0 (Dawn) to 0.75 (Dusk ends). Night: 0.75 to 1.0
-  // Server ranges: TwilightMorning (0.92-0.97) -> Dawn (0.0-0.05) -> Morning (0.05-0.35) -> Noon (0.35-0.55) -> Afternoon (0.55-0.72) -> Dusk (0.72-0.76) -> TwilightEvening (0.76-0.80) -> Night (0.80-0.92) -> Midnight (0.97-1.0)
+  // Server ranges: Night (0.80-0.92) -> Midnight (0.92-0.97) -> TwilightMorning (0.97-1.0) -> Dawn (0.0-0.05) -> Morning (0.05-0.35) -> Noon (0.35-0.55) -> Afternoon (0.55-0.72) -> Dusk (0.72-0.76) -> TwilightEvening (0.76-0.80) -> Night
   
-  // Twilight Morning (0.92 - 0.97): Pre-dawn twilight
-  // SYMMETRY: TM(0.92) should match TE(0.80), TM(0.97) should match TE(0.76)
+  // Midnight (0.92 - 0.97): Deep night, preparing for twilight
+  // SYMMETRY: Midnight(0.92) should match Night(0.92), Midnight(0.97) should match TwilightMorning(0.97)
   if (cycleProgress >= 0.92 && cycleProgress < 0.97) {
     const t = (cycleProgress - 0.92) / 0.05;
     alphaMultiplier = lerp(minNightAlpha, lerp(minNightAlpha, maxDayAlpha, 0.5), t); // Fading in from night
@@ -121,12 +121,21 @@ export function applyStandardDropShadow(
     currentOffsetX = 0; // Offset doesn't matter much if alpha is low
     currentOffsetY = 0;
     currentBlur = defaultDayBlur; // Blur doesn't matter if alpha is low
-  } else { // Midnight (0.97 - 1.0, but TwilightMorning handles 0.92-0.97)
+  } else if (cycleProgress >= 0.97) { // TwilightMorning (0.97 - 1.0, wraps around) - Pre-dawn twilight
+    // SYMMETRY: TM(0.97) should match TE(0.76), TM(1.0/0.0) should match Dawn(0.0)
+    const t = cycleProgress >= 0.97 ? (cycleProgress - 0.97) / 0.03 : (cycleProgress + 0.03) / 0.03; // Handle wrap-around
+    alphaMultiplier = lerp(lerp(minNightAlpha, maxDayAlpha, 0.5), lerp(minNightAlpha, maxDayAlpha, 0.5), t); // Fading in from midnight
+    currentOffsetX = lerp(10, 10, t); // Behind and to the right (positive X) - sun in east
+    currentOffsetY = lerp(7, 7, t);  // Behind (positive Y)
+    currentBlur = sunriseSunsetBlur; // Soft blur
+  } else {
+    // Fallback (should never reach here, but TypeScript needs this)
     alphaMultiplier = minNightAlpha;
-    currentOffsetX = 0; // Offset doesn't matter much if alpha is low
+    currentOffsetX = 0;
     currentOffsetY = 0;
-    currentBlur = defaultDayBlur; // Blur doesn't matter if alpha is low
+    currentBlur = defaultDayBlur;
   }
+  
   ctx.shadowColor = `rgba(${baseRGB},${alphaMultiplier.toFixed(2)})`;
   ctx.shadowBlur = Math.round(currentBlur);
   ctx.shadowOffsetX = Math.round(currentOffsetX);
@@ -244,11 +253,10 @@ export function drawDynamicGroundShadow({
 
   // Calculate sun position throughout the day
   // 0.0 = midnight, 0.25 = dawn, 0.5 = noon, 0.75 = dusk, 1.0 = midnight
-  // Server ranges: TwilightMorning (0.92-0.97) -> Dawn (0.0-0.05) -> Morning (0.05-0.35) -> Noon (0.35-0.55) -> Afternoon (0.55-0.72) -> Dusk (0.72-0.76) -> TwilightEvening (0.76-0.80) -> Night (0.80-0.92) -> Midnight (0.97-1.0)
+  // Server ranges: Night (0.80-0.92) -> Midnight (0.92-0.97) -> TwilightMorning (0.97-1.0) -> Dawn (0.0-0.05) -> Morning (0.05-0.35) -> Noon (0.35-0.55) -> Afternoon (0.55-0.72) -> Dusk (0.72-0.76) -> TwilightEvening (0.76-0.80) -> Night
   
-  // Twilight Morning (0.92 - 0.97): Pre-dawn twilight, long shadows preparing for dawn
-  // Check this FIRST since it's at the end of the cycle (wraps before Dawn)
-  // SYMMETRY: TM(0.92) should match TE(0.80), TM(0.97) should match TE(0.76)
+  // Midnight (0.92 - 0.97): Deep night, preparing for twilight
+  // SYMMETRY: Midnight(0.92) should match Night(0.92), Midnight(0.97) should match TwilightMorning(0.97)
   if (cycleProgress >= 0.92 && cycleProgress < 0.97) {
     const t = (cycleProgress - 0.92) / 0.05;
     // Alpha: 0.3 at start (0.92, near night) → 0.5 at end (0.97, near dawn)
@@ -325,8 +333,15 @@ export function drawDynamicGroundShadow({
     shadowLength = 0;
     shadowShearX = 0;
     shadowScaleY = 0.5;
-  } else { // Midnight (0.97 - 1.0)
-    // No shadows during deepest night (TwilightMorning handles 0.92-0.97)
+  } else if (cycleProgress >= 0.97) { // TwilightMorning (0.97 - 1.0, wraps around)
+    // Pre-dawn twilight shadows (Midnight handles 0.92-0.97)
+    const t = cycleProgress >= 0.97 ? (cycleProgress - 0.97) / 0.03 : (cycleProgress + 0.03) / 0.03; // Handle wrap-around
+    overallAlpha = lerp(maxShadowAlpha * 0.5, maxShadowAlpha * 0.6, t); // Fading in towards dawn
+    shadowLength = lerp(maxStretchFactor * 0.8, maxStretchFactor * 0.7, t);
+    shadowShearX = lerp(1.2, 1.1, t); // Rightward lean, preparing for dawn
+    shadowScaleY = lerp(0.3, 0.35, t);
+  } else {
+    // Fallback (should never reach here, but TypeScript needs this)
     overallAlpha = 0;
     shadowLength = 0;
     shadowShearX = 0;
@@ -429,51 +444,6 @@ export function drawDynamicGroundShadow({
 
   ctx.restore();
 } 
-
-// TEMPORARY DEBUG VERSION of drawDynamicGroundShadow
-// export function drawDynamicGroundShadow({
-//   ctx,
-//   entityImage, // Unused in this debug version
-//   entityCenterX,
-//   entityBaseY,
-//   imageDrawWidth, // Used for debug rect width
-//   imageDrawHeight, // Unused
-//   cycleProgress,
-//   baseShadowColor = '0,0,0', // Unused
-//   maxShadowAlpha = 0.35,
-//   maxStretchFactor = 1.8, // Unused
-//   minStretchFactor = 0.1, // Unused
-// }: DynamicGroundShadowParams): void {
-
-//   let overallAlpha: number;
-//   // Simplified alpha calculation for debug
-//   if (cycleProgress >= 0.75 || cycleProgress < 0.05) { // Night/Deep Dawn/Dusk
-//     overallAlpha = 0;
-//   } else {
-//     overallAlpha = maxShadowAlpha * 0.5; // Fixed moderate alpha for debugging day
-//   }
-
-//   if (overallAlpha < 0.01) {
-//     return;
-//   }
-
-//   ctx.save(); // Still use save/restore for isolation
-
-//   const debugShadowWidth = imageDrawWidth * 0.8; 
-//   const debugShadowHeight = 20; 
-
-//   ctx.fillStyle = `rgba(50,50,50,${overallAlpha.toFixed(2)})`; 
-
-//   ctx.fillRect(
-//     entityCenterX - debugShadowWidth / 2,
-//     entityBaseY - debugShadowHeight / 2, 
-//     debugShadowWidth,
-//     debugShadowHeight
-//   );
-  
-//   ctx.globalAlpha = 1.0; 
-//   ctx.restore();
-// } 
 
 /**
  * Helper function to calculate shake offsets for shadow synchronization.

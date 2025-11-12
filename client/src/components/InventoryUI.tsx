@@ -32,14 +32,15 @@ import {
     PlayerCorpse,
     Stash as SpacetimeDBStash,
     RainCollector as SpacetimeDBRainCollector,
+    HomesteadHearth as SpacetimeDBHomesteadHearth,
     WorldState,
+    ActiveConsumableEffect,
     // Import the generated types for ItemLocation variants
     ItemLocation,
     InventoryLocationData, // Assuming this is the type for ItemLocation.Inventory.value
     EquippedLocationData,  // Assuming this is the type for ItemLocation.Equipped.value
     EquipmentSlotType,    // Make sure this matches the actual exported name for the slot type enum/union
     StatThresholdsConfig,
-    ActiveConsumableEffect,
     KnockedOutStatus
 } from '../generated';
 import { Identity } from 'spacetimedb';
@@ -81,6 +82,7 @@ interface InventoryUIProps {
     playerCorpses: Map<string, PlayerCorpse>; // <<< ADD prop definition for corpses
     stashes: Map<string, SpacetimeDBStash>; // <<< ADDED stashes prop
     rainCollectors: Map<string, SpacetimeDBRainCollector>; // Add rain collectors prop
+    homesteadHearths: Map<string, SpacetimeDBHomesteadHearth>; // ADDED: Homestead Hearths
     currentStorageBox?: SpacetimeDBWoodenStorageBox | null; // <<< ADDED Prop Definition
     // NEW: Add Generic Placement Props
     startPlacement: (itemInfo: PlacementItemInfo) => void;
@@ -91,6 +93,8 @@ interface InventoryUIProps {
     craftingQueueItems: Map<string, CraftingQueueItem>;
     onCraftingSearchFocusChange?: (isFocused: boolean) => void;
     worldState: WorldState | null;
+    players?: Map<string, Player>; // ADDED: Players for building privilege list
+    activeConsumableEffects?: Map<string, ActiveConsumableEffect>; // ADDED: For building privilege check
 }
 
 // Represents an item instance with its definition for rendering
@@ -136,6 +140,7 @@ const InventoryUI: React.FC<InventoryUIProps> = ({
     playerCorpses,
     stashes,
     rainCollectors,
+    homesteadHearths,
     currentStorageBox,
     startPlacement,
     cancelPlacement,
@@ -144,6 +149,8 @@ const InventoryUI: React.FC<InventoryUIProps> = ({
     craftingQueueItems,
     onCraftingSearchFocusChange,
     worldState,
+    players,
+    activeConsumableEffects,
 }) => {
     const isPlacingItem = placementInfo !== null;
     const prevInteractionTargetRef = useRef<typeof interactionTarget | undefined>(undefined);
@@ -864,6 +871,7 @@ const InventoryUI: React.FC<InventoryUIProps> = ({
                             playerCorpses={playerCorpses}
                             stashes={stashes}
                             rainCollectors={rainCollectors}
+                            homesteadHearths={homesteadHearths}
                             currentStorageBox={currentStorageBox}
                             connection={connection}
                             onItemDragStart={onItemDragStart}
@@ -873,6 +881,8 @@ const InventoryUI: React.FC<InventoryUIProps> = ({
                             onExternalItemMouseLeave={handleExternalItemMouseLeave}
                             onExternalItemMouseMove={handleExternalItemMouseMove}
                             worldState={worldState}
+                            players={players}
+                            activeConsumableEffects={activeConsumableEffects}
                         />
                     ) : (
                         // Otherwise, show the crafting UI
