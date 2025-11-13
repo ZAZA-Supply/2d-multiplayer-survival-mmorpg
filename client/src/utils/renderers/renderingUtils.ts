@@ -1062,13 +1062,14 @@ export const renderYSortedEntities = ({
             
         } else if (type === 'fog_overlay') {
             const fogEntity = entity as { clusterId: string; bounds: { minX: number; minY: number; maxX: number; maxY: number } };
-            // Render fog overlay (black mask) above placeables but below walls
+            // Render fog overlay (ceiling tile image) above placeables but below walls
             renderFogOverlayCluster({
                 ctx,
                 bounds: fogEntity.bounds,
                 worldScale: 1.0,
                 viewOffsetX: -cameraOffsetX, // Convert camera offset to view offset
                 viewOffsetY: -cameraOffsetY,
+                foundationTileImagesRef: foundationTileImagesRef,
             });
             
         } else if (type === 'wall_cell') {

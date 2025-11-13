@@ -991,6 +991,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       img.src = module.default;
     });
 
+    // Load ceiling tile for fog of war overlay
+    import('../assets/tiles/ceiling_twig.png').then((module) => {
+      const img = new Image();
+      img.onload = () => {
+        foundationTileImagesRef.current.set('ceiling_twig.png', img);
+      };
+      img.onerror = () => console.error('Failed to load ceiling_twig.png');
+      img.src = module.default;
+    });
+
     // Note: Interior wall images are no longer needed - interior walls now use the same
     // images as exterior walls with visual modifications (lighter color, bottom half, shadow)
   }, []);

@@ -169,7 +169,7 @@ export function renderFogOverlay({
 
 /**
  * Render fog of war overlay for an entire building cluster
- * This renders a black rectangle over the entire cluster bounds to hide interior contents
+ * This renders a tiled ceiling image over the entire cluster bounds to hide interior contents
  * Renders above placeables but below walls
  */
 export function renderFogOverlayCluster({
@@ -178,12 +178,14 @@ export function renderFogOverlayCluster({
   worldScale,
   viewOffsetX,
   viewOffsetY,
+  foundationTileImagesRef,
 }: {
   ctx: CanvasRenderingContext2D;
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
   worldScale: number;
   viewOffsetX: number;
   viewOffsetY: number;
+  foundationTileImagesRef?: React.RefObject<Map<string, HTMLImageElement>>;
 }): void {
   // Since canvas context is already translated by camera offset,
   // we just use world coordinates directly
@@ -192,9 +194,38 @@ export function renderFogOverlayCluster({
   const screenWidth = (bounds.maxX - bounds.minX) * worldScale;
   const screenHeight = (bounds.maxY - bounds.minY) * worldScale;
 
-  // Draw black fog of war overlay (fully opaque) - covers entire cluster
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(screenX, screenY, screenWidth, screenHeight);
+  // Get ceiling tile image
+  const ceilingImage = foundationTileImagesRef?.current?.get('ceiling_twig.png');
+  
+  if (ceilingImage && ceilingImage.complete && ceilingImage.naturalHeight !== 0) {
+    // Tile the ceiling image across the entire cluster bounds
+    const tileSize = FOUNDATION_TILE_SIZE * worldScale;
+    const startX = screenX;
+    const startY = screenY;
+    
+    // Calculate how many tiles we need in each direction
+    const tilesX = Math.ceil(screenWidth / tileSize);
+    const tilesY = Math.ceil(screenHeight / tileSize);
+    
+    // Draw tiled ceiling image
+    for (let ty = 0; ty < tilesY; ty++) {
+      for (let tx = 0; tx < tilesX; tx++) {
+        const x = startX + (tx * tileSize);
+        const y = startY + (ty * tileSize);
+        // Only draw the portion that's within bounds
+        const drawWidth = Math.min(tileSize, screenX + screenWidth - x);
+        const drawHeight = Math.min(tileSize, screenY + screenHeight - y);
+        
+        if (drawWidth > 0 && drawHeight > 0) {
+          ctx.drawImage(ceilingImage, x, y, drawWidth, drawHeight);
+        }
+      }
+    }
+  } else {
+    // Fallback: Draw black rectangle if image not loaded
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(screenX, screenY, screenWidth, screenHeight);
+  }
 }
 
 /**
