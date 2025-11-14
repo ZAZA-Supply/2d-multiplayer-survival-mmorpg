@@ -175,13 +175,73 @@ export function renderTree(
     cycleProgress: number,
     onlyDrawShadow?: boolean, // New flag
     skipDrawingShadow?: boolean, // New flag
-    localPlayerPosition?: { x: number; y: number } | null, // Player position (unused but kept for compatibility)
+    localPlayerPosition?: { x: number; y: number } | null, // Player position for transparency logic
     treeShadowsEnabled: boolean = true, // NEW: Visual cortex module setting
     isFalling?: boolean, // NEW: Tree is currently falling
     fallProgress?: number // NEW: Progress of fall animation (0.0 to 1.0)
 ) {
     // PERFORMANCE: Skip shadow rendering entirely if disabled in visual settings
     const shouldSkipShadows = !treeShadowsEnabled || skipDrawingShadow;
+    
+    // Calculate if tree visually overlaps and occludes the player
+    const MIN_ALPHA = 0.3; // Minimum opacity when tree is blocking player
+    const MAX_ALPHA = 1.0; // Full opacity when not blocking
+    
+    let treeAlpha = MAX_ALPHA;
+    
+    if (localPlayerPosition && !onlyDrawShadow) {
+        // Get tree's visual bounding box (trees are tall and wide)
+        const treeVisualWidth = 240; // Approximate visual width of tree
+        const treeVisualHeight = 320; // Approximate visual height of tree
+        
+        // Tree is drawn with bottom-center at tree.posX, tree.posY
+        const treeLeft = tree.posX - treeVisualWidth / 2;
+        const treeRight = tree.posX + treeVisualWidth / 2;
+        // CRITICAL: Extend tree's visual area UPWARD to catch players behind tall trees
+        // When player moves away (lower Y = north), tree still visually blocks them
+        const treeVisualExtension = 300; // Upward extension to capture tree tops
+        const treeTop = tree.posY - treeVisualHeight - treeVisualExtension; // Tree extends upward + extension
+        // Shift the bottom up so tree doesn't fade when player is at trunk level
+        const trunkHeightOffset = 100; // Don't trigger transparency when at trunk base level
+        const treeBottom = tree.posY - trunkHeightOffset;
+        
+        // Player bounding box (approximate)
+        const playerSize = 48;
+        const playerLeft = localPlayerPosition.x - playerSize / 2;
+        const playerRight = localPlayerPosition.x + playerSize / 2;
+        const playerTop = localPlayerPosition.y - playerSize;
+        const playerBottom = localPlayerPosition.y;
+        
+        // Check if player overlaps with tree's visual area (shifted upward)
+        const overlapsHorizontally = playerRight > treeLeft && playerLeft < treeRight;
+        const overlapsVertically = playerBottom > treeTop && playerTop < treeBottom;
+        
+        // Tree should be transparent if:
+        // 1. It overlaps with player visually
+        // 2. Tree renders AFTER player (tree.posY > player.posY means tree is in front in Y-sort)
+        if (overlapsHorizontally && overlapsVertically && tree.posY > localPlayerPosition.y) {
+            // Calculate how much the player is behind the tree (for smooth fade)
+            const depthDifference = tree.posY - localPlayerPosition.y;
+            const maxDepthForFade = 200; // Max distance for fade effect (increased for taller trees)
+            
+            if (depthDifference > 0 && depthDifference < maxDepthForFade) {
+                // Closer to tree = more transparent
+                const fadeFactor = 1 - (depthDifference / maxDepthForFade);
+                treeAlpha = MAX_ALPHA - (fadeFactor * (MAX_ALPHA - MIN_ALPHA));
+                treeAlpha = Math.max(MIN_ALPHA, Math.min(MAX_ALPHA, treeAlpha));
+            } else if (depthDifference >= maxDepthForFade) {
+                // Very close - use minimum alpha
+                treeAlpha = MIN_ALPHA;
+            }
+        }
+    }
+    
+    // Apply transparency if needed
+    const needsTransparency = treeAlpha < MAX_ALPHA;
+    if (needsTransparency) {
+        ctx.save();
+        ctx.globalAlpha = treeAlpha;
+    }
     
     // Handle falling animation
     if (isFalling && fallProgress !== undefined && fallProgress !== null) {
@@ -199,6 +259,11 @@ export function renderTree(
             onlyDrawShadow,    // Pass flag
             skipDrawingShadow: shouldSkipShadows  // Use computed shadow skip flag
         });
+    }
+    
+    // Restore context if transparency was applied
+    if (needsTransparency) {
+        ctx.restore();
     }
 }
 
