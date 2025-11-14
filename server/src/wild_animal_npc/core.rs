@@ -483,6 +483,18 @@ pub fn process_wild_animal_ai(ctx: &ReducerContext, _schedule: WildAnimalAiSched
         return Err("Wild animal AI can only be processed by scheduler".to_string());
     }
 
+    // Early return if there are no animals - prevents unnecessary processing
+    let animal_count = ctx.db.wild_animal().iter().count();
+    if animal_count == 0 {
+        // No animals to process - stop the schedule to save resources
+        let schedule_table = ctx.db.wild_animal_ai_schedule();
+        for schedule in schedule_table.iter() {
+            schedule_table.id().delete(schedule.id);
+        }
+        log::debug!("Stopped wild animal AI schedule - no animals in database");
+        return Ok(());
+    }
+
     let current_time = ctx.timestamp;
     let mut rng = rand::rngs::StdRng::seed_from_u64(
         (current_time.to_micros_since_unix_epoch() as u64).wrapping_add(42)
