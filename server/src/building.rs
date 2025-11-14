@@ -1878,6 +1878,75 @@ pub fn is_line_blocked_by_walls(
     check_line_hits_wall(ctx, start_x, start_y, end_x, end_y).is_some()
 }
 
+/// Checks if a world position is too close to any wall (with buffer zone)
+/// Used to prevent placing placeables on or near walls
+/// Returns true if the position is within the buffer zone around a wall, false otherwise
+pub fn is_position_on_wall(
+    ctx: &ReducerContext,
+    world_x: f32,
+    world_y: f32,
+) -> bool {
+    const WALL_COLLISION_THICKNESS: f32 = 6.0;
+    const PLACEMENT_BUFFER: f32 = 24.0; // Buffer zone around walls (prevents placing too close on either side)
+    
+    let walls = ctx.db.wall_cell();
+    
+    // Convert world position to foundation cell coordinates
+    let cell_x = (world_x / FOUNDATION_TILE_SIZE_PX as f32).floor() as i32;
+    let cell_y = (world_y / FOUNDATION_TILE_SIZE_PX as f32).floor() as i32;
+    
+    // Check walls in nearby cells (±1 cell in each direction to catch edge cases)
+    for offset_x in -1..=1 {
+        for offset_y in -1..=1 {
+            let check_cell_x = cell_x + offset_x;
+            let check_cell_y = cell_y + offset_y;
+            
+            for wall in walls.idx_cell_coords().filter((check_cell_x, check_cell_y)) {
+                if wall.is_destroyed {
+                    continue;
+                }
+                
+                // Calculate wall edge collision bounds using foundation cell coordinates
+                let tile_left = check_cell_x as f32 * FOUNDATION_TILE_SIZE_PX as f32;
+                let tile_top = check_cell_y as f32 * FOUNDATION_TILE_SIZE_PX as f32;
+                let tile_right = tile_left + FOUNDATION_TILE_SIZE_PX as f32;
+                let tile_bottom = tile_top + FOUNDATION_TILE_SIZE_PX as f32;
+                
+                // Determine wall edge bounds with buffer zone on both sides
+                // Edge 0 = North (top), 1 = East (right), 2 = South (bottom), 3 = West (left)
+                // Buffer extends on both interior and exterior sides of the wall
+                let (wall_min_x, wall_max_x, wall_min_y, wall_max_y) = match wall.edge {
+                    0 => { // North (top edge) - horizontal line
+                        // Buffer extends both north (exterior) and south (interior) of the wall
+                        (tile_left, tile_right, tile_top - WALL_COLLISION_THICKNESS / 2.0 - PLACEMENT_BUFFER, tile_top + WALL_COLLISION_THICKNESS / 2.0 + PLACEMENT_BUFFER)
+                    },
+                    1 => { // East (right edge) - vertical line
+                        // Buffer extends both east (exterior) and west (interior) of the wall
+                        (tile_right - WALL_COLLISION_THICKNESS / 2.0 - PLACEMENT_BUFFER, tile_right + WALL_COLLISION_THICKNESS / 2.0 + PLACEMENT_BUFFER, tile_top, tile_bottom)
+                    },
+                    2 => { // South (bottom edge) - horizontal line
+                        // Buffer extends both south (exterior) and north (interior) of the wall
+                        (tile_left, tile_right, tile_bottom - WALL_COLLISION_THICKNESS / 2.0 - PLACEMENT_BUFFER, tile_bottom + WALL_COLLISION_THICKNESS / 2.0 + PLACEMENT_BUFFER)
+                    },
+                    3 => { // West (left edge) - vertical line
+                        // Buffer extends both west (exterior) and east (interior) of the wall
+                        (tile_left - WALL_COLLISION_THICKNESS / 2.0 - PLACEMENT_BUFFER, tile_left + WALL_COLLISION_THICKNESS / 2.0 + PLACEMENT_BUFFER, tile_top, tile_bottom)
+                    },
+                    _ => continue, // Skip invalid edges
+                };
+                
+                // Check if placement position is within wall collision bounds (including buffer)
+                if world_x >= wall_min_x && world_x <= wall_max_x &&
+                   world_y >= wall_min_y && world_y <= wall_max_y {
+                    return true;
+                }
+            }
+        }
+    }
+    
+    false
+}
+
 /// Helper function: Checks if a line segment intersects with an AABB
 fn line_intersects_aabb(
     x1: f32, y1: f32, x2: f32, y2: f32,

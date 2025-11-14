@@ -171,6 +171,8 @@ export function renderFogOverlay({
  * Render fog of war overlay for an entire building cluster
  * This renders a tiled ceiling image over the entire cluster bounds to hide interior contents
  * Renders above placeables but below walls
+ * Skips rendering ceiling tiles for entrance way foundations (perimeter foundations without walls on exposed edges)
+ * Extends upward to cover north wall interiors (which extend upward for isometric depth)
  */
 export function renderFogOverlayCluster({
   ctx,
@@ -179,6 +181,10 @@ export function renderFogOverlayCluster({
   viewOffsetX,
   viewOffsetY,
   foundationTileImagesRef,
+  entranceWayFoundations, // Set of foundation cell coordinates (e.g., "cellX,cellY") that are entrance ways
+  clusterFoundationCoords, // Set of ALL foundation coordinates in this cluster
+  northWallFoundations, // Set of foundation coordinates that have north walls (for ceiling extension)
+  southWallFoundations, // Set of foundation coordinates that have south walls (to prevent covering them)
 }: {
   ctx: CanvasRenderingContext2D;
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
@@ -186,13 +192,25 @@ export function renderFogOverlayCluster({
   viewOffsetX: number;
   viewOffsetY: number;
   foundationTileImagesRef?: React.RefObject<Map<string, HTMLImageElement>>;
+  entranceWayFoundations?: Set<string>; // Set of "cellX,cellY" strings for entrance way foundations
+  clusterFoundationCoords?: Set<string>; // Set of "cellX,cellY" strings for ALL foundations in cluster
+  northWallFoundations?: Set<string>; // Set of "cellX,cellY" strings for foundations with north walls
+  southWallFoundations?: Set<string>; // Set of "cellX,cellY" strings for foundations with south walls
 }): void {
+  // CRITICAL: Save context to ensure proper rendering state
+  ctx.save();
+  
+  // North walls extend upward by 1.0 tiles (96px) for isometric depth
+  // Ceiling tiles need to extend upward to cover the interior of north walls
+  const NORTH_WALL_EXTENSION = FOUNDATION_TILE_SIZE * 1.0; // Same as NORTH_WALL_HEIGHT
+  
   // Since canvas context is already translated by camera offset,
   // we just use world coordinates directly
+  // Extend bounds upward to cover north walls
   const screenX = bounds.minX;
-  const screenY = bounds.minY;
+  const screenY = bounds.minY - NORTH_WALL_EXTENSION; // Extend upward
   const screenWidth = (bounds.maxX - bounds.minX) * worldScale;
-  const screenHeight = (bounds.maxY - bounds.minY) * worldScale;
+  const screenHeight = ((bounds.maxY - bounds.minY) + NORTH_WALL_EXTENSION) * worldScale; // Include extension
 
   // Get ceiling tile image
   const ceilingImage = foundationTileImagesRef?.current?.get('ceiling_twig.png');
@@ -207,25 +225,119 @@ export function renderFogOverlayCluster({
     const tilesX = Math.ceil(screenWidth / tileSize);
     const tilesY = Math.ceil(screenHeight / tileSize);
     
-    // Draw tiled ceiling image
+    // Draw tiled ceiling image, only where there are foundations, skipping entrance ways
+    // Also render ceiling tiles above foundations with north walls to cover their interior
     for (let ty = 0; ty < tilesY; ty++) {
       for (let tx = 0; tx < tilesX; tx++) {
         const x = startX + (tx * tileSize);
         const y = startY + (ty * tileSize);
+        
+        // Convert world pixel coordinates back to cell coordinates
+        const cellX = Math.floor(x / FOUNDATION_TILE_SIZE);
+        const cellY = Math.floor(y / FOUNDATION_TILE_SIZE);
+        const foundationKey = `${cellX},${cellY}`;
+        
+        // Check if this position should have a ceiling tile
+        let shouldRenderCeiling = false;
+        
+        // Case 1: There's a foundation at this position (not an entrance way)
+        if (clusterFoundationCoords && clusterFoundationCoords.has(foundationKey)) {
+          // Skip entrance way foundations
+          if (!entranceWayFoundations || !entranceWayFoundations.has(foundationKey)) {
+            shouldRenderCeiling = true;
+          }
+        } 
+        // Case 2: This is empty space above a foundation with a north wall (to cover north wall interior)
+        else {
+          // Check if the foundation one row below (cellY + 1) has a north wall
+          const foundationBelowKey = `${cellX},${cellY + 1}`;
+          if (northWallFoundations && northWallFoundations.has(foundationBelowKey)) {
+            // CRITICAL: Only render ceiling tile if current position is completely empty
+            // This prevents accidentally covering any foundations or their walls
+            shouldRenderCeiling = true;
+          }
+        }
+        
+        // Never cover foundations that have south walls - those walls must render on top
+        if (shouldRenderCeiling && southWallFoundations && southWallFoundations.has(foundationKey)) {
+          shouldRenderCeiling = false;
+        }
+        
+        if (!shouldRenderCeiling) {
+          continue;
+        }
+        
         // Only draw the portion that's within bounds
         const drawWidth = Math.min(tileSize, screenX + screenWidth - x);
         const drawHeight = Math.min(tileSize, screenY + screenHeight - y);
         
         if (drawWidth > 0 && drawHeight > 0) {
+          // Ensure ceiling tiles render with full opacity and normal blending
+          ctx.globalAlpha = 1.0;
+          ctx.globalCompositeOperation = 'source-over';
           ctx.drawImage(ceilingImage, x, y, drawWidth, drawHeight);
         }
       }
     }
   } else {
-    // Fallback: Draw black rectangle if image not loaded
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(screenX, screenY, screenWidth, screenHeight);
+    // Fallback: Draw black rectangles if image not loaded, only where foundations exist
+    const tileSize = FOUNDATION_TILE_SIZE * worldScale;
+    const tilesX = Math.ceil(screenWidth / tileSize);
+    const tilesY = Math.ceil(screenHeight / tileSize);
+    
+    for (let ty = 0; ty < tilesY; ty++) {
+      for (let tx = 0; tx < tilesX; tx++) {
+        const x = screenX + (tx * tileSize);
+        const y = screenY + (ty * tileSize);
+        const cellX = Math.floor(x / FOUNDATION_TILE_SIZE);
+        const cellY = Math.floor(y / FOUNDATION_TILE_SIZE);
+        const foundationKey = `${cellX},${cellY}`;
+        
+        // Check if this position should have a ceiling tile
+        let shouldRenderCeiling = false;
+        
+        // Case 1: There's a foundation at this position (not an entrance way)
+        if (clusterFoundationCoords && clusterFoundationCoords.has(foundationKey)) {
+          // Skip entrance way foundations
+          if (!entranceWayFoundations || !entranceWayFoundations.has(foundationKey)) {
+            shouldRenderCeiling = true;
+          }
+        } 
+        // Case 2: This is empty space above a foundation with a north wall (to cover north wall interior)
+        else {
+          // Check if the foundation one row below (cellY + 1) has a north wall
+          const foundationBelowKey = `${cellX},${cellY + 1}`;
+          if (northWallFoundations && northWallFoundations.has(foundationBelowKey)) {
+            // CRITICAL: Only render ceiling tile if current position is completely empty
+            // This prevents accidentally covering any foundations or their walls
+            shouldRenderCeiling = true;
+          }
+        }
+        
+        // Never cover foundations that have south walls - those walls must remain visible
+        if (shouldRenderCeiling && southWallFoundations && southWallFoundations.has(foundationKey)) {
+          shouldRenderCeiling = false;
+        }
+        
+        if (!shouldRenderCeiling) {
+          continue;
+        }
+        
+        const drawWidth = Math.min(tileSize, screenX + screenWidth - x);
+        const drawHeight = Math.min(tileSize, screenY + screenHeight - y);
+        if (drawWidth > 0 && drawHeight > 0) {
+          // Ensure ceiling tiles render with full opacity and normal blending
+          ctx.globalAlpha = 1.0;
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(x, y, drawWidth, drawHeight);
+        }
+      }
+    }
   }
+  
+  // Restore context state
+  ctx.restore();
 }
 
 /**
@@ -847,6 +959,8 @@ export interface RenderWallParams {
   foundationTileImagesRef?: React.RefObject<Map<string, HTMLImageElement>>;
   allWalls?: Map<string, any>; // ADDED: All walls to check for adjacent walls
   cycleProgress?: number; // ADDED: Day/night cycle progress for exterior shadows
+  localPlayerPosition?: { x: number; y: number } | null; // ADDED: Player position for transparency logic
+  playerInsideCluster?: boolean; // ADDED: Only fade walls when player is inside this building cluster
 }
 
 export function renderWall({
@@ -858,8 +972,25 @@ export function renderWall({
   foundationTileImagesRef,
   allWalls,
   cycleProgress = 0.5, // Default to noon if not provided
+  localPlayerPosition,
+  playerInsideCluster = false,
 }: RenderWallParams): void {
   if (wall.isDestroyed) {
+    return;
+  }
+
+  // When the player is outside of the building, east/west walls should not be rendered.
+  // They would normally be occluded by the ceiling tiles/fog overlay, and rendering them
+  // causes visual artifacts where the wall edges poke through the roof. To avoid this,
+  // simply skip drawing east/west walls unless the player is inside the cluster.
+  const isEastWestWall = wall.edge === 1 || wall.edge === 3;
+  if (isEastWestWall && !playerInsideCluster) {
+    return;
+  }
+
+  // Skip rendering north walls (edge 0) when player is outside the building cluster
+  // North walls are interior walls that should not be visible from outside
+  if (wall.edge === 0 && !playerInsideCluster) {
     return;
   }
 
@@ -868,6 +999,111 @@ export function renderWall({
   const screenX = worldX;
   const screenY = worldY;
   const screenSize = FOUNDATION_TILE_SIZE * worldScale;
+  
+  // Calculate wall transparency if player is behind it (similar to trees)
+  const MIN_ALPHA = 0.3;
+  const MAX_ALPHA = 1.0;
+  let wallAlpha = MAX_ALPHA;
+  const shouldFadeWhenInside = playerInsideCluster;
+  const shouldFadeNorthWallsOutside = !playerInsideCluster && wall.edge === 0;
+  const canFadeWall = localPlayerPosition && (shouldFadeWhenInside || shouldFadeNorthWallsOutside);
+  
+  if (canFadeWall) {
+    // Only apply transparency to north/south cardinal walls and diagonal north/south walls
+    const isNorthSouthCardinal = wall.edge === 0 || wall.edge === 2;
+    const isDiagonal = wall.edge === 4 || wall.edge === 5;
+    const isTriangle = wall.foundationShape >= 2 && wall.foundationShape <= 5;
+    
+    // Check if this is a north/south wall that should have transparency
+    let shouldCheckTransparency = false;
+    let isPlayerBehind = false;
+    
+    if (isNorthSouthCardinal) {
+      // Cardinal north/south walls
+      shouldCheckTransparency = true;
+      if (wall.edge === 0) {
+        // North wall: player is behind if player.y < wall.y (player is north of wall)
+        isPlayerBehind = localPlayerPosition.y < worldY;
+      } else if (wall.edge === 2) {
+        // South wall: player is behind if player.y > wall.y (player is south of wall)
+        isPlayerBehind = localPlayerPosition.y > worldY;
+      }
+    } else if (isDiagonal && isTriangle) {
+      // Diagonal walls on triangle foundations
+      // TriNW (2) and TriNE (3) are "south" triangles - player behind if player.y < wall.y
+      // TriSE (4) and TriSW (5) are "north" triangles - player behind if player.y > wall.y
+      shouldCheckTransparency = true;
+      if (wall.foundationShape === 2 || wall.foundationShape === 3) {
+        // South triangles: player behind if player.y < wall.y
+        isPlayerBehind = localPlayerPosition.y < worldY;
+      } else if (wall.foundationShape === 4 || wall.foundationShape === 5) {
+        // North triangles: player behind if player.y > wall.y
+        isPlayerBehind = localPlayerPosition.y > worldY;
+      }
+    }
+    
+    if (shouldCheckTransparency && isPlayerBehind) {
+      // Calculate wall bounding box for overlap detection
+      let wallLeft: number, wallRight: number, wallTop: number, wallBottom: number;
+      
+      if (isNorthSouthCardinal) {
+        // Cardinal walls: use wall rectangle bounds
+        if (wall.edge === 0) {
+          // North wall
+          const NORTH_WALL_HEIGHT = screenSize * 1.0;
+          wallLeft = screenX;
+          wallRight = screenX + screenSize;
+          wallTop = screenY - NORTH_WALL_HEIGHT;
+          wallBottom = screenY;
+        } else {
+          // South wall
+          const SOUTH_WALL_HEIGHT = screenSize;
+          wallLeft = screenX;
+          wallRight = screenX + screenSize;
+          wallTop = screenY + screenSize - SOUTH_WALL_HEIGHT;
+          wallBottom = screenY + screenSize;
+        }
+      } else {
+        // Diagonal walls: use triangle bounding box
+        wallLeft = screenX;
+        wallRight = screenX + screenSize;
+        wallTop = screenY;
+        wallBottom = screenY + screenSize * 2; // Diagonal walls extend upward
+      }
+      
+      // Player bounding box
+      const playerSize = 48;
+      const playerLeft = localPlayerPosition.x - playerSize / 2;
+      const playerRight = localPlayerPosition.x + playerSize / 2;
+      const playerTop = localPlayerPosition.y - playerSize;
+      const playerBottom = localPlayerPosition.y;
+      
+      // Check if player overlaps with wall visually
+      const overlapsHorizontally = playerRight > wallLeft && playerLeft < wallRight;
+      const overlapsVertically = playerBottom > wallTop && playerTop < wallBottom;
+      
+      if (overlapsHorizontally && overlapsVertically) {
+        // Calculate depth difference for smooth fade
+        const depthDifference = Math.abs(worldY - localPlayerPosition.y);
+        const maxDepthForFade = 100;
+        
+        if (depthDifference > 0 && depthDifference < maxDepthForFade) {
+          const fadeFactor = 1 - (depthDifference / maxDepthForFade);
+          wallAlpha = MAX_ALPHA - (fadeFactor * (MAX_ALPHA - MIN_ALPHA));
+          wallAlpha = Math.max(MIN_ALPHA, Math.min(MAX_ALPHA, wallAlpha));
+        } else if (depthDifference >= maxDepthForFade) {
+          wallAlpha = MIN_ALPHA;
+        }
+      }
+    }
+  }
+  
+  // Apply transparency if needed
+  const needsTransparency = wallAlpha < MAX_ALPHA;
+  if (needsTransparency) {
+    ctx.save();
+    ctx.globalAlpha = wallAlpha;
+  }
   
   // Wall thickness (thin rectangle)
   const WALL_THICKNESS = 4 * worldScale; // 4 pixels thick (for north/south walls)
@@ -908,6 +1144,25 @@ export function renderWall({
   // Perspective correction: North walls (away from viewer) appear shorter than south walls (closer to viewer)
   const NORTH_WALL_HEIGHT = screenSize * 1.0; // 1.0 tiles tall (full height)
   const SOUTH_WALL_HEIGHT = screenSize; // 1 tile tall (closer to viewer, full height)
+
+  // For west walls, draw interior shadow BEFORE the wall itself so wall appears above shadow
+  // Only render interior shadows when player is inside the building cluster
+  if (wall.edge === 3 && playerInsideCluster) {
+    const shadowWidth = screenSize * 0.3; // Shadow extends horizontally onto the foundation
+    const shadowY = screenY; // Start at the top of the foundation tile (where wall meets ground)
+    const shadowHeight = screenSize; // Shadow covers the full height of the foundation tile
+    const shadowX = screenX; // Start from the left edge of the foundation tile (where wall meets interior)
+    const shadowGradient = ctx.createLinearGradient(shadowX, shadowY, shadowX + shadowWidth, shadowY);
+
+    // Same gradient stops as north wall shadow for consistency
+    shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0.5)'); // More intense start (at wall)
+    shadowGradient.addColorStop(0.3, 'rgba(0, 0, 0, 0.3)'); // Gradual fade midpoint
+    shadowGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.12)'); // Soft before end
+    shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)'); // Fade to transparent
+
+    ctx.fillStyle = shadowGradient;
+    ctx.fillRect(shadowX, shadowY, shadowWidth, shadowHeight);
+  }
   
   switch (wall.edge) {
     case 0: // North (top edge) - extend upward for isometric depth (SHORTER due to perspective)
@@ -1907,15 +2162,16 @@ export function renderWall({
   
   ctx.restore();
   
-  // Draw interior shadow for east/west walls AFTER all wall rendering and context restoration
+  // Draw interior shadow for east walls AFTER all wall rendering and context restoration
   // This ensures shadows are not clipped and render on top of foundations
   // East walls (edge === 1) cast shadow to the left (toward interior)
-  // West walls (edge === 3) cast shadow to the right (toward interior)
+  // West walls (edge === 3) have their shadows drawn BEFORE the wall itself
   // Shadows should be projected onto the foundation tile, starting from the wall position
-  // NOTE: East/west wall shadows are drawn BEFORE south walls (see south wall rendering above)
-  // So we skip drawing east/west wall shadow here if there's a south wall on the same foundation
-  if (wall.edge === 1 || wall.edge === 3) {
-    // For east/west walls, check if there's a south wall on the same foundation
+  // NOTE: East wall shadows are drawn BEFORE south walls (see south wall rendering above)
+  // So we skip drawing east wall shadow here if there's a south wall on the same foundation
+  // Only render interior shadows when player is inside the building cluster
+  if (wall.edge === 1 && playerInsideCluster) {
+    // For east walls, check if there's a south wall on the same foundation
     // If so, skip drawing shadow here (it was already drawn before the south wall)
     if (allWalls) {
       // Find south wall on the same foundation tile (edge === 2)
@@ -2038,6 +2294,11 @@ export function renderWall({
       
       ctx.restore();
     }
+  }
+  
+  // Restore context if transparency was applied
+  if (needsTransparency) {
+    ctx.restore();
   }
 }
 

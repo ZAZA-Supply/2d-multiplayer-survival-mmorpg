@@ -519,6 +519,12 @@ pub fn place_campfire(ctx: &ReducerContext, item_instance_id: u64, world_x: f32,
         return Err(format!("Cannot place campfire too far away ({} > {}).",
                 dist_sq_place.sqrt(), CAMPFIRE_PLACEMENT_MAX_DISTANCE));
     }
+    
+    // Check if placement position is on a wall
+    if crate::building::is_position_on_wall(ctx, world_x, world_y) {
+        return Err("Cannot place campfire on a wall.".to_string());
+    }
+    
     for other_fire in campfires.iter() {
         let dx_fire = world_x - other_fire.pos_x;
         let dy_fire = world_y - other_fire.pos_y;

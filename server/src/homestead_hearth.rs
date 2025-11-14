@@ -1034,6 +1034,11 @@ pub fn place_homestead_hearth(
         return Err("Matron's Chest must be placed on a foundation (full or triangle). Build a foundation first!".to_string());
     }
 
+    // 2.6. Check if placement position is on a wall
+    if crate::building::is_position_on_wall(ctx, world_x, world_y) {
+        return Err("Cannot place Matron's Chest on a wall.".to_string());
+    }
+
     // 3. Check for collision with other hearths (prevent overlapping building privilege zones)
     for existing_hearth in hearths.iter() {
         if existing_hearth.is_destroyed {

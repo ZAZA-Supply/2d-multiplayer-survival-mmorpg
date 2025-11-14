@@ -6,9 +6,11 @@ import resourceSystemImplementation from './posts/resource-system-implementation
 import fieldCauldronAIRecipeGeneration from './posts/field-cauldron-ai-recipe-generation';
 import best2DSurvivalGames from './posts/best-2d-survival-games';
 import babushkaSpriteEvolution from './posts/babushka-sprite-evolution';
+import buildingSystem2DChallenges from './posts/building-system-2d-challenges';
 
 // Export posts as an array, sorted by date (newest first)
 export const blogPosts = [
+  buildingSystem2DChallenges, // November 14, 2025
   brothBulletsAlphaLaunch, // January 15, 2025 - Alpha Launch!
   spacetimedbRevolution, // January 15, 2025
   babushkaSpriteEvolution, // April 6, 2025

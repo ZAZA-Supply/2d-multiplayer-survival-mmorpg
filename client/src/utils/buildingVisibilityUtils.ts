@@ -273,3 +273,128 @@ export function shouldMaskFoundation(
   return false;
 }
 
+/**
+ * Detect entrance way foundations (foundations on the perimeter without walls on exposed edges)
+ * Returns a Set of foundation cell coordinates (e.g., "cellX,cellY") that are entrance ways
+ * 
+ * A foundation is considered an entrance way if:
+ * - It's on the perimeter (has at least one exposed edge)
+ * - ALL of its exposed edges lack walls (true doorway/opening)
+ * 
+ * This prevents ceiling tiles from being skipped for foundations that have some walls
+ * but one open edge (which are still part of the enclosed structure).
+ */
+export function detectEntranceWayFoundations(
+  cluster: FoundationCell[],
+  allWalls: Map<string, WallCell>,
+  foundationCoords: Set<string>
+): Set<string> {
+  const entranceWays = new Set<string>();
+
+  for (const foundation of cluster) {
+    // Check each cardinal direction to see if this foundation is on the perimeter
+    const directions = [
+      { edge: 0, dx: 0, dy: -1 },  // North
+      { edge: 1, dx: 1, dy: 0 },   // East
+      { edge: 2, dx: 0, dy: 1 },   // South
+      { edge: 3, dx: -1, dy: 0 },  // West
+    ];
+
+    let exposedEdgeCount = 0;
+    let exposedEdgesWithoutWallCount = 0;
+
+    for (const dir of directions) {
+      const adjacentX = foundation.cellX + dir.dx;
+      const adjacentY = foundation.cellY + dir.dy;
+      const adjacentKey = getFoundationCellKey(adjacentX, adjacentY);
+
+      // If no foundation in this direction, this edge is exposed (on perimeter)
+      if (!foundationCoords.has(adjacentKey)) {
+        exposedEdgeCount++;
+        
+        // Check if there's a wall on this exposed edge
+        let hasWallOnThisEdge = false;
+        for (const [_, wall] of allWalls) {
+          if (wall.isDestroyed) continue;
+          if (wall.cellX === foundation.cellX && 
+              wall.cellY === foundation.cellY && 
+              wall.edge === dir.edge) {
+            hasWallOnThisEdge = true;
+            break;
+          }
+        }
+
+        // Count exposed edges without walls
+        if (!hasWallOnThisEdge) {
+          exposedEdgesWithoutWallCount++;
+        }
+      }
+    }
+
+    // Only mark as entrance way if ALL exposed edges lack walls
+    // This means it's a true opening/doorway, not a partially walled foundation
+    if (exposedEdgeCount > 0 && exposedEdgesWithoutWallCount === exposedEdgeCount) {
+      const foundationKey = getFoundationCellKey(foundation.cellX, foundation.cellY);
+      entranceWays.add(foundationKey);
+    }
+  }
+
+  return entranceWays;
+}
+
+/**
+ * Detect foundations that have north walls (edge 0)
+ * Returns a Set of foundation cell coordinates (e.g., "cellX,cellY") that have north walls
+ * Used to extend ceiling tiles upward to cover north wall interiors
+ */
+export function detectNorthWallFoundations(
+  cluster: FoundationCell[],
+  allWalls: Map<string, WallCell>
+): Set<string> {
+  const northWallFoundations = new Set<string>();
+
+  for (const foundation of cluster) {
+    // Check if this foundation has a north wall (edge 0)
+    for (const [_, wall] of allWalls) {
+      if (wall.isDestroyed) continue;
+      if (wall.cellX === foundation.cellX && 
+          wall.cellY === foundation.cellY && 
+          wall.edge === 0) { // North wall
+        const foundationKey = getFoundationCellKey(foundation.cellX, foundation.cellY);
+        northWallFoundations.add(foundationKey);
+        break;
+      }
+    }
+  }
+
+  return northWallFoundations;
+}
+
+/**
+ * Detect foundations that have south walls (edge 2)
+ * Returns a Set of foundation cell coordinates (e.g., "cellX,cellY") that have south walls
+ * Used to prevent ceiling tiles from covering south walls
+ */
+export function detectSouthWallFoundations(
+  cluster: FoundationCell[],
+  allWalls: Map<string, WallCell>
+): Set<string> {
+  const southWallFoundations = new Set<string>();
+
+  for (const foundation of cluster) {
+    // Check if this foundation has a south wall (edge 2)
+    for (const [_, wall] of allWalls) {
+      if (wall.isDestroyed) continue;
+      if (wall.cellX === foundation.cellX && 
+          wall.cellY === foundation.cellY && 
+          wall.edge === 2) { // South wall
+        const foundationKey = getFoundationCellKey(foundation.cellX, foundation.cellY);
+        southWallFoundations.add(foundationKey);
+        break;
+      }
+    }
+  }
+
+  return southWallFoundations;
+}
+

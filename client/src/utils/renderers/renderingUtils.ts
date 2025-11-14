@@ -480,12 +480,35 @@ export const renderYSortedEntities = ({
     // PERFORMANCE: Clean up memory caches periodically
     cleanupCaches();
     
+    // Precompute mapping from foundation cell coordinates to building cluster IDs
+    const cellCoordToClusterId = new Map<string, string>();
+    if (buildingClusters) {
+        buildingClusters.forEach((cluster, clusterId) => {
+            if (cluster?.cellCoords) {
+                cluster.cellCoords.forEach((coord: string) => {
+                    cellCoordToClusterId.set(coord, clusterId);
+                });
+            }
+        });
+    }
+    
     // NOTE: Underwater shadows are now rendered separately in GameCanvas.tsx
     // before the water overlay, not here in renderYSortedEntities
     
-    // First Pass: Render all entities. Trees and stones will skip their dynamic ground shadows.
-    // Other entities (players, boxes, etc.) render as normal.
+    // CRITICAL FIX FOR CEILING TILE GLITCHING:
+    // The Y-sorting comparator has explicit checks for fog/wall ordering, but it's still unreliable.
+    // Solution: Render in THREE SEPARATE PASSES with GUARANTEED order
+    // Pass 1: Everything except fog and walls (normal Y-sorted)
+    // Pass 2: Fog overlays ONLY (ceiling tiles)
+    // Pass 3: Walls ONLY (always on top of fog)
+    
+    // First Pass: Render all non-fog, non-wall entities (players, trees, placeables, etc.)
     ySortedEntities.forEach(({ type, entity }) => {
+        // Skip fog overlays and walls - they render in later passes
+        if (type === 'fog_overlay' || type === 'wall_cell') {
+          return;
+        }
+        
         if (type === 'player') {
             const player = entity as SpacetimeDBPlayer;
             const playerId = player.identity.toHexString();
@@ -1059,33 +1082,6 @@ export const renderYSortedEntities = ({
                 foundationTileImagesRef: foundationTileImagesRef,
                 allFoundations: allFoundations, // Pass all foundations to check for adjacent foundations
             });
-            
-        } else if (type === 'fog_overlay') {
-            const fogEntity = entity as { clusterId: string; bounds: { minX: number; minY: number; maxX: number; maxY: number } };
-            // Render fog overlay (ceiling tile image) above placeables but below walls
-            renderFogOverlayCluster({
-                ctx,
-                bounds: fogEntity.bounds,
-                worldScale: 1.0,
-                viewOffsetX: -cameraOffsetX, // Convert camera offset to view offset
-                viewOffsetY: -cameraOffsetY,
-                foundationTileImagesRef: foundationTileImagesRef,
-            });
-            
-        } else if (type === 'wall_cell') {
-            const wall = entity as SpacetimeDBWallCell;
-            
-            // Walls use cell coordinates directly - renderWall handles conversion
-            renderWall({
-                ctx,
-                wall: wall as any, // Will be properly typed after bindings regeneration
-                worldScale: 1.0,
-                viewOffsetX: -cameraOffsetX, // Convert camera offset to view offset
-                viewOffsetY: -cameraOffsetY,
-                foundationTileImagesRef: foundationTileImagesRef,
-                allWalls: allWalls, // Pass all walls to check for adjacent walls
-                cycleProgress: cycleProgress, // Pass cycleProgress for exterior shadows on triangle foundations
-            });
         } else if (type === 'shelter') {
             // Shelters are fully rendered in the first pass, including shadows.
             // No action needed in this second (shadow-only) pass.
@@ -1094,78 +1090,76 @@ export const renderYSortedEntities = ({
         } 
     });
 
-    // Second Pass: Render ONLY the dynamic ground shadows for entities that need special shadow handling.
-    // UPDATED: Trees now render their shadows inline with their entities for proper Y-sorting.
-    // This pass is kept for any future entities that might need special shadow treatment.
+    // PASS 2: Render north walls only (before ceiling tiles)
     ySortedEntities.forEach(({ type, entity }) => {
-        if (type === 'tree') {
-            // Trees now render their shadows inline with the entity for proper Y-sorting
-        } else if (type === 'stone') {
-            // Stones render their shadows inline with the entity
-        } else if (type === 'shelter') {
-            // Shelters are fully rendered in the first pass, including shadows.
-            // No action needed in this second (shadow-only) pass.
-        } else if (type === 'harvestable_resource') {
-            // Harvestable resources are fully rendered in the first pass - no second pass needed
-        } else if (type === 'campfire') {
-            // Campfires handle their own shadows, no separate pass needed here generally
-        } else if (type === 'furnace') { // ADDED: Furnace second pass
-            // Furnaces are fully rendered in the first pass - no second pass needed (same as campfires)
-        } else if (type === 'lantern') {
-            // Lanterns are fully rendered in the first pass - no second pass needed
-        } else if (type === 'dropped_item') {
-            // Dropped items handle their own shadows
-        } else if (type === 'sleeping_bag') {
-            // Sleeping bags handle their own shadows (via renderConfiguredGroundEntity)
-        } else if (type === 'stash') {
-            // Stashes handle their own shadows within their main render function
-        } else if (type === 'wooden_storage_box') {
-            // No shadow-only pass needed for wooden_storage_box as it uses applyStandardDropShadow
-        } else if (type === 'player_corpse') {
-            // Player corpses are fully rendered in the first pass.
-            // Their shadows (if any, like applyStandardDropShadow) are part of that initial render.
-            // Do not re-render here.
-        } else if (type === 'player') {
-            // Players are fully rendered in the first pass, including their shadows.
-            // No action needed for players in this second (shadow-only) pass.
-        } else if (type === 'grass') {
-            // Grass is fully rendered in the first pass - no second pass needed
-        } else if (type === 'projectile') {
-            // Projectiles are fully rendered in the first pass and don't have separate shadows
-            // No action needed in the shadow-only pass
-        } else if (type === 'planted_seed') {
-            // Planted seeds are fully rendered in the first pass - no second pass needed
-        } else if (type === 'rain_collector') {
-            // Rain collectors are fully rendered in the first pass - no second pass needed
-        } else if (type === 'homestead_hearth') {
-            // Homestead hearths are fully rendered in the first pass - no second pass needed
-        } else if (type === 'wild_animal') {
-            // Wild animals are rendered separately in GameCanvas - no second pass needed
-        } else if (type === 'viper_spittle') {
-            // Viper spittle is rendered separately in GameCanvas - no second pass needed
-        } else if (type === 'animal_corpse') {
-            // Animal corpses are fully rendered in the first pass - no second pass needed
-        } else if (type === 'barrel') {
-            // Barrels are fully rendered in the first pass - no second pass needed
-        } else if (type === 'sea_stack') {
-            // Sea stacks are fully rendered in the first pass - no second pass needed
-        } else if (type === 'foundation_cell') {
-            // Foundations are fully rendered in the first pass (ground level).
-            // No action needed in this second (shadow-only) pass.
-        } else if (type === 'fog_overlay') {
-            // Fog overlays are fully rendered in the first pass.
-            // No action needed in this second (shadow-only) pass.
-        } else if (type === 'wall_cell') {
-            // Render exterior wall shadows (change throughout the day based on sun position)
-            // Shadows are cast outward onto the ground outside the building
+        if (type === 'wall_cell') {
+            const wall = entity as SpacetimeDBWallCell;
+
+            // Only render north walls (edge 0) - they render before ceiling tiles
+            if (wall.edge !== 0) {
+                return;
+            }
+            
+            // Determine if this wall belongs to the same building cluster the player is inside
+            const wallCellKey = `${wall.cellX},${wall.cellY}`;
+            const wallClusterId = cellCoordToClusterId.get(wallCellKey);
+            const playerInsideThisCluster = wallClusterId !== undefined && wallClusterId === playerBuildingClusterId;
+            
+            renderWall({
+                ctx,
+                wall: wall as any,
+                worldScale: 1.0,
+                viewOffsetX: -cameraOffsetX,
+                viewOffsetY: -cameraOffsetY,
+                foundationTileImagesRef: foundationTileImagesRef,
+                allWalls: allWalls,
+                cycleProgress: cycleProgress,
+                localPlayerPosition: localPlayerPosition,
+                playerInsideCluster: playerInsideThisCluster,
+            });
+        }
+    });
+
+    // PASS 3: Render east/west walls and diagonal walls FIRST (before ceiling tiles)
+    // These walls will be covered by ceiling tiles in PASS 5
+    ySortedEntities.forEach(({ type, entity }) => {
+        if (type === 'wall_cell') {
+            const wall = entity as SpacetimeDBWallCell;
+
+            // Only render east/west walls (edge 1 and 3) and diagonal walls (edge 4 and 5) - they render BEFORE ceiling tiles
+            if (wall.edge !== 1 && wall.edge !== 3 && wall.edge !== 4 && wall.edge !== 5) {
+                return;
+            }
+
+            // Determine if this wall belongs to the same building cluster the player is inside
+            const wallCellKey = `${wall.cellX},${wall.cellY}`;
+            const wallClusterId = cellCoordToClusterId.get(wallCellKey);
+            const playerInsideThisCluster = wallClusterId !== undefined && wallClusterId === playerBuildingClusterId;
+
+            renderWall({
+                ctx,
+                wall: wall as any,
+                worldScale: 1.0,
+                viewOffsetX: -cameraOffsetX,
+                viewOffsetY: -cameraOffsetY,
+                foundationTileImagesRef: foundationTileImagesRef,
+                allWalls: allWalls,
+                cycleProgress: cycleProgress,
+                localPlayerPosition: localPlayerPosition,
+                playerInsideCluster: playerInsideThisCluster,
+            });
+        }
+    });
+
+    // PASS 4: Render exterior wall shadows BEFORE ceiling tiles so the tiles occlude them
+    ySortedEntities.forEach(({ type, entity }) => {
+        if (type === 'wall_cell') {
             const wall = entity as SpacetimeDBWallCell;
             // Skip triangle foundations - their exterior shadows are rendered in the first pass
-            // Triangle foundations are identified by foundationShape >= 2 && foundationShape <= 5
             const isTriangleFoundation = wall.foundationShape >= 2 && wall.foundationShape <= 5;
             // Skip north walls (edge === 0) - their exterior shadows are rendered in the first pass
             const isNorthWall = wall.edge === 0;
             if (!isTriangleFoundation && !isNorthWall) {
-                // Cast shadows based on edge position and time of day
                 renderWallExteriorShadow({
                     ctx,
                     wall: wall as any,
@@ -1175,8 +1169,67 @@ export const renderYSortedEntities = ({
                     viewOffsetY: -cameraOffsetY,
                 });
             }
-        } else {
-            console.warn('Unhandled entity type for Y-sorting (second pass):', type, entity);
+        }
+    });
+
+    // PASS 5: Render ceiling tiles (AFTER east/west walls & exterior shadows, but BEFORE south walls)
+    // CRITICAL: Ceiling tiles must render between east/west walls and south walls
+    ySortedEntities.forEach(({ type, entity }) => {
+        if (type === 'fog_overlay') {
+            const fogEntity = entity as { clusterId: string; bounds: { minX: number; minY: number; maxX: number; maxY: number }; entranceWayFoundations?: string[]; clusterFoundationCoords?: string[]; northWallFoundations?: string[]; southWallFoundations?: string[] };
+
+            // Save context and ensure ceiling tiles render with full opacity on top
+            ctx.save();
+            ctx.globalAlpha = 1.0; // Ensure full opacity
+            ctx.globalCompositeOperation = 'source-over'; // Ensure normal blending
+
+            // Render fog overlay (ceiling tile image)
+            // Note: renderFogOverlayCluster has its own save/restore, but we wrap it to ensure proper state
+            renderFogOverlayCluster({
+                ctx,
+                bounds: fogEntity.bounds,
+                worldScale: 1.0,
+                viewOffsetX: -cameraOffsetX,
+                viewOffsetY: -cameraOffsetY,
+                foundationTileImagesRef: foundationTileImagesRef,
+                entranceWayFoundations: fogEntity.entranceWayFoundations ? new Set(fogEntity.entranceWayFoundations) : undefined,
+                clusterFoundationCoords: fogEntity.clusterFoundationCoords ? new Set(fogEntity.clusterFoundationCoords) : undefined,
+                northWallFoundations: fogEntity.northWallFoundations ? new Set(fogEntity.northWallFoundations) : undefined,
+                southWallFoundations: fogEntity.southWallFoundations ? new Set(fogEntity.southWallFoundations) : undefined,
+            });
+            
+            // Restore context
+            ctx.restore();
+        }
+    });
+
+    // PASS 6: Render south walls (AFTER ceiling tiles, so they appear ON TOP of ceiling tiles)
+    ySortedEntities.forEach(({ type, entity }) => {
+        if (type === 'wall_cell') {
+            const wall = entity as SpacetimeDBWallCell;
+
+            // Only render south walls (edge 2) - they render after ceiling tiles
+            if (wall.edge !== 2) {
+                return;
+            }
+
+            // Determine if this wall belongs to the same building cluster the player is inside
+            const wallCellKey = `${wall.cellX},${wall.cellY}`;
+            const wallClusterId = cellCoordToClusterId.get(wallCellKey);
+            const playerInsideThisCluster = wallClusterId !== undefined && wallClusterId === playerBuildingClusterId;
+
+            renderWall({
+                ctx,
+                wall: wall as any,
+                worldScale: 1.0,
+                viewOffsetX: -cameraOffsetX,
+                viewOffsetY: -cameraOffsetY,
+                foundationTileImagesRef: foundationTileImagesRef,
+                allWalls: allWalls,
+                cycleProgress: cycleProgress,
+                localPlayerPosition: localPlayerPosition,
+                playerInsideCluster: playerInsideThisCluster,
+            });
         }
     });
 };

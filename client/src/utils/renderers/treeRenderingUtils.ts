@@ -202,7 +202,7 @@ export function renderTree(
         const treeVisualExtension = 300; // Upward extension to capture tree tops
         const treeTop = tree.posY - treeVisualHeight - treeVisualExtension; // Tree extends upward + extension
         // Shift the bottom up so tree doesn't fade when player is at trunk level
-        const trunkHeightOffset = 100; // Don't trigger transparency when at trunk base level
+        const trunkHeightOffset = 150; // Don't trigger transparency when at trunk base level (reduced to start fade lower)
         const treeBottom = tree.posY - trunkHeightOffset;
         
         // Player bounding box (approximate)
@@ -222,7 +222,7 @@ export function renderTree(
         if (overlapsHorizontally && overlapsVertically && tree.posY > localPlayerPosition.y) {
             // Calculate how much the player is behind the tree (for smooth fade)
             const depthDifference = tree.posY - localPlayerPosition.y;
-            const maxDepthForFade = 200; // Max distance for fade effect (increased for taller trees)
+            const maxDepthForFade = 100; // Max distance for fade effect (increased for taller trees)
             
             if (depthDifference > 0 && depthDifference < maxDepthForFade) {
                 // Closer to tree = more transparent

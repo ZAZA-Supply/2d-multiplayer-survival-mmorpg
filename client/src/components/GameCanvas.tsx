@@ -65,6 +65,7 @@ import { useFireArrowParticles } from '../hooks/useFireArrowParticles';
 import { useWorldTileCache } from '../hooks/useWorldTileCache';
 import { useAmbientSounds } from '../hooks/useAmbientSounds';
 import { useFurnaceParticles } from '../hooks/useFurnaceParticles';
+import { playImmediateSound } from '../hooks/useSoundSystem';
 
 // --- Rendering Utilities ---
 import { renderWorldBackground } from '../utils/renderers/worldRenderingUtils';
@@ -871,12 +872,45 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       }
     };
 
+    const handleFireProjectileResult = (ctx: any, targetWorldX: number, targetWorldY: number) => {
+      if (ctx.event?.status?.tag === 'Failed') {
+        const errorMsg = ctx.event.status.value || '';
+        // Check if error is about arrows/ammunition
+        if (errorMsg.includes('not loaded') || 
+            errorMsg.includes('ammunition') || 
+            errorMsg.includes('arrow') ||
+            errorMsg.includes('No loaded ammunition')) {
+          // Play error sound for instant feedback
+          playImmediateSound('error_arrows', 1.0);
+        }
+      }
+    };
+
+    const handleUpgradeFoundationResult = (ctx: any, foundationId: bigint, newTier: number) => {
+      if (ctx.event?.status?.tag === 'Failed') {
+        const errorMsg = ctx.event.status.value || '';
+        // Check if error is about insufficient resources
+        if (errorMsg.includes('Not enough') || 
+            errorMsg.includes('wood') || 
+            errorMsg.includes('stone') ||
+            errorMsg.includes('metal fragments') ||
+            errorMsg.includes('Required:')) {
+          // Play error sound for instant feedback
+          playImmediateSound('error_resources', 1.0);
+        }
+      }
+    };
+
     connection.reducers.onDestroyFoundation(handleDestroyFoundationResult);
     connection.reducers.onDestroyWall(handleDestroyWallResult);
+    connection.reducers.onFireProjectile(handleFireProjectileResult);
+    connection.reducers.onUpgradeFoundation(handleUpgradeFoundationResult);
 
     return () => {
       connection.reducers.removeOnDestroyFoundation(handleDestroyFoundationResult);
       connection.reducers.removeOnDestroyWall(handleDestroyWallResult);
+      connection.reducers.removeOnFireProjectile(handleFireProjectileResult);
+      connection.reducers.removeOnUpgradeFoundation(handleUpgradeFoundationResult);
     };
   }, [connection]);
 
@@ -1015,6 +1049,15 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       if (ctx.event?.status?.tag === 'Failed') {
         const errorMsg = ctx.event.status.value || 'Failed to upgrade wall';
         console.error('[GameCanvas] upgradeWall failed:', errorMsg);
+        // Check if error is about insufficient resources
+        if (errorMsg.includes('Not enough') || 
+            errorMsg.includes('wood') || 
+            errorMsg.includes('stone') ||
+            errorMsg.includes('metal fragments') ||
+            errorMsg.includes('Required:')) {
+          // Play error sound for instant feedback
+          playImmediateSound('error_resources', 1.0);
+        }
       } else if (ctx.event?.status?.tag === 'Committed') {
         console.log('[GameCanvas] upgradeWall succeeded! Wall', wallId, 'upgraded to tier', newTier);
         // The wall tier update will come through SpacetimeDB subscriptions automatically

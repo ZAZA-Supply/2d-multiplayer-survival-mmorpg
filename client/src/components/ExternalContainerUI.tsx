@@ -795,137 +795,154 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
                         <div style={{ 
                             marginTop: '12px', 
                             marginBottom: '8px',
-                            padding: '8px',
+                            padding: '10px',
                             backgroundColor: 'rgba(0, 0, 0, 0.3)',
                             borderRadius: '4px',
                             border: '1px solid rgba(255, 255, 255, 0.1)'
                         }}>
                             <div style={{ 
-                                fontSize: '12px', 
+                                fontSize: '13px', 
                                 fontWeight: 'bold',
                                 color: '#87CEEB',
-                                marginBottom: '6px'
+                                marginBottom: '8px'
                             }}>
                                 🏗️ Building Privilege
                             </div>
                             
-                            {playersWithPrivilege.length > 0 ? (
-                                <div style={{ fontSize: '11px', color: '#ffffff', marginBottom: '8px' }}>
-                                    <div style={{ marginBottom: '4px', fontWeight: 'bold' }}>Players with privilege:</div>
-                                    {playersWithPrivilege.map((p) => (
-                                        <div key={p.id} style={{ marginLeft: '8px', color: p.id === playerId ? '#00ff88' : '#cccccc' }}>
-                                            • {p.name || p.id.substring(0, 8)} {p.id === playerId && '(You)'}
+                            <div style={{ 
+                                display: 'flex', 
+                                gap: '16px',
+                                alignItems: 'flex-start'
+                            }}>
+                                {/* Left column: Button */}
+                                <div style={{ flex: '1', minWidth: '0' }}>
+                                    <button
+                                        onClick={handleGrantBuildingPrivilege}
+                                        className={`${styles.interactionButton} ${currentPlayerHasPrivilege ? styles.extinguishButton : styles.lightFireButton}`}
+                                        style={{ width: '100%' }}
+                                    >
+                                        {currentPlayerHasPrivilege ? 'Revoke Building Privilege' : 'Grant Building Privilege'}
+                                    </button>
+                                </div>
+                                
+                                {/* Right column: Players list */}
+                                <div style={{ flex: '1', minWidth: '0' }}>
+                                    {playersWithPrivilege.length > 0 ? (
+                                        <div style={{ fontSize: '12px', color: '#ffffff' }}>
+                                            <div style={{ marginBottom: '6px', fontWeight: 'bold', color: '#87CEEB' }}>Players with privilege:</div>
+                                            {playersWithPrivilege.map((p) => (
+                                                <div key={p.id} style={{ 
+                                                    marginBottom: '4px', 
+                                                    color: p.id === playerId ? '#00ff88' : '#cccccc',
+                                                    fontSize: '13px'
+                                                }}>
+                                                    • {p.name || p.id.substring(0, 8)} {p.id === playerId && '(You)'}
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
+                                    ) : (
+                                        <div style={{ fontSize: '12px', color: '#aaaaaa', fontStyle: 'italic' }}>
+                                            No players with building privilege
+                                        </div>
+                                    )}
                                 </div>
-                            ) : (
-                                <div style={{ fontSize: '11px', color: '#aaaaaa', marginBottom: '8px', fontStyle: 'italic' }}>
-                                    No players with building privilege
-                                </div>
-                            )}
-                            
-                            <button
-                                onClick={handleGrantBuildingPrivilege}
-                                className={`${styles.interactionButton} ${currentPlayerHasPrivilege ? styles.extinguishButton : styles.lightFireButton}`}
-                                style={{ width: '100%', marginTop: '4px' }}
-                            >
-                                {currentPlayerHasPrivilege ? 'Revoke Building Privilege' : 'Grant Building Privilege'}
-                            </button>
-                            
+                            </div>
                         </div>
 
                         {/* Upkeep UI */}
                         <div style={{ 
                             marginTop: '12px', 
                             marginBottom: '8px',
-                            padding: '8px',
+                            padding: '10px',
                             backgroundColor: 'rgba(0, 0, 0, 0.3)',
                             borderRadius: '4px',
                             border: '1px solid rgba(255, 255, 255, 0.1)'
                         }}>
                             <div style={{ 
-                                fontSize: '12px', 
+                                fontSize: '13px', 
                                 fontWeight: 'bold',
                                 color: '#ffa040',
-                                marginBottom: '6px'
+                                marginBottom: '8px'
                             }}>
                                 ⚙️ Building Upkeep
                             </div>
                             
                             {upkeepCosts ? (
-                                <>
-                                    <div style={{ fontSize: '11px', color: '#ffffff', marginBottom: '8px' }}>
-                                        <div style={{ marginBottom: '4px', fontWeight: 'bold' }}>Required per hour:</div>
-                                        <div style={{ marginLeft: '8px', marginBottom: '2px' }}>
-                                            🪵 Wood: <span style={{ color: upkeepCosts.availableWood >= upkeepCosts.requiredWood ? '#00ff88' : '#ff4444' }}>
-                                                {upkeepCosts.requiredWood} / {upkeepCosts.availableWood}
-                                            </span>
-                                        </div>
-                                        <div style={{ marginLeft: '8px', marginBottom: '2px' }}>
-                                            🪨 Stone: <span style={{ color: upkeepCosts.availableStone >= upkeepCosts.requiredStone ? '#00ff88' : '#ff4444' }}>
-                                                {upkeepCosts.requiredStone} / {upkeepCosts.availableStone}
-                                            </span>
-                                        </div>
-                                        <div style={{ marginLeft: '8px', marginBottom: '2px' }}>
-                                            ⚙️ Metal: <span style={{ color: upkeepCosts.availableMetal >= upkeepCosts.requiredMetal ? '#00ff88' : '#ff4444' }}>
-                                                {upkeepCosts.requiredMetal} / {upkeepCosts.availableMetal}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    
-                                    {upkeepCosts.requiredWood === 0 && upkeepCosts.requiredStone === 0 && upkeepCosts.requiredMetal === 0 ? (
-                                        <div style={{ fontSize: '11px', color: '#00ff88', fontStyle: 'italic' }}>
-                                            ✓ No upkeep required (only twig buildings)
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div style={{ 
-                                                fontSize: '11px', 
-                                                color: (upkeepCosts.availableWood >= upkeepCosts.requiredWood && 
-                                                       upkeepCosts.availableStone >= upkeepCosts.requiredStone && 
-                                                       upkeepCosts.availableMetal >= upkeepCosts.requiredMetal) 
-                                                    ? '#00ff88' : '#ff4444',
-                                                fontWeight: 'bold',
-                                                marginTop: '4px'
-                                            }}>
-                                                {(upkeepCosts.availableWood >= upkeepCosts.requiredWood && 
-                                                  upkeepCosts.availableStone >= upkeepCosts.requiredStone && 
-                                                  upkeepCosts.availableMetal >= upkeepCosts.requiredMetal) 
-                                                    ? '✓ Buildings Protected' 
-                                                    : '⚠️ Insufficient Resources - Buildings Will Decay'}
+                                <div style={{ 
+                                    display: 'flex', 
+                                    gap: '16px',
+                                    alignItems: 'flex-start'
+                                }}>
+                                    {/* Left column: Status and time estimates */}
+                                    <div style={{ flex: '1', minWidth: '0' }}>
+                                        {upkeepCosts.requiredWood === 0 && upkeepCosts.requiredStone === 0 && upkeepCosts.requiredMetal === 0 ? (
+                                            <div style={{ fontSize: '12px', color: '#00ff88', fontStyle: 'italic' }}>
+                                                ✓ No upkeep required (only twig buildings)
                                             </div>
-                                            
-                                            {/* Show time estimate - resource duration when protected, decay time when unprotected */}
-                                            {upkeepCosts.estimatedDecayHours !== null && 
-                                             upkeepCosts.estimatedDecayHours !== undefined && (
+                                        ) : (
+                                            <>
                                                 <div style={{ 
                                                     fontSize: '12px', 
                                                     color: (upkeepCosts.availableWood >= upkeepCosts.requiredWood && 
                                                            upkeepCosts.availableStone >= upkeepCosts.requiredStone && 
-                                                           upkeepCosts.availableMetal >= upkeepCosts.requiredMetal)
-                                                        ? '#87CEEB' : '#ffaa44',
-                                                    marginTop: '4px',
-                                                    fontStyle: 'italic'
+                                                           upkeepCosts.availableMetal >= upkeepCosts.requiredMetal) 
+                                                        ? '#00ff88' : '#ff4444',
+                                                    fontWeight: 'bold',
+                                                    marginBottom: '6px'
                                                 }}>
                                                     {(upkeepCosts.availableWood >= upkeepCosts.requiredWood && 
                                                       upkeepCosts.availableStone >= upkeepCosts.requiredStone && 
-                                                      upkeepCosts.availableMetal >= upkeepCosts.requiredMetal) ? (
-                                                        <>
-                                                            ⏱️ Resources will last: {calculateResourceDuration(upkeepCosts)}
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            ⏱️ Buildings will decay in: {formatDecayTime(upkeepCosts.estimatedDecayHours)}
-                                                        </>
-                                                    )}
+                                                      upkeepCosts.availableMetal >= upkeepCosts.requiredMetal) 
+                                                        ? '✓ Building Protected' 
+                                                        : '⚠️ Insufficient Resources - Buildings Will Decay'}
                                                 </div>
-                                            )}
-                                        </>
-                                    )}
-                                   
-                                </>
+                                                
+                                                {/* Show time estimate - resource duration when protected, decay time when unprotected */}
+                                                {upkeepCosts.estimatedDecayHours !== null && 
+                                                 upkeepCosts.estimatedDecayHours !== undefined && (
+                                                    <div style={{ 
+                                                        fontSize: '13px', 
+                                                        color: (upkeepCosts.availableWood >= upkeepCosts.requiredWood && 
+                                                               upkeepCosts.availableStone >= upkeepCosts.requiredStone && 
+                                                               upkeepCosts.availableMetal >= upkeepCosts.requiredMetal)
+                                                            ? '#87CEEB' : '#ffaa44',
+                                                        fontStyle: 'italic'
+                                                    }}>
+                                                        {(upkeepCosts.availableWood >= upkeepCosts.requiredWood && 
+                                                          upkeepCosts.availableStone >= upkeepCosts.requiredStone && 
+                                                          upkeepCosts.availableMetal >= upkeepCosts.requiredMetal) ? (
+                                                            <>
+                                                                ⏱️ Resources will last: {calculateResourceDuration(upkeepCosts)}
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                ⏱️ Buildings will decay in: {formatDecayTime(upkeepCosts.estimatedDecayHours)}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                    
+                                    {/* Right column: Resource requirements */}
+                                    <div style={{ flex: '1', minWidth: '0' }}>
+                                        <div style={{ fontSize: '12px', color: '#ffffff' }}>
+                                            <div style={{ marginBottom: '6px', fontWeight: 'bold', color: '#ffa040' }}>Required per hour:</div>
+                                            <div style={{ marginBottom: '4px', fontSize: '13px' }}>
+                                                🪵 Wood: {upkeepCosts.requiredWood}
+                                            </div>
+                                            <div style={{ marginBottom: '4px', fontSize: '13px' }}>
+                                                🪨 Stone: {upkeepCosts.requiredStone}
+                                            </div>
+                                            <div style={{ marginBottom: '4px', fontSize: '13px' }}>
+                                                ⚙️ Metal: {upkeepCosts.requiredMetal}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             ) : (
-                                <div style={{ fontSize: '11px', color: '#aaaaaa', fontStyle: 'italic' }}>
+                                <div style={{ fontSize: '12px', color: '#aaaaaa', fontStyle: 'italic' }}>
                                     Loading upkeep information...
                                 </div>
                             )}

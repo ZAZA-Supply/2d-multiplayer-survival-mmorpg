@@ -20,6 +20,7 @@ import {
   faTrash,
   IconDefinition 
 } from '@fortawesome/free-solid-svg-icons';
+import { playImmediateSound } from '../hooks/useSoundSystem';
 
 /**
  * Generic interface for any upgradable building tile
@@ -150,9 +151,11 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
     });
   }, [activeConsumableEffects, localPlayerId, connection]);
 
-  // Get resource counts (from inventory and hotbar)
+  // Get resource counts (from inventory and hotbar - only local player's items)
   const getResourceCount = (resourceName: string): number => {
-    if (!connection || !itemDefinitions) return 0;
+    if (!connection || !itemDefinitions || !connection.identity) return 0;
+    
+    const localPlayerIdentity = connection.identity;
     
     let resourceDefId: bigint | null = null;
     for (const def of itemDefinitions.values()) {
@@ -166,7 +169,11 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
     
     let total = 0;
     for (const item of inventoryItems.values()) {
-      if (item.itemDefId === resourceDefId) {
+      // Only count items in the local player's inventory or hotbar
+      const isPlayerItem = (item.location.tag === 'Inventory' || item.location.tag === 'Hotbar') &&
+                          item.location.value.ownerId.isEqual(localPlayerIdentity);
+      
+      if (isPlayerItem && item.itemDefId === resourceDefId) {
         total += item.quantity;
       }
     }
@@ -396,6 +403,8 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
             isSelectingRef.current = false;
           }, 50);
         } else {
+          // Option not available - play error sound
+          playImmediateSound('error_resources', 1.0);
           setTimeout(() => {
             onCancel();
             isSelectingRef.current = false;
@@ -510,14 +519,14 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
                     ? isHovered || isSelected
                       ? 'url(#upgradeSectorHoverGradient)'
                       : 'url(#upgradeSectorNormalGradient)'
-                    : 'rgba(20, 20, 25, 0.5)'
+                    : 'rgba(80, 30, 30, 0.7)'
                 }
                 stroke={
                   isAvailable
                     ? isHovered || isSelected
                       ? '#00ffff'
                       : 'rgba(0, 170, 255, 0.5)'
-                    : 'rgba(50, 50, 50, 0.3)'
+                    : 'rgba(150, 60, 60, 0.6)'
                 }
                 strokeWidth={isHovered || isSelected ? 3 : 2}
                 style={{
@@ -526,7 +535,7 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
                   cursor: isAvailable ? 'pointer' : 'not-allowed',
                   pointerEvents: 'auto',
                 }}
-                opacity={isAvailable ? 1 : 0.4}
+                opacity={isAvailable ? 1 : 0.7}
               />
             </g>
           );
@@ -576,10 +585,10 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
                 icon={upgradeOptions[hoveredIndex].icon}
                 style={{
                   fontSize: '48px',
-                  color: upgradeOptions[hoveredIndex].available ? '#00ffff' : '#666',
+                  color: upgradeOptions[hoveredIndex].available ? '#00ffff' : '#cc6666',
                   filter: upgradeOptions[hoveredIndex].available 
                     ? 'drop-shadow(0 0 12px rgba(0, 255, 255, 0.8))' 
-                    : 'none',
+                    : 'drop-shadow(0 0 8px rgba(204, 102, 102, 0.6))',
                 }}
               />
             </div>
@@ -647,23 +656,6 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
                 {upgradeOptions[hoveredIndex].requirements.metal} x Metal ({metalCount})
               </div>
             )}
-            {/* Show reason if unavailable */}
-            {upgradeOptions[hoveredIndex].reason && (
-              <div
-                style={{
-                  fontSize: '10px',
-                  fontFamily: '"Press Start 2P", cursive',
-                  color: '#ff6666',
-                  textShadow: '0 0 5px rgba(255, 102, 102, 0.8)',
-                  marginTop: '8px',
-                  padding: '4px',
-                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                  borderRadius: '3px',
-                }}
-              >
-                ⚠ {upgradeOptions[hoveredIndex].reason}
-              </div>
-            )}
           </div>
         )}
 
@@ -695,7 +687,7 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
                     ? isHovered 
                       ? 'drop-shadow(0 0 12px rgba(0, 255, 255, 1))' 
                       : 'drop-shadow(0 0 6px rgba(0, 170, 255, 0.6))'
-                    : 'grayscale(100%) brightness(0.3)',
+                    : 'drop-shadow(0 0 4px rgba(204, 102, 102, 0.5))',
                   transition: 'all 0.15s ease',
                 }}
               >
@@ -707,7 +699,7 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
                       ? isHovered 
                         ? '#00ffff' 
                         : '#00aaff'
-                      : '#444',
+                      : '#cc6666',
                   }}
                 />
               </div>

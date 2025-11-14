@@ -127,6 +127,11 @@ pub fn place_shelter(ctx: &ReducerContext, item_instance_id: u64, world_x: f32, 
                 dist_sq_place, SHELTER_PLACEMENT_MAX_DISTANCE_SQUARED));
     }
 
+    // Check if placement position is on a wall
+    if crate::building::is_position_on_wall(ctx, world_x, world_y) {
+        return Err("Cannot place shelter on a wall.".to_string());
+    }
+
     // Check collision with other shelters - RE-ENABLING
     for other_shelter in shelters.iter() {
         if other_shelter.is_destroyed { continue; }

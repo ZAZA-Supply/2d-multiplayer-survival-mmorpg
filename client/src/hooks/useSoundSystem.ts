@@ -78,9 +78,19 @@ const SOUND_DEFINITIONS = {
     // Building sounds - immediate (local feedback)
     construction_placement_error: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Foundation placement error sound
     error_resources: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Resource error sound (client-side immediate for instant feedback)
+    error_arrows: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Arrow error sound (client-side immediate for instant feedback when firing without arrows)
 } as const;
 
 type SoundType = keyof typeof SOUND_DEFINITIONS;
+
+// Sounds that should not have pitch variation (always play at original pitch)
+const NO_PITCH_VARIATION_SOUNDS: Set<SoundType> = new Set([
+    'error_resources',
+    'error_arrows',
+] as SoundType[]);
+
+// Track active error sounds to prevent multiple from playing simultaneously
+const activeErrorSounds = new Set<HTMLAudioElement>();
 
 // Sound configuration
 const SOUND_CONFIG = {
@@ -294,6 +304,7 @@ const PRELOAD_SOUNDS = [
     'foundation_stone_upgraded.mp3',                        // 1 foundation stone upgraded variation
     'foundation_metal_upgraded.mp3',                        // 1 foundation metal upgraded variation
     'twig_foundation_destroyed.mp3',                        // 1 twig foundation destroyed variation
+    'error_arrows.mp3',                                      // 1 error arrows variation
 ] as const;
 
 // Enhanced audio loading with error handling and performance monitoring
@@ -528,6 +539,8 @@ const playLocalSound = async (
                 variationCount = 1; // crush_bones.mp3
             } else if (soundType === 'construction_placement_error') {
                 variationCount = 1; // construction_placement_error.mp3
+            } else if (soundType === 'error_arrows') {
+                variationCount = 1; // error_arrows.mp3
             } else if (soundType === 'arrow_hit') {
                 variationCount = 1; // arrow_hit.mp3
             } else if (soundType === 'shoot_bow') {
@@ -574,8 +587,26 @@ const playLocalSound = async (
             }
         }
         
+        // Check if this is an error sound (no pitch variation sounds) - prevent multiple from playing at once
+        const isErrorSound = NO_PITCH_VARIATION_SOUNDS.has(soundType);
+        if (isErrorSound) {
+            // Stop any currently playing error sounds
+            activeErrorSounds.forEach(audio => {
+                try {
+                    audio.pause();
+                    audio.currentTime = 0;  
+                } catch (e) {
+                    // Ignore errors when stopping
+                }
+            });
+            activeErrorSounds.clear();
+        }
+        
         // Add random pitch variation (0.9 to 1.1 range for subtle local variation)
-        const pitchVariation = 0.9 + Math.random() * SOUND_CONFIG.LOCAL_PITCH_VARIATION;
+        // Skip pitch variation for sounds in the no-pitch-variation list
+        const pitchVariation = NO_PITCH_VARIATION_SOUNDS.has(soundType) 
+            ? 1.0  // No pitch variation - play at original pitch
+            : 0.9 + Math.random() * SOUND_CONFIG.LOCAL_PITCH_VARIATION;
         
         // Add slight random volume variation (±5% for subtle variety)
         const volumeVariation = 0.95 + Math.random() * SOUND_CONFIG.LOCAL_VOLUME_VARIATION;
@@ -599,8 +630,17 @@ const playLocalSound = async (
             
             // Track and cleanup
             activeSounds.add(audioClone);
+            
+            // Track error sounds separately to prevent multiple from playing
+            if (isErrorSound) {
+                activeErrorSounds.add(audioClone);
+            }
+            
             const cleanup = () => {
                 activeSounds.delete(audioClone);
+                if (isErrorSound) {
+                    activeErrorSounds.delete(audioClone);
+                }
                 audioClone.removeEventListener('ended', cleanup);
                 audioClone.removeEventListener('error', cleanup);
             };

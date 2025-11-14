@@ -125,7 +125,12 @@ pub fn place_sleeping_bag(ctx: &ReducerContext, item_instance_id: u64, world_x: 
         return Err("Could not find player data.".to_string());
     }
 
-    // 4. Validate Collision with other Sleeping Bags
+    // 4. Check if placement position is on a wall
+    if crate::building::is_position_on_wall(ctx, world_x, world_y) {
+        return Err("Cannot place sleeping bag on a wall.".to_string());
+    }
+
+    // 5. Validate Collision with other Sleeping Bags
     for other_bag in sleeping_bags.iter() {
         let dx = world_x - other_bag.pos_x;
         let dy = world_y - other_bag.pos_y;
@@ -135,7 +140,7 @@ pub fn place_sleeping_bag(ctx: &ReducerContext, item_instance_id: u64, world_x: 
     }
     // TODO: Add collision checks against other entities if needed (trees, stones, boxes, etc.)
 
-    // 5. Consume the Item
+    // 6. Consume the Item
     log::info!(
         "[PlaceSleepingBag] Consuming item instance {} from player {:?}",
         item_instance_id, sender_id

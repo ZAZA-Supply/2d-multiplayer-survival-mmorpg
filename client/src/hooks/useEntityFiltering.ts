@@ -51,7 +51,7 @@ export interface ViewportBounds {
 }
 
 // Import building visibility utilities
-import { getBuildingClusters, getPlayerBuildingClusterId, shouldMaskFoundation, type BuildingCluster } from '../utils/buildingVisibilityUtils';
+import { getBuildingClusters, getPlayerBuildingClusterId, shouldMaskFoundation, detectEntranceWayFoundations, detectNorthWallFoundations, detectSouthWallFoundations, type BuildingCluster } from '../utils/buildingVisibilityUtils';
 
 interface EntityFilteringResult {
   visibleHarvestableResources: SpacetimeDBHarvestableResource[];
@@ -136,7 +136,7 @@ export type YSortedEntityType =
   | { type: 'sleeping_bag'; entity: SpacetimeDBSleepingBag } // ADDED: Sleeping bags
   | { type: 'foundation_cell'; entity: SpacetimeDBFoundationCell } // ADDED: Building foundations
   | { type: 'wall_cell'; entity: SpacetimeDBWallCell } // ADDED: Building walls
-  | { type: 'fog_overlay'; entity: { clusterId: string; bounds: { minX: number; minY: number; maxX: number; maxY: number } } }; // ADDED: Fog of war overlay (renders above placeables, below walls)
+  | { type: 'fog_overlay'; entity: { clusterId: string; bounds: { minX: number; minY: number; maxX: number; maxY: number }; entranceWayFoundations?: string[]; clusterFoundationCoords?: string[]; northWallFoundations?: string[]; southWallFoundations?: string[] } }; // ADDED: Fog of war overlay (renders above placeables, below walls)
 
 // ===== HELPER FUNCTIONS FOR Y-SORTING =====
 const getEntityY = (item: YSortedEntityType, timestamp: number): number => {
@@ -196,14 +196,13 @@ const getEntityY = (item: YSortedEntityType, timestamp: number): number => {
     }
     case 'fog_overlay': {
       // Fog overlays must ALWAYS render above placeables but BELOW walls for realism
-      // Strategy: Use explicit sorting for BOTH relationships (most reliable)
-      // Fog Y position: Use the center Y of the building cluster bounds
-      // This ensures fog covers the entire building area
-      const fogEntity = entity as { clusterId: string; bounds: { minX: number; minY: number; maxX: number; maxY: number } };
+      // Use the ACTUAL center Y of the building cluster for natural Y-sorting
+      // The explicit sorting checks (lines 1484-1489) ensure walls ALWAYS render above fog
+      // Using the actual building Y position ensures fog sorts correctly relative to placeables
+      const fogEntity = entity as { clusterId: string; bounds: { minX: number; minY: number; maxX: number; maxY: number }; entranceWayFoundations?: string[]; clusterFoundationCoords?: string[]; northWallFoundations?: string[]; southWallFoundations?: string[] };
+      // Use center Y of the building for natural sorting
       const centerY = (fogEntity.bounds.minY + fogEntity.bounds.maxY) / 2;
-      // Set fog Y just above typical placeable positions (center + 50)
-      // Explicit checks ensure walls always render above fog
-      return centerY + 50;
+      return centerY;
     }
     case 'wall_cell': {
       const wall = entity as SpacetimeDBWallCell;
@@ -276,22 +275,22 @@ const getEntityPriority = (item: YSortedEntityType): number => {
     case 'barrel': return 15;
     case 'rain_collector': return 18;
     case 'foundation_cell': return 0.5; // ADDED: Foundations render early (ground level)
-    case 'fog_overlay': return 19.9; // ADDED: Fog overlays render above ALL placeables (max ~18) but below walls (22+)
+    case 'projectile': return 19;
+    case 'viper_spittle': return 19;
+    case 'animal_corpse': return 20;
+    case 'player_corpse': return 20;
+    case 'player': return 21; // Players render before fog overlays (below ceiling tiles)
+    case 'fog_overlay': return 21.5; // ADDED: Fog overlays render above players (21) but below walls (22+)
     case 'wall_cell': {
       const wall = item.entity as SpacetimeDBWallCell;
       if (wall.edge === 0 || wall.edge === 2) {
-        // North/south walls render above players but below east/west walls
-        return 22; // Render after players (priority 21)
+        // North/south walls render above players and fog overlays
+        return 22; // Render after players (priority 21) and fog (21.5)
       } else {
         // East/west walls render ABOVE north walls (closer to viewer in 3/4 perspective)
         return 23; // Higher priority than north walls (22) to render on top
       }
     }
-    case 'projectile': return 19;
-    case 'viper_spittle': return 19;
-    case 'animal_corpse': return 20;
-    case 'player_corpse': return 20;
-    case 'player': return 21;
     case 'shelter': return 25;
     default: return 0;
   }
@@ -1390,6 +1389,7 @@ export function useEntityFiltering(
     // These render above placeables but below walls
     // CRITICAL: Must always check and add fog overlays when player is outside enclosed buildings
     // This ensures consistent fog of war for PVP gameplay
+    // IMPORTANT: Add fog overlays BEFORE walls to ensure correct render order
     if (buildingClusters && buildingClusters.size > 0) {
       const processedClusters = new Set<string>();
 
@@ -1415,11 +1415,43 @@ export function useEntityFiltering(
                 maxY = Math.max(maxY, worldY + FOUNDATION_TILE_SIZE);
               });
 
+              // Detect entrance way foundations (foundations on perimeter without walls on exposed edges)
+              // Get all foundations in this cluster
+              const clusterFoundations: SpacetimeDBFoundationCell[] = [];
+              for (const f of visibleFoundationCells) {
+                if (cluster.foundationIds.has(f.id)) {
+                  clusterFoundations.push(f);
+                }
+              }
+
+              // Detect entrance way foundations (foundations on perimeter without walls on exposed edges)
+              const entranceWayFoundations = detectEntranceWayFoundations(
+                clusterFoundations,
+                wallCells || new Map(),
+                cluster.cellCoords
+              );
+
+              // Detect foundations with north walls (for ceiling extension to cover north wall interiors)
+              const northWallFoundations = detectNorthWallFoundations(
+                clusterFoundations,
+                wallCells || new Map()
+              );
+
+              // Detect foundations with south walls (to prevent ceiling from covering them)
+              const southWallFoundations = detectSouthWallFoundations(
+                clusterFoundations,
+                wallCells || new Map()
+              );
+
               allEntities[index++] = {
                 type: 'fog_overlay',
                 entity: {
                   clusterId,
-                  bounds: { minX, minY, maxX, maxY }
+                  bounds: { minX, minY, maxX, maxY },
+                  entranceWayFoundations: Array.from(entranceWayFoundations), // Convert Set to Array for serialization
+                  clusterFoundationCoords: Array.from(cluster.cellCoords), // Pass all foundation coords to prevent rendering outside building
+                  northWallFoundations: Array.from(northWallFoundations), // Pass foundations with north walls for ceiling extension
+                  southWallFoundations: Array.from(southWallFoundations) // Pass foundations with south walls to prevent covering them
                 }
               };
               processedClusters.add(clusterId);
@@ -1450,14 +1482,24 @@ export function useEntityFiltering(
       const bIsWall = b.type === 'wall_cell';
       
       // If one is fog and the other is wall, wall ALWAYS wins (renders above)
+      // Return IMMEDIATELY to prevent any other logic from interfering
       if (aIsFog && bIsWall) {
-        return -1; // Fog renders before (below) wall - absolute precedence
+        return -1; // Fog renders before (below) wall - absolute precedence, NO EXCEPTIONS
       }
       if (bIsFog && aIsWall) {
-        return 1; // Wall renders after (above) fog - absolute precedence
+        return 1; // Wall renders after (above) fog - absolute precedence, NO EXCEPTIONS
       }
       
-      // CRITICAL: Ensure fog ALWAYS renders above placeables within masked building clusters - SECOND CHECK (right after walls)
+      // CRITICAL: Ensure fog ALWAYS renders above players - SECOND CHECK (right after walls)
+      // Players must always render below ceiling tiles/fog of war
+      if (aIsFog && b.type === 'player') {
+        return 1; // Fog renders after (above) player - absolute precedence
+      }
+      if (bIsFog && a.type === 'player') {
+        return -1; // Fog renders after (above) player - absolute precedence
+      }
+      
+      // CRITICAL: Ensure fog ALWAYS renders above placeables within masked building clusters - THIRD CHECK (after players)
       // This MUST run before any other logic to guarantee placeables are always hidden by fog
       const placeableTypes: Array<YSortedEntityType['type']> = [
         'wooden_storage_box', 'stash', 'campfire', 'furnace', 'lantern', 

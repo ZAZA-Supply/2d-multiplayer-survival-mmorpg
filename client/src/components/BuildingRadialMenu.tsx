@@ -19,6 +19,7 @@ import {
   faDoorOpen,
   IconDefinition 
 } from '@fortawesome/free-solid-svg-icons';
+import { playImmediateSound } from '../hooks/useSoundSystem';
 
 interface BuildingRadialMenuProps {
   isVisible: boolean;
@@ -66,9 +67,11 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const isSelectingRef = useRef(false); // Prevent multiple selections
 
-  // Calculate total wood in inventory
+  // Calculate total wood in inventory (only local player's items)
   const getWoodCount = (): number => {
-    if (!connection || !itemDefinitions) return 0;
+    if (!connection || !itemDefinitions || !connection.identity) return 0;
+    
+    const localPlayerIdentity = connection.identity;
     
     // Find Wood item definition
     let woodDefId: bigint | null = null;
@@ -81,10 +84,14 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
     
     if (!woodDefId) return 0;
     
-    // Sum up all wood items (inventory + hotbar)
+    // Sum up all wood items (inventory + hotbar - only local player's items)
     let total = 0;
     for (const item of inventoryItems.values()) {
-      if (item.itemDefId === woodDefId) {
+      // Only count items in the local player's inventory or hotbar
+      const isPlayerItem = (item.location.tag === 'Inventory' || item.location.tag === 'Hotbar') &&
+                          item.location.value.ownerId.isEqual(localPlayerIdentity);
+      
+      if (isPlayerItem && item.itemDefId === woodDefId) {
         total += item.quantity;
       }
     }
@@ -250,7 +257,8 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
             isSelectingRef.current = false;
           }, 50);
         } else {
-          // Option not available - clear building selection
+          // Option not available - play error sound and clear building selection
+          playImmediateSound('error_resources', 1.0);
           setTimeout(() => {
             onCancel(); // This will clear building mode
             isSelectingRef.current = false;
@@ -369,14 +377,14 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
                     ? isHovered || isSelected
                       ? 'url(#sectorHoverGradient)'
                       : 'url(#sectorNormalGradient)'
-                    : 'rgba(20, 20, 25, 0.5)'
+                    : 'rgba(80, 30, 30, 0.7)'
                 }
                 stroke={
                   isAvailable
                     ? isHovered || isSelected
                       ? '#00ffff'
                       : 'rgba(0, 170, 255, 0.5)'
-                    : 'rgba(50, 50, 50, 0.3)'
+                    : 'rgba(150, 60, 60, 0.6)'
                 }
                 strokeWidth={isHovered || isSelected ? 3 : 2}
                 style={{
@@ -385,7 +393,7 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
                   cursor: isAvailable ? 'pointer' : 'not-allowed',
                   pointerEvents: 'auto',
                 }}
-                opacity={isAvailable ? 1 : 0.4}
+                opacity={isAvailable ? 1 : 0.7}
               />
             </g>
           );
@@ -436,10 +444,10 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
                 icon={buildingOptions[hoveredIndex].icon}
                 style={{
                   fontSize: '48px',
-                  color: buildingOptions[hoveredIndex].available ? '#00ffff' : '#666',
+                  color: buildingOptions[hoveredIndex].available ? '#00ffff' : '#cc6666',
                   filter: buildingOptions[hoveredIndex].available 
                     ? 'drop-shadow(0 0 12px rgba(0, 255, 255, 0.8))' 
-                    : 'none',
+                    : 'drop-shadow(0 0 8px rgba(204, 102, 102, 0.6))',
                 }}
               />
             </div>
@@ -515,7 +523,7 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
                     ? isHovered 
                       ? 'drop-shadow(0 0 12px rgba(0, 255, 255, 1))' 
                       : 'drop-shadow(0 0 6px rgba(0, 170, 255, 0.6))'
-                    : 'grayscale(100%) brightness(0.3)',
+                    : 'drop-shadow(0 0 4px rgba(204, 102, 102, 0.5))',
                   transition: 'all 0.15s ease',
                 }}
               >
@@ -527,7 +535,7 @@ export const BuildingRadialMenu: React.FC<BuildingRadialMenuProps> = ({
                       ? isHovered 
                         ? '#00ffff' 
                         : '#00aaff'
-                      : '#444',
+                      : '#cc6666',
                   }}
                 />
               </div>

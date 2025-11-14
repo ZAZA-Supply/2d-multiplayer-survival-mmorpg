@@ -237,9 +237,94 @@ function isSeedPlacementTooClose(connection: DbConnection | null, placementInfo:
 }
 
 /**
- * Checks if placement is too far from the player.
- * Returns true if the placement position is beyond the allowed range.
+ * Checks if a world position is too close to any wall (with buffer zone)
+ * Used to prevent placing placeables on or near walls (client-side validation)
+ * Returns true if the position is within the buffer zone around a wall, false otherwise
  */
+function isPositionOnWall(
+    connection: DbConnection | null,
+    worldX: number,
+    worldY: number
+): boolean {
+    if (!connection) return false;
+    
+    const WALL_COLLISION_THICKNESS = 6.0;
+    const PLACEMENT_BUFFER = 24.0; // Buffer zone around walls (prevents placing too close on either side)
+    const FOUNDATION_TILE_SIZE = 96;
+    
+    // Convert world position to foundation cell coordinates
+    const cellX = Math.floor(worldX / FOUNDATION_TILE_SIZE);
+    const cellY = Math.floor(worldY / FOUNDATION_TILE_SIZE);
+    
+    // Check walls in nearby cells (±1 cell in each direction to catch edge cases)
+    for (let offsetX = -1; offsetX <= 1; offsetX++) {
+        for (let offsetY = -1; offsetY <= 1; offsetY++) {
+            const checkCellX = cellX + offsetX;
+            const checkCellY = cellY + offsetY;
+            
+            // Iterate through all walls and check if they're on this cell
+            for (const wall of connection.db.wallCell.iter()) {
+                if (wall.isDestroyed) continue;
+                
+                // Only check walls on the cell we're interested in
+                if (wall.cellX !== checkCellX || wall.cellY !== checkCellY) continue;
+                
+                // Calculate wall edge collision bounds using foundation cell coordinates
+                const tileLeft = checkCellX * FOUNDATION_TILE_SIZE;
+                const tileTop = checkCellY * FOUNDATION_TILE_SIZE;
+                const tileRight = tileLeft + FOUNDATION_TILE_SIZE;
+                const tileBottom = tileTop + FOUNDATION_TILE_SIZE;
+                
+                // Determine wall edge bounds with buffer zone on both sides
+                // Edge 0 = North (top), 1 = East (right), 2 = South (bottom), 3 = West (left)
+                // Buffer extends on both interior and exterior sides of the wall
+                let wallMinX: number, wallMaxX: number, wallMinY: number, wallMaxY: number;
+                
+                switch (wall.edge) {
+                    case 0: // North (top edge) - horizontal line
+                        // Buffer extends both north (exterior) and south (interior) of the wall
+                        wallMinX = tileLeft;
+                        wallMaxX = tileRight;
+                        wallMinY = tileTop - WALL_COLLISION_THICKNESS / 2.0 - PLACEMENT_BUFFER;
+                        wallMaxY = tileTop + WALL_COLLISION_THICKNESS / 2.0 + PLACEMENT_BUFFER;
+                        break;
+                    case 1: // East (right edge) - vertical line
+                        // Buffer extends both east (exterior) and west (interior) of the wall
+                        wallMinX = tileRight - WALL_COLLISION_THICKNESS / 2.0 - PLACEMENT_BUFFER;
+                        wallMaxX = tileRight + WALL_COLLISION_THICKNESS / 2.0 + PLACEMENT_BUFFER;
+                        wallMinY = tileTop;
+                        wallMaxY = tileBottom;
+                        break;
+                    case 2: // South (bottom edge) - horizontal line
+                        // Buffer extends both south (exterior) and north (interior) of the wall
+                        wallMinX = tileLeft;
+                        wallMaxX = tileRight;
+                        wallMinY = tileBottom - WALL_COLLISION_THICKNESS / 2.0 - PLACEMENT_BUFFER;
+                        wallMaxY = tileBottom + WALL_COLLISION_THICKNESS / 2.0 + PLACEMENT_BUFFER;
+                        break;
+                    case 3: // West (left edge) - vertical line
+                        // Buffer extends both west (exterior) and east (interior) of the wall
+                        wallMinX = tileLeft - WALL_COLLISION_THICKNESS / 2.0 - PLACEMENT_BUFFER;
+                        wallMaxX = tileLeft + WALL_COLLISION_THICKNESS / 2.0 + PLACEMENT_BUFFER;
+                        wallMinY = tileTop;
+                        wallMaxY = tileBottom;
+                        break;
+                    default:
+                        continue; // Skip invalid edges
+                }
+                
+                // Check if placement position is within wall collision bounds (including buffer)
+                if (worldX >= wallMinX && worldX <= wallMaxX &&
+                    worldY >= wallMinY && worldY <= wallMaxY) {
+                    return true;
+                }
+            }
+        }
+    }
+    
+    return false;
+}
+
 export function isPlacementTooFar(
     placementInfo: PlacementItemInfo | null, 
     playerX: number, 
@@ -809,8 +894,11 @@ export function renderPlacementPreview({
             return true; // No foundation found, placement is invalid
         })();
     
+    // Check if placement position is on a wall
+    const isOnWall = connection ? isPositionOnWall(connection, worldMouseX, worldMouseY) : false;
+    
     // Apply visual effect - red tint with opacity for any invalid placement
-    const isInvalidPlacement = isPlacementTooFar || isOnWater || isTooCloseToSeeds || isOnFoundation || isNotOnFoundation || placementError;
+    const isInvalidPlacement = isPlacementTooFar || isOnWater || isTooCloseToSeeds || isOnFoundation || isNotOnFoundation || isOnWall || placementError;
     
     if (isInvalidPlacement) {
         // Strong red tint for all invalid placements

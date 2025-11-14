@@ -287,6 +287,11 @@ pub fn place_lantern(ctx: &ReducerContext, item_instance_id: u64, world_x: f32, 
                 dist_sq_place.sqrt(), LANTERN_PLACEMENT_MAX_DISTANCE));
     }
 
+    // Check if placement position is on a wall
+    if crate::building::is_position_on_wall(ctx, world_x, world_y) {
+        return Err("Cannot place lantern on a wall.".to_string());
+    }
+
     // Check for collision with other lanterns
     for other_lantern in lanterns.iter() {
         let dx_lantern = world_x - other_lantern.pos_x;

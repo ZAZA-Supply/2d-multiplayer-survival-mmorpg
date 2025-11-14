@@ -286,7 +286,7 @@ pub fn get_tool_definitions() -> Vec<ItemDefinition> {
             .build(),
 
         // Water Storage Tools
-        ItemBuilder::new("Reed Water Bottle", "A portable water container crafted from hollow reed segments sealed with tallow. Can be filled from water sources. Capacity: 2L.", ItemCategory::Tool)
+        ItemBuilder::new("Reed Water Bottle", "A portable water container crafted from hollow reed segments sealed with tallow. Can be filled from water sources by pressing F. Capacity: 2L.", ItemCategory::Tool)
             .icon("reed_water_bottle.png")
             .equippable(None)
             .crafting_cost(vec![
@@ -298,7 +298,7 @@ pub fn get_tool_definitions() -> Vec<ItemDefinition> {
             .respawn_time(480)
             .build(),
 
-        ItemBuilder::new("Plastic Water Jug", "A large plastic container for storing water. Durable and lightweight with excellent capacity. Can be filled from water sources. Capacity: 5L.", ItemCategory::Tool)
+        ItemBuilder::new("Plastic Water Jug", "A large plastic container for storing water. Durable and lightweight with excellent capacity. Can be filled from water sources by pressing F. Capacity: 5L.", ItemCategory::Tool)
             .icon("water_jug.png")
             .equippable(None)
             .respawn_time(720)
