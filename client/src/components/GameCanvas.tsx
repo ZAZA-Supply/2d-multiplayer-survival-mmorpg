@@ -889,8 +889,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     const handleUpgradeFoundationResult = (ctx: any, foundationId: bigint, newTier: number) => {
       if (ctx.event?.status?.tag === 'Failed') {
         const errorMsg = ctx.event.status.value || '';
+        // Check if error is about building privilege
+        if (errorMsg.includes('Building privilege') || errorMsg.includes('building privilege')) {
+          // Play building privilege error sound for instant feedback
+          playImmediateSound('error_building_privilege', 1.0);
+        }
+        // Check if error is about tier upgrade (cannot downgrade or already at tier)
+        else if (errorMsg.includes('Cannot downgrade') || 
+                 errorMsg.includes('Current tier') || 
+                 errorMsg.includes('Target tier')) {
+          // Play tier upgrade error sound for instant feedback
+          playImmediateSound('error_tier_upgrade', 1.0);
+        }
         // Check if error is about insufficient resources
-        if (errorMsg.includes('Not enough') || 
+        else if (errorMsg.includes('Not enough') || 
             errorMsg.includes('wood') || 
             errorMsg.includes('stone') ||
             errorMsg.includes('metal fragments') ||
@@ -1049,8 +1061,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       if (ctx.event?.status?.tag === 'Failed') {
         const errorMsg = ctx.event.status.value || 'Failed to upgrade wall';
         console.error('[GameCanvas] upgradeWall failed:', errorMsg);
+        // Check if error is about building privilege
+        if (errorMsg.includes('Building privilege') || errorMsg.includes('building privilege')) {
+          // Play building privilege error sound for instant feedback
+          playImmediateSound('error_building_privilege', 1.0);
+        }
+        // Check if error is about tier upgrade (cannot downgrade or already at tier)
+        else if (errorMsg.includes('Cannot downgrade') || 
+                 errorMsg.includes('Current tier') || 
+                 errorMsg.includes('Target tier')) {
+          // Play tier upgrade error sound for instant feedback
+          playImmediateSound('error_tier_upgrade', 1.0);
+        }
         // Check if error is about insufficient resources
-        if (errorMsg.includes('Not enough') || 
+        else if (errorMsg.includes('Not enough') || 
             errorMsg.includes('wood') || 
             errorMsg.includes('stone') ||
             errorMsg.includes('metal fragments') ||

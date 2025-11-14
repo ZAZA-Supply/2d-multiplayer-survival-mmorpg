@@ -48,6 +48,8 @@ use crate::environment::calculate_chunk_index;
 use crate::campfire::{Campfire, CAMPFIRE_COLLISION_RADIUS, CAMPFIRE_COLLISION_Y_OFFSET, campfire as CampfireTableTrait, campfire_processing_schedule as CampfireProcessingScheduleTableTrait};
 use crate::lantern::{Lantern, lantern as LanternTableTrait};
 use crate::stash::{Stash, stash as StashTableTrait};
+use crate::PrivateMessage;
+use crate::private_message as PrivateMessageTableTrait;
 use crate::sleeping_bag::{SleepingBag, SLEEPING_BAG_COLLISION_RADIUS, SLEEPING_BAG_COLLISION_Y_OFFSET, sleeping_bag as SleepingBagTableTrait};
 use crate::shelter::Shelter; // Ensure Shelter struct is imported
 use crate::shelter::shelter as ShelterTableTrait; // Ensure Shelter table trait is imported
@@ -1184,6 +1186,34 @@ pub fn damage_tree(
     }
     
     if tree_destroyed {
+        // Final chop bonus: Reward players for completing the tree with a small bonus
+        // Bonus is 15-25% of the yield from this hit, scaling with tool quality
+        if actual_yield > 0 {
+            let bonus_percentage = rng.gen_range(0.15..=0.25); // 15-25% bonus
+            let final_chop_bonus = ((actual_yield as f32) * bonus_percentage).ceil() as u32;
+            
+            if final_chop_bonus > 0 {
+                let bonus_result = grant_resource(ctx, attacker_id, resource_name_to_grant, final_chop_bonus);
+                
+                if let Err(e) = bonus_result {
+                    log::error!("Failed to grant final chop bonus {} to player {:?}: {}", resource_name_to_grant, attacker_id, e);
+                } else {
+                    log::info!("Player {:?} received final chop bonus: {} {} ({}% of yield)", 
+                             attacker_id, final_chop_bonus, resource_name_to_grant, (bonus_percentage * 100.0) as u32);
+                    
+                    // Send dopamine-inducing bonus notification to player
+                    let bonus_message = PrivateMessage {
+                        id: 0, // Auto-incremented
+                        recipient_identity: attacker_id,
+                        sender_display_name: "SYSTEM".to_string(),
+                        text: format!("🎉 BONUS! +{} {}", final_chop_bonus, resource_name_to_grant),
+                        sent: timestamp,
+                    };
+                    ctx.db.private_message().insert(bonus_message);
+                }
+            }
+        }
+        
         log::info!("Tree {} destroyed by Player {:?}. Scheduling respawn.", tree_id, attacker_id);
         // Calculate random respawn time for trees
         let respawn_duration_secs = if tree::MIN_TREE_RESPAWN_TIME_SECS >= tree::MAX_TREE_RESPAWN_TIME_SECS {
@@ -1256,6 +1286,35 @@ pub fn damage_stone(
     }
     
     if stone_destroyed {
+        // Final hit bonus: Reward players for completing the stone with a small bonus
+        // Bonus is 15-25% of the yield from this hit, scaling with tool quality
+        if actual_yield > 0 {
+            let bonus_percentage = rng.gen_range(0.15..=0.25); // 15-25% bonus
+            let final_hit_bonus = ((actual_yield as f32) * bonus_percentage).ceil() as u32;
+            
+            if final_hit_bonus > 0 {
+                let bonus_result = grant_resource(ctx, attacker_id, resource_name_to_grant, final_hit_bonus);
+                
+                if let Err(e) = bonus_result {
+                    log::error!("Failed to grant final hit bonus {} to player {:?}: {}", resource_name_to_grant, attacker_id, e);
+                } else {
+                    log::info!("Player {:?} received final hit bonus: {} {} ({}% of yield)", 
+                             attacker_id, final_hit_bonus, resource_name_to_grant, (bonus_percentage * 100.0) as u32);
+                    
+                    // Send dopamine-inducing bonus notification to player
+                    let bonus_message = PrivateMessage {
+                        id: 0, // Auto-incremented
+                        recipient_identity: attacker_id,
+                        sender_display_name: "SYSTEM".to_string(),
+                        text: format!("🎉 BONUS! +{} {}", final_hit_bonus,
+                        resource_name_to_grant),
+                        sent: timestamp,
+                    };
+                    ctx.db.private_message().insert(bonus_message);
+                }
+            }
+        }
+        
         log::info!("Stone {} depleted by Player {:?}. Scheduling respawn.", stone_id, attacker_id);
         // Calculate random respawn time for stones
         let respawn_duration_secs = if stone::MIN_STONE_RESPAWN_TIME_SECS >= stone::MAX_STONE_RESPAWN_TIME_SECS {

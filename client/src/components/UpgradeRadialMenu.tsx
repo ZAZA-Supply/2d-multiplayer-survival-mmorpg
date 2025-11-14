@@ -403,8 +403,14 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
             isSelectingRef.current = false;
           }, 50);
         } else {
-          // Option not available - play error sound
-          playImmediateSound('error_resources', 1.0);
+          // Option not available - play appropriate error sound based on reason
+          if (option.reason?.includes('Building privilege') || option.reason?.includes('building privilege')) {
+            playImmediateSound('error_building_privilege', 1.0);
+          } else if (option.reason?.includes('Already at or above this tier') || option.reason?.includes('already at')) {
+            playImmediateSound('error_tier_upgrade', 1.0);
+          } else {
+            playImmediateSound('error_resources', 1.0);
+          }
           setTimeout(() => {
             onCancel();
             isSelectingRef.current = false;

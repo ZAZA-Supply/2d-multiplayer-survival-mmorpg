@@ -79,6 +79,8 @@ const SOUND_DEFINITIONS = {
     construction_placement_error: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Foundation placement error sound
     error_resources: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Resource error sound (client-side immediate for instant feedback)
     error_arrows: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Arrow error sound (client-side immediate for instant feedback when firing without arrows)
+    error_building_privilege: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Building privilege error sound (client-side immediate for instant feedback when trying to upgrade without privilege)
+    error_tier_upgrade: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Tier upgrade error sound (client-side immediate for instant feedback when trying to upgrade to same or lower tier)
 } as const;
 
 type SoundType = keyof typeof SOUND_DEFINITIONS;
@@ -87,6 +89,8 @@ type SoundType = keyof typeof SOUND_DEFINITIONS;
 const NO_PITCH_VARIATION_SOUNDS: Set<SoundType> = new Set([
     'error_resources',
     'error_arrows',
+    'error_building_privilege',
+    'error_tier_upgrade',
 ] as SoundType[]);
 
 // Track active error sounds to prevent multiple from playing simultaneously
@@ -305,6 +309,10 @@ const PRELOAD_SOUNDS = [
     'foundation_metal_upgraded.mp3',                        // 1 foundation metal upgraded variation
     'twig_foundation_destroyed.mp3',                        // 1 twig foundation destroyed variation
     'error_arrows.mp3',                                      // 1 error arrows variation
+    'error_resources.mp3',                                   // 1 error resources variation
+    'error_building_privilege.mp3',                         // 1 error building privilege variation
+    'error_tier_upgrade.mp3',                               // 1 error tier upgrade variation
+    'construction_placement_error.mp3',                     // 1 construction placement error variation
 ] as const;
 
 // Enhanced audio loading with error handling and performance monitoring
@@ -541,6 +549,10 @@ const playLocalSound = async (
                 variationCount = 1; // construction_placement_error.mp3
             } else if (soundType === 'error_arrows') {
                 variationCount = 1; // error_arrows.mp3
+            } else if (soundType === 'error_building_privilege') {
+                variationCount = 1; // error_building_privilege.mp3
+            } else if (soundType === 'error_tier_upgrade') {
+                variationCount = 1; // error_tier_upgrade.mp3
             } else if (soundType === 'arrow_hit') {
                 variationCount = 1; // arrow_hit.mp3
             } else if (soundType === 'shoot_bow') {
