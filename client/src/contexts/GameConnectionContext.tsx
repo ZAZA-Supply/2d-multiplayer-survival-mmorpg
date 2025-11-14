@@ -196,6 +196,19 @@ export const GameConnectionProvider: React.FC<GameConnectionProviderProps> = ({ 
                     
                     if (err) {
                         const errorMessage = err.message || 'Connection lost';
+                        
+                        // Check for deserialization errors
+                        if (errorMessage.includes('Tried to read') && errorMessage.includes('byte(s)')) {
+                            console.error('[GameConn LOG] Deserialization error detected - schema mismatch or corrupted data');
+                            updateConnectionState(
+                                ConnectionState.ERROR, 
+                                null, 
+                                null, 
+                                'Data format error detected. Please refresh your browser to reload the latest client version.'
+                            );
+                            return;
+                        }
+                        
                         updateConnectionState(ConnectionState.ERROR, null, null, errorMessage);
                         
                         // Check for auth errors
@@ -217,6 +230,19 @@ export const GameConnectionProvider: React.FC<GameConnectionProviderProps> = ({ 
                     cleanupConnection();
                     
                     const errorMessage = err.message || err.toString();
+                    
+                    // Check for deserialization errors
+                    if (errorMessage.includes('Tried to read') && errorMessage.includes('byte(s)')) {
+                        console.error('[GameConn LOG] Deserialization error during connection - schema mismatch or corrupted data');
+                        updateConnectionState(
+                            ConnectionState.ERROR,
+                            null,
+                            null,
+                            'Data format error detected. Please refresh your browser to reload the latest client version.'
+                        );
+                        return;
+                    }
+                    
                     updateConnectionState(
                         ConnectionState.ERROR,
                         null,
