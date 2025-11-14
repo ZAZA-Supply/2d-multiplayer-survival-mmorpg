@@ -3,10 +3,12 @@ import dirtTile from '../../assets/tiles/dirt.png';
 import dirtRoadTile from '../../assets/tiles/dirt_road.png';
 import seaTile from '../../assets/tiles/sea2.png';
 import beachTile from '../../assets/tiles/beach3.png';
-// Import autotile assets
+// Import existing autotile assets (these files exist)
 import grassDirtAutotile from '../../assets/tiles/tileset_grass_dirt_autotile.png';
 import grassBeachAutotile from '../../assets/tiles/tileset_grass_beach_autotile.png';
 import beachSeaAutotile from '../../assets/tiles/tileset_beach_sea_autotile.png';
+// Note: Missing autotile images are loaded dynamically in proceduralWorldRenderer.ts
+// to handle missing files gracefully until they are created
 
 export interface TileAssetConfig {
     baseTexture: string;

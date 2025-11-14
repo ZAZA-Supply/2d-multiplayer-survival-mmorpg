@@ -537,7 +537,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                             cursor: 'pointer'
                         }}
                     >
-                        Debug Overlay: {showAutotileDebug ? 'ON' : 'OFF'}
+                        Tileset Overlay: {showAutotileDebug ? 'ON' : 'OFF'}
                     </button>
                     
                     <button 

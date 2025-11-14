@@ -380,9 +380,54 @@ export const AUTOTILE_CONFIGS: { [key: string]: AutotileConfig } = {
         columns: 6,    // 6 columns: 1280 ÷ 6 ≈ 213.33 pixels wide
         rows: 8        // 8 rows: 1280 ÷ 8 = 160 pixels tall
     },
-    // Future autotile sets can be added here
-    // 'Grass_Sea': { ... },
-    // 'Dirt_DirtRoad': { ... },
+    'Dirt_Beach': {
+        primaryType: 'Dirt',
+        secondaryType: 'Beach',
+        tilesetPath: '/src/assets/tiles/tileset_dirt_beach_autotile.png',
+        tileSize: 213,
+        columns: 6,
+        rows: 8
+    },
+    'DirtRoad_Beach': {
+        primaryType: 'DirtRoad',
+        secondaryType: 'Beach',
+        tilesetPath: '/src/assets/tiles/tileset_dirtroad_beach_autotile.png',
+        tileSize: 213,
+        columns: 6,
+        rows: 8
+    },
+    'Dirt_DirtRoad': {
+        primaryType: 'Dirt',
+        secondaryType: 'DirtRoad',
+        tilesetPath: '/src/assets/tiles/tileset_dirt_dirtroad_autotile.png',
+        tileSize: 213,
+        columns: 6,
+        rows: 8
+    },
+    'DirtRoad_Dirt': {
+        primaryType: 'DirtRoad',
+        secondaryType: 'Dirt',
+        tilesetPath: '/src/assets/tiles/tileset_dirtroad_dirt_autotile.png',
+        tileSize: 213,
+        columns: 6,
+        rows: 8
+    },
+    'Grass_DirtRoad': {
+        primaryType: 'Grass',
+        secondaryType: 'DirtRoad',
+        tilesetPath: '/src/assets/tiles/tileset_grass_dirtroad_autotile.png',
+        tileSize: 213,
+        columns: 6,
+        rows: 8
+    },
+    'DirtRoad_Grass': {
+        primaryType: 'DirtRoad',
+        secondaryType: 'Grass',
+        tilesetPath: '/src/assets/tiles/tileset_dirtroad_grass_autotile.png',
+        tileSize: 213,
+        columns: 6,
+        rows: 8
+    },
 };
 
 /**
