@@ -441,17 +441,77 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
         }
     }, [connection, container.containerId, container.containerEntity]);
 
+    // Track if privilege toggle is in progress to prevent double-clicks
+    const [isTogglingPrivilege, setIsTogglingPrivilege] = useState(false);
+
     // Handle grant building privilege for matron's chest
+    // CRITICAL FIX: Add debouncing and proper error handling
     const handleGrantBuildingPrivilege = useCallback(() => {
-        if (!connection?.reducers || container.containerId === null || !container.containerEntity) return;
-        
-        const hearthIdNum = typeof container.containerId === 'bigint' ? Number(container.containerId) : container.containerId;
-        try {
-            connection.reducers.grantBuildingPrivilegeFromHearth(hearthIdNum);
-        } catch (e: any) {
-            console.error("Error granting building privilege:", e);
+        if (!connection?.reducers || container.containerId === null || !container.containerEntity) {
+            console.warn("[BuildingPrivilege] Cannot grant privilege - missing connection or container");
+            return;
         }
-    }, [connection, container.containerId, container.containerEntity]);
+        
+        // Prevent double-clicks and rapid toggling
+        if (isTogglingPrivilege) {
+            console.warn("[BuildingPrivilege] Toggle already in progress, ignoring click");
+            return;
+        }
+        
+        setIsTogglingPrivilege(true);
+        const hearthIdNum = typeof container.containerId === 'bigint' ? Number(container.containerId) : container.containerId;
+        
+        // Register one-time callback to handle the response
+        const handlePrivilegeResponse = (ctx: any, hearthIdParam: number) => {
+            if (hearthIdParam !== hearthIdNum) return; // Not our call
+            
+            // Remove callback after handling
+            if (connection?.reducers?.removeOnGrantBuildingPrivilegeFromHearth) {
+                connection.reducers.removeOnGrantBuildingPrivilegeFromHearth(handlePrivilegeResponse);
+            }
+            
+            // Reset toggle flag
+            setIsTogglingPrivilege(false);
+            
+            // Check reducer event status
+            const status = ctx.event?.status;
+            if (status?.tag === 'Failed') {
+                const errorMsg = status.value || 'Failed to toggle building privilege';
+                console.error("[BuildingPrivilege] Failed to toggle privilege:", errorMsg);
+                // Show error to user
+                alert(`Failed to toggle building privilege: ${errorMsg}`);
+            } else if (status?.tag === 'Committed') {
+                console.log("[BuildingPrivilege] Successfully toggled building privilege");
+                // State will update automatically via activeConsumableEffects subscription
+                // Give it a moment to propagate
+                setTimeout(() => {
+                    console.log("[BuildingPrivilege] State should be updated now");
+                }, 100);
+            }
+        };
+        
+        // Register callback before calling reducer
+        if (connection.reducers.onGrantBuildingPrivilegeFromHearth) {
+            connection.reducers.onGrantBuildingPrivilegeFromHearth(handlePrivilegeResponse);
+        }
+        
+        try {
+            console.log("[BuildingPrivilege] Calling grantBuildingPrivilegeFromHearth for hearth", hearthIdNum);
+            connection.reducers.grantBuildingPrivilegeFromHearth(hearthIdNum);
+            
+            // Timeout fallback in case callback never fires (shouldn't happen, but safety net)
+            setTimeout(() => {
+                setIsTogglingPrivilege(false);
+            }, 5000); // 5 second timeout
+        } catch (e: any) {
+            console.error("[BuildingPrivilege] Error calling reducer:", e);
+            setIsTogglingPrivilege(false);
+            // Remove callback on error
+            if (connection?.reducers?.removeOnGrantBuildingPrivilegeFromHearth) {
+                connection.reducers.removeOnGrantBuildingPrivilegeFromHearth(handlePrivilegeResponse);
+            }
+        }
+    }, [connection, container.containerId, container.containerEntity, isTogglingPrivilege]);
 
     // Get list of players with building privilege
     const playersWithPrivilege = useMemo(() => {
@@ -475,8 +535,9 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
         
         return privilegePlayers;
     }, [activeConsumableEffects, players]);
-
+    
     // Check if current player has building privilege
+    // CRITICAL FIX: Ensure state updates properly
     const currentPlayerHasPrivilege = useMemo(() => {
         if (!activeConsumableEffects || !playerId) return false;
         
@@ -820,8 +881,20 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
                                         onClick={handleGrantBuildingPrivilege}
                                         className={`${styles.interactionButton} ${currentPlayerHasPrivilege ? styles.extinguishButton : styles.lightFireButton}`}
                                         style={{ width: '100%' }}
+                                        disabled={!connection || container.containerId === null || isTogglingPrivilege}
+                                        title={
+                                            !connection ? 'Not connected' : 
+                                            container.containerId === null ? 'No container selected' : 
+                                            isTogglingPrivilege ? 'Processing...' : 
+                                            ''
+                                        }
                                     >
-                                        {currentPlayerHasPrivilege ? 'Revoke Building Privilege' : 'Grant Building Privilege'}
+                                        {isTogglingPrivilege 
+                                            ? 'Processing...' 
+                                            : currentPlayerHasPrivilege 
+                                                ? 'Revoke Building Privilege' 
+                                                : 'Grant Building Privilege'
+                                        }
                                     </button>
                                 </div>
                                 

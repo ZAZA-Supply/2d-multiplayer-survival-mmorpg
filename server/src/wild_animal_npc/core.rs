@@ -487,11 +487,9 @@ pub fn process_wild_animal_ai(ctx: &ReducerContext, _schedule: WildAnimalAiSched
     let animal_count = ctx.db.wild_animal().iter().count();
     if animal_count == 0 {
         // No animals to process - stop the schedule to save resources
-        let schedule_table = ctx.db.wild_animal_ai_schedule();
-        for schedule in schedule_table.iter() {
-            schedule_table.id().delete(schedule.id);
-        }
-        log::debug!("Stopped wild animal AI schedule - no animals in database");
+        // BUT: Don't delete the schedule - keep it running so it can restart when animals spawn
+        // This fixes the issue where animals spawn but don't move because schedule was deleted
+        log::debug!("No animals to process (count: {}). Schedule will continue running and restart when animals spawn.", animal_count);
         return Ok(());
     }
 

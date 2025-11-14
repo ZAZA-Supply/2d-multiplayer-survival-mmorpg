@@ -1483,6 +1483,18 @@ export const useSpacetimeTables = ({
                 console.warn('[SPATIAL] Viewport contains NaN values, skipping spatial update.', viewport);
                 return;
             }
+            
+            // 🚨 PRODUCTION FIX: Check for zero-sized viewport (common on initial load)
+            const viewportWidth = viewport.maxX - viewport.minX;
+            const viewportHeight = viewport.maxY - viewport.minY;
+            if (viewportWidth <= 0 || viewportHeight <= 0) {
+                console.warn('[SPATIAL] Viewport has zero or negative size, skipping spatial update.', {
+                    viewport,
+                    width: viewportWidth,
+                    height: viewportHeight
+                });
+                return;
+            }
 
             // MASTER SWITCH: Skip spatial subscription logic if all spatial subscriptions are disabled
             if (DISABLE_ALL_SPATIAL_SUBSCRIPTIONS) {
@@ -1532,7 +1544,12 @@ export const useSpacetimeTables = ({
             // This prevents race conditions on startup.
             if (!subscribedChunksRef.current.size) {
                 // --- INITIAL SUBSCRIPTION ---
-                console.log("[SPATIAL] First valid viewport received. Performing initial subscription.", viewport);
+                console.log("[SPATIAL] First valid viewport received. Performing initial subscription.", {
+                    viewport,
+                    width: viewportWidth,
+                    height: viewportHeight,
+                    chunks: getChunkIndicesForViewportWithBuffer(viewport, CHUNK_BUFFER_SIZE).length
+                });
 
                 // Ensure any old subscriptions are cleared (shouldn't be any, but for safety)
                 spatialSubsRef.current.forEach((handles) => handles.forEach(safeUnsubscribe));

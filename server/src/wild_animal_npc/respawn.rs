@@ -5,7 +5,7 @@ use log;
 use crate::{TILE_SIZE_PX, WORLD_WIDTH_TILES, WORLD_HEIGHT_TILES};
 use crate::environment::{calculate_chunk_index, is_wild_animal_location_suitable, is_position_on_water, is_position_in_central_compound};
 use crate::utils::calculate_tile_bounds;
-use super::core::{AnimalSpecies, AnimalState, MovementPattern, WildAnimal, AnimalBehavior};
+use super::core::{AnimalSpecies, AnimalState, MovementPattern, WildAnimal, AnimalBehavior, init_wild_animal_ai_schedule};
 
 // Table trait imports
 use crate::wild_animal_npc::core::wild_animal;
@@ -105,6 +105,14 @@ pub fn maintain_wild_animal_population(ctx: &ReducerContext) -> Result<(), Strin
     if spawned_count > 0 {
         log::info!("Wild animal respawn cycle complete: spawned {} animals in {} attempts (population: {}/{})", 
                    spawned_count, spawn_attempts, current_animal_count + spawned_count, TARGET_POPULATION);
+        
+        // CRITICAL FIX: Restart AI schedule if it was stopped (e.g., after database clear)
+        // This ensures animals will actually move and function after spawning
+        if let Err(e) = init_wild_animal_ai_schedule(ctx) {
+            log::warn!("Failed to restart AI schedule after spawning animals: {}. Animals may not move until next AI tick.", e);
+        } else {
+            log::debug!("AI schedule restarted after spawning {} animals", spawned_count);
+        }
     } else if animals_needed > 0 {
         log::warn!("Failed to spawn any animals this cycle despite low population ({}/{}). Will retry next cycle.", 
                    current_animal_count, TARGET_POPULATION);
