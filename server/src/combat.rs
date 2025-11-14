@@ -1223,9 +1223,54 @@ pub fn damage_tree(
         };
         let respawn_time = timestamp + TimeDuration::from_micros(respawn_duration_secs as i64 * 1_000_000);
         tree.respawn_at = Some(respawn_time);
+        
+        // Store tree position before updating database
+        const TREE_PROTECTION_DISTANCE_SQ: f32 = 100.0 * 100.0; // 100px protection radius (matches campfire.rs)
+        let tree_pos_x = tree.pos_x;
+        let tree_pos_y = tree.pos_y;
+        
+        // Update tree in database first so protection checks see it as destroyed
+        ctx.db.tree().id().update(tree.clone());
+        
+        // Check for campfires that were protected by this tree and extinguish them if no longer protected
+        for mut campfire in ctx.db.campfire().iter() {
+            // Skip campfires that aren't burning or are destroyed
+            if !campfire.is_burning || campfire.is_destroyed {
+                continue;
+            }
+            
+            // Check if this campfire was within protection distance of the destroyed tree
+            let dx = campfire.pos_x - tree_pos_x;
+            let dy = campfire.pos_y - tree_pos_y;
+            let distance_sq = dx * dx + dy * dy;
+            
+            if distance_sq <= TREE_PROTECTION_DISTANCE_SQ {
+                // This campfire was protected by the destroyed tree
+                // Check if it's still protected by any other tree or shelter
+                if !crate::campfire::is_campfire_protected_from_rain(ctx, &campfire) {
+                    // No longer protected - extinguish the campfire
+                    campfire.is_burning = false;
+                    campfire.current_fuel_def_id = None;
+                    campfire.remaining_fuel_burn_time_secs = None;
+                    
+                    // Stop campfire sound when extinguished
+                    crate::sound_events::stop_campfire_sound(ctx, campfire.id as u64);
+                    
+                    // Update the campfire in the database
+                    ctx.db.campfire().id().update(campfire.clone());
+                    
+                    // Cancel any scheduled processing for this campfire
+                    ctx.db.campfire_processing_schedule().campfire_id().delete(campfire.id as u64);
+                    
+                    log::info!("Campfire {} extinguished after tree {} was cut down (no longer protected)", 
+                              campfire.id, tree_id);
+                }
+            }
+        }
+    } else {
+        // Tree not destroyed - update normally
+        ctx.db.tree().id().update(tree);
     }
-    
-    ctx.db.tree().id().update(tree);
     
     Ok(AttackResult {
         hit: true,

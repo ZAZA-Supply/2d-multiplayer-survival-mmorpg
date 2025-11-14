@@ -205,6 +205,8 @@ import { MoveItemWithinStash } from "./move_item_within_stash_reducer.ts";
 export { MoveItemWithinStash };
 import { MoveToFirstAvailableHotbarSlot } from "./move_to_first_available_hotbar_slot_reducer.ts";
 export { MoveToFirstAvailableHotbarSlot };
+import { MoveToFirstAvailableInventorySlot } from "./move_to_first_available_inventory_slot_reducer.ts";
+export { MoveToFirstAvailableInventorySlot };
 import { PickupDroppedItem } from "./pickup_dropped_item_reducer.ts";
 export { PickupDroppedItem };
 import { PickupLantern } from "./pickup_lantern_reducer.ts";
@@ -1953,6 +1955,10 @@ const REMOTE_MODULE = {
       reducerName: "move_to_first_available_hotbar_slot",
       argsType: MoveToFirstAvailableHotbarSlot.getTypeScriptAlgebraicType(),
     },
+    move_to_first_available_inventory_slot: {
+      reducerName: "move_to_first_available_inventory_slot",
+      argsType: MoveToFirstAvailableInventorySlot.getTypeScriptAlgebraicType(),
+    },
     pickup_dropped_item: {
       reducerName: "pickup_dropped_item",
       argsType: PickupDroppedItem.getTypeScriptAlgebraicType(),
@@ -2522,6 +2528,7 @@ export type Reducer = never
 | { name: "MoveItemWithinLantern", args: MoveItemWithinLantern }
 | { name: "MoveItemWithinStash", args: MoveItemWithinStash }
 | { name: "MoveToFirstAvailableHotbarSlot", args: MoveToFirstAvailableHotbarSlot }
+| { name: "MoveToFirstAvailableInventorySlot", args: MoveToFirstAvailableInventorySlot }
 | { name: "PickupDroppedItem", args: PickupDroppedItem }
 | { name: "PickupLantern", args: PickupLantern }
 | { name: "PickupStorageBox", args: PickupStorageBox }
@@ -3962,6 +3969,22 @@ export class RemoteReducers {
 
   removeOnMoveToFirstAvailableHotbarSlot(callback: (ctx: ReducerEventContext, itemInstanceId: bigint) => void) {
     this.connection.offReducer("move_to_first_available_hotbar_slot", callback);
+  }
+
+  moveToFirstAvailableInventorySlot(itemInstanceId: bigint) {
+    const __args = { itemInstanceId };
+    let __writer = new __BinaryWriter(1024);
+    MoveToFirstAvailableInventorySlot.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("move_to_first_available_inventory_slot", __argsBuffer, this.setCallReducerFlags.moveToFirstAvailableInventorySlotFlags);
+  }
+
+  onMoveToFirstAvailableInventorySlot(callback: (ctx: ReducerEventContext, itemInstanceId: bigint) => void) {
+    this.connection.onReducer("move_to_first_available_inventory_slot", callback);
+  }
+
+  removeOnMoveToFirstAvailableInventorySlot(callback: (ctx: ReducerEventContext, itemInstanceId: bigint) => void) {
+    this.connection.offReducer("move_to_first_available_inventory_slot", callback);
   }
 
   pickupDroppedItem(droppedItemId: bigint) {
@@ -6154,6 +6177,11 @@ export class SetReducerFlags {
   moveToFirstAvailableHotbarSlotFlags: __CallReducerFlags = 'FullUpdate';
   moveToFirstAvailableHotbarSlot(flags: __CallReducerFlags) {
     this.moveToFirstAvailableHotbarSlotFlags = flags;
+  }
+
+  moveToFirstAvailableInventorySlotFlags: __CallReducerFlags = 'FullUpdate';
+  moveToFirstAvailableInventorySlot(flags: __CallReducerFlags) {
+    this.moveToFirstAvailableInventorySlotFlags = flags;
   }
 
   pickupDroppedItemFlags: __CallReducerFlags = 'FullUpdate';

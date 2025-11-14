@@ -895,18 +895,22 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         // - Server returns error and auto-unloads weapon
         // This is a sync issue, not a user error, so don't play error sound
         
-        // Only play sound for pre-fire validation errors
-        if (errorMsg.includes('Weapon is not loaded') && 
-            !errorMsg.includes('No loaded ammunition found in inventory to consume')) {
+        // Check for consumption errors FIRST (most specific) to exclude them from sound
+        if (errorMsg.includes('No loaded ammunition found in inventory to consume') ||
+            errorMsg.includes('ammunition found in inventory')) {
+          // Arrow consumption failed - sync issue, don't play sound
+          // This happens when client thinks weapon is ready but server can't find arrow
+          console.debug('[FireProjectile] Arrow consumption sync issue (weapon will auto-unload):', errorMsg);
+          return; // Exit early, don't play sound
+        }
+        
+        // Only play sound for pre-fire validation errors (weapon not loaded before firing)
+        if (errorMsg.includes('Weapon is not loaded')) {
           // Weapon wasn't loaded before firing - legitimate user error
           playImmediateSound('error_arrows', 1.0);
         } else if (errorMsg.includes('not loaded correctly')) {
           // Weapon state is invalid - legitimate error
           playImmediateSound('error_arrows', 1.0);
-        } else if (errorMsg.includes('No loaded ammunition found in inventory to consume') ||
-                   errorMsg.includes('ammunition found in inventory')) {
-          // Arrow consumption failed - sync issue, don't play sound
-          console.debug('[FireProjectile] Arrow consumption sync issue (weapon will auto-unload):', errorMsg);
         }
         // Note: We explicitly exclude consumption errors from playing sound
       }

@@ -35,7 +35,8 @@ const SHELTER_SHAKE_INTENSITY_PX = 6; // Less intense for a large, sturdy object
 const clientShelterShakeStartTimes = new Map<string, number>(); // shelterId -> client timestamp when shake started
 const lastKnownServerShelterShakeTimes = new Map<string, number>();
 
-const SHELTER_OUTLINE_THICKNESS = 2;
+const SHELTER_OUTLINE_THICKNESS = 1; // Thinner debug outline
+const SHELTER_OUTLINE_COLOR = 'rgba(92, 62, 33, 0.6)'; // Earthy brown tone
 // DEBUG: Server-side AABB collision constants (mirror what's in server/src/shelter.rs)
 const DEBUG_SHELTER_COLLISION_WIDTH = 300.0;
 const DEBUG_SHELTER_COLLISION_HEIGHT = 125.0;
@@ -155,7 +156,7 @@ export const renderShelter = ({
   // --- Outline if owner is inside ---
   if (isOwnerInside) {
     ctx.globalAlpha = 1.0; // Reset alpha for outline
-    ctx.strokeStyle = 'black';
+    ctx.strokeStyle = SHELTER_OUTLINE_COLOR;
     ctx.lineWidth = SHELTER_OUTLINE_THICKNESS;
     // Draw a rect around the AABB bounds
     ctx.strokeRect(

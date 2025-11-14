@@ -61,7 +61,7 @@ pub const HEARTH_MAX_HEALTH: f32 = 1000.0;
 use crate::player as PlayerTableTrait;
 use crate::Player;
 use crate::items::{
-    InventoryItem, ItemDefinition,
+    InventoryItem, ItemDefinition, ItemCategory,
     inventory_item as InventoryItemTableTrait, 
     item_definition as ItemDefinitionTableTrait,
 };
@@ -146,23 +146,10 @@ pub struct HomesteadHearth {
     pub upkeep_interval_seconds: u64, // How often upkeep is processed (default: 3600 = 1 hour)
 }
 
-/// Allowed item names for hearth inventory (building materials and crafting resources)
-const ALLOWED_ITEM_NAMES: &[&str] = &[
-    "Wood",
-    "Stone",
-    "Metal Fragments",
-    "Cloth",
-    "Plant Fiber", // Changed from "Fiber" to "Plant Fiber"
-    "Coal",
-    "Bone Fragments",
-    "Animal Fat",
-    "Tallow",
-    "Animal Leather",
-];
-
 /// Checks if an item is allowed in the hearth inventory
+/// Only items with Material category are allowed
 fn is_item_allowed(item_def: &ItemDefinition) -> bool {
-    ALLOWED_ITEM_NAMES.contains(&item_def.name.as_str())
+    item_def.category == ItemCategory::Material
 }
 
 /// Validates that a player is within interaction distance of a hearth
@@ -1197,7 +1184,7 @@ pub fn move_item_to_hearth(
         .ok_or_else(|| format!("Item definition {} not found", item_to_move.item_def_id))?;
     
     if !is_item_allowed(&item_def) {
-        return Err(format!("Item '{}' is not allowed in Matron's Chest. Only building materials and crafting resources (Wood, Stone, Metal Fragments, Cloth, Plant Fiber, Coal, Bone Fragments, Animal Fat, Tallow, Animal Leather) are allowed.", item_def.name));
+        return Err(format!("Item '{}' is not allowed in Matron's Chest. Only materials are allowed.", item_def.name));
     }
     
     // Use generic handler
@@ -1258,7 +1245,7 @@ pub fn split_stack_into_hearth(
         .ok_or_else(|| format!("Item definition {} not found", source_item.item_def_id))?;
     
     if !is_item_allowed(&item_def) {
-        return Err(format!("Item '{}' is not allowed in Matron's Chest. Only building materials and crafting resources (Wood, Stone, Metal Fragments, Cloth, Plant Fiber, Coal, Bone Fragments, Animal Fat, Tallow, Animal Leather) are allowed.", item_def.name));
+        return Err(format!("Item '{}' is not allowed in Matron's Chest. Only materials are allowed.", item_def.name));
     }
     
     let mut source_item_mut = source_item;
@@ -1346,7 +1333,7 @@ pub fn quick_move_to_hearth(
         .ok_or_else(|| format!("Item definition {} not found", item_to_move.item_def_id))?;
     
     if !is_item_allowed(&item_def) {
-        return Err(format!("Item '{}' is not allowed in Matron's Chest. Only building materials and crafting resources (Wood, Stone, Metal Fragments, Cloth, Plant Fiber, Coal, Bone Fragments, Animal Fat, Tallow, Animal Leather) are allowed.", item_def.name));
+        return Err(format!("Item '{}' is not allowed in Matron's Chest. Only materials are allowed.", item_def.name));
     }
     
     inventory_management::handle_quick_move_to_container(ctx, &mut hearth, item_instance_id)?;

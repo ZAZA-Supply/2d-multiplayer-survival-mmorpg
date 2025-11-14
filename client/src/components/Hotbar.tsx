@@ -941,6 +941,14 @@ const Hotbar: React.FC<HotbarProps> = ({
           }
           return;
       }
+
+      // Default action: Move item from hotbar to first available inventory slot
+      try {
+          console.log(`[Hotbar ContextMenu] Moving item ${itemInfo.definition.name} from hotbar to first available inventory slot`);
+          connection.reducers.moveToFirstAvailableInventorySlot(itemInstanceId);
+      } catch (error: any) {
+          console.error("[Hotbar ContextMenu] Failed to move item to inventory:", error);
+      }
   };
 
   // console.log('[Hotbar] Render: animationProgress state:', animationProgress.toFixed(3)); // Added log

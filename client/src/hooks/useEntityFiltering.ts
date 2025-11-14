@@ -440,10 +440,21 @@ function countEntitiesInRadius(
 }
 
 // Helper function to get player position for distance calculations
-function getPlayerPosition(players: Map<string, SpacetimeDBPlayer>): { x: number; y: number } | null {
+function getPlayerPosition(
+  players: Map<string, SpacetimeDBPlayer>,
+  localPlayerId?: string
+): { x: number; y: number } | null {
   if (!players || players.size === 0) return null;
-  
-  // Try to find the local player or use the first available player
+
+  // Prefer the local player if we know their ID
+  if (localPlayerId) {
+    const localPlayer = players.get(localPlayerId);
+    if (localPlayer) {
+      return { x: localPlayer.positionX, y: localPlayer.positionY };
+    }
+  }
+
+  // Fallback: use the first available player (e.g., in spectator mode)
   const firstPlayer = Array.from(players.values())[0];
   return firstPlayer ? { x: firstPlayer.positionX, y: firstPlayer.positionY } : null;
 }
@@ -559,7 +570,7 @@ export function useEntityFiltering(
   frameCounter++;
   
   // Get player position for distance calculations
-  const playerPos = getPlayerPosition(players);
+  const playerPos = getPlayerPosition(players, localPlayerId);
   
   // Emergency mode removed
 

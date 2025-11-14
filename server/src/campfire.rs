@@ -1467,7 +1467,7 @@ fn is_heavy_raining(ctx: &ReducerContext) -> bool {
 }
 
 /// Checks if a campfire is protected from rain by being inside a shelter, building, or near a tree
-fn is_campfire_protected_from_rain(ctx: &ReducerContext, campfire: &Campfire) -> bool {
+pub fn is_campfire_protected_from_rain(ctx: &ReducerContext, campfire: &Campfire) -> bool {
     // Check if campfire is inside any shelter
     for shelter in ctx.db.shelter().iter() {
         if shelter.is_destroyed {

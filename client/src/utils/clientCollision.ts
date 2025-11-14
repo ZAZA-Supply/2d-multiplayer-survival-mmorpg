@@ -358,6 +358,45 @@ function getCollisionCandidates(
     });
   }
   
+  // Filter shelters - use AABB collision (must match server-side collision bounds)
+  // IMPORTANT: We cull based on the AABB CENTER, not the shelter base Y.
+  // Using the base Y here would make collision only work when approaching
+  // from below, since the interior AABB lives well above the base.
+  if (entities.shelters && entities.shelters.size > 0) {
+    let sheltersChecked = 0;
+    for (const shelter of entities.shelters.values()) {
+      if (shelter.isDestroyed) continue; // Skip destroyed shelters
+      if (sheltersChecked >= COLLISION_PERF.MAX_STRUCTURES_TO_CHECK) break;
+
+      // Skip collision for shelters owned by the local player (they can walk through their own shelters)
+      if (localPlayerId && shelter.placedBy.toHexString() === localPlayerId) {
+        continue;
+      }
+
+      // Calculate shelter AABB center (matches server-side logic exactly)
+      const shelterAabbCenterX = shelter.posX;
+      const shelterAabbCenterY = shelter.posY - SHELTER_DIMS.AABB_CENTER_Y_OFFSET_FROM_POS_Y;
+
+      // Distance-based culling using the AABB center, not the base
+      const dxShelter = shelterAabbCenterX - playerX;
+      const dyShelter = shelterAabbCenterY - playerY;
+      const distSqShelter = dxShelter * dxShelter + dyShelter * dyShelter;
+      if (distSqShelter > COLLISION_PERF.STRUCTURE_CULL_DISTANCE_SQ) continue;
+
+      sheltersChecked++;
+
+      // Add AABB collision shape (center-based, matches server bounds exactly)
+      shapes.push({
+        id: shelter.id.toString(),
+        type: `shelter-${shelter.id.toString()}`,
+        x: shelterAabbCenterX,
+        y: shelterAabbCenterY,
+        width: SHELTER_DIMS.WIDTH,   // 300 (matches SHELTER_COLLISION_WIDTH)
+        height: SHELTER_DIMS.HEIGHT  // 125 (matches SHELTER_COLLISION_HEIGHT)
+      });
+    }
+  }
+  
   // Filter wall cells - create thin collision edges along wall boundaries
   const FOUNDATION_TILE_SIZE = 96; // Foundation tile size in pixels (2x world tiles)
   const WALL_COLLISION_THICKNESS = 6; // Thin collision thickness (slightly thicker than visual 4px to prevent walking through)
@@ -608,10 +647,16 @@ const COLLISION_OFFSETS = {
   HOMESTEAD_HEARTH: { x: 0, y: -72.5 }, // Homestead hearth collision offset (matches server-side HEARTH_COLLISION_Y_OFFSET)
 } as const;
 
-// Shelter AABB dimensions
+// Shelter AABB dimensions (must match server-side constants in shelter.rs)
+// These are tuned to match the interior collision rectangle (black debug box)
+// drawn in `shelterRenderingUtils.ts`, so what you see is exactly what you
+// collide with as a non-owner.
 const SHELTER_DIMS = {
-  WIDTH: 300,
-  HEIGHT: 125,
+  WIDTH: 300,          // SHELTER_COLLISION_WIDTH
+  HEIGHT: 125,         // SHELTER_COLLISION_HEIGHT
+  HALF_WIDTH: 150,     // SHELTER_AABB_HALF_WIDTH
+  HALF_HEIGHT: 62.5,   // SHELTER_AABB_HALF_HEIGHT
+  AABB_CENTER_Y_OFFSET_FROM_POS_Y: 200, // SHELTER_AABB_CENTER_Y_OFFSET_FROM_POS_Y
 } as const;
 
 // Performance optimization - debug disabled for production performance

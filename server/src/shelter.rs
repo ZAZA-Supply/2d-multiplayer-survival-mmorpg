@@ -53,11 +53,15 @@ pub const SHELTER_MAX_HEALTH: f32 = SHELTER_INITIAL_MAX_HEALTH;
 /// Width of the shelter's collision AABB.
 pub(crate) const SHELTER_COLLISION_WIDTH: f32 = 300.0;
 /// Height of the shelter's collision AABB.
-pub(crate) const SHELTER_COLLISION_HEIGHT: f32 = 200.0; // Increased from 125.0 to 200.0 for better rain protection
+///
+/// NOTE: This height is tuned to match the *interior* collision rectangle shown
+/// by the client-side debug box (see `shelterRenderingUtils.ts`). It defines
+/// the walkable / non‑walkable area for non‑owners, not the full visual canopy.
+pub(crate) const SHELTER_COLLISION_HEIGHT: f32 = 125.0;
 /// Half-width of the shelter's collision AABB.
 pub(crate) const SHELTER_AABB_HALF_WIDTH: f32 = SHELTER_COLLISION_WIDTH / 2.0;
 /// Half-height of the shelter's collision AABB.
-pub(crate) const SHELTER_AABB_HALF_HEIGHT: f32 = SHELTER_COLLISION_HEIGHT / 2.0; // Now 200.0 / 2.0 = 100.0
+pub(crate) const SHELTER_AABB_HALF_HEIGHT: f32 = SHELTER_COLLISION_HEIGHT / 2.0;
 /// Vertical offset from shelter.pos_y (base) to the center of the AABB.
 /// AABB_center_y = shelter.pos_y - SHELTER_AABB_CENTER_Y_OFFSET_FROM_POS_Y.
 pub(crate) const SHELTER_AABB_CENTER_Y_OFFSET_FROM_POS_Y: f32 = 200.0; // Keep the same offset to maintain position

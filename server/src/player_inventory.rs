@@ -646,4 +646,73 @@ pub fn move_to_first_available_hotbar_slot(ctx: &ReducerContext, item_instance_i
     }
 }
 
+#[spacetimedb::reducer]
+pub fn move_to_first_available_inventory_slot(ctx: &ReducerContext, item_instance_id: u64) -> Result<(), String> {
+    let sender_id = ctx.sender;
+    let inventory_items = ctx.db.inventory_item();
+    let active_equip_table = ctx.db.active_equipment();
+
+    let mut item_to_move = get_player_item(ctx, item_instance_id)?;
+    let original_location = item_to_move.location.clone();
+    let mut was_active_item = false;
+
+    // Determine if it was equipped or active
+    match &original_location {
+        ItemLocation::Inventory(data) => {
+            if data.owner_id == sender_id {
+                if let Some(active_equip) = active_equip_table.player_identity().find(sender_id) {
+                    if active_equip.equipped_item_instance_id == Some(item_instance_id) {
+                        was_active_item = true;
+                    }
+                }
+            }
+        }
+        ItemLocation::Hotbar(data) => {
+            if data.owner_id == sender_id {
+                if let Some(active_equip) = active_equip_table.player_identity().find(sender_id) {
+                    if active_equip.equipped_item_instance_id == Some(item_instance_id) {
+                        was_active_item = true;
+                    }
+                }
+            }
+        }
+        ItemLocation::Equipped(ref data) => {
+            if data.owner_id != sender_id {
+                return Err("Item not owned by player or not in direct possession.".to_string());
+            }
+            // Equipped armor can be moved to inventory
+        }
+        _ => {
+            return Err("Item must be in player's inventory, hotbar, or equipped to move to inventory.".to_string());
+        }
+    }
+
+    // Find first empty inventory slot
+    if let Some(empty_slot) = find_first_empty_inventory_slot(ctx, sender_id) {
+        log::info!("[MoveToInventory] Moving item {} from {:?} to first available inventory slot: {}", item_instance_id, original_location, empty_slot);
+        
+        // Update location first
+        item_to_move.location = ItemLocation::Inventory(crate::models::InventoryLocationData { owner_id: sender_id, slot_index: empty_slot });
+        inventory_items.instance_id().update(item_to_move.clone());
+
+        // Clear original equipment slot if it was equipped armor
+        if let ItemLocation::Equipped(data) = &original_location {
+            if data.owner_id == sender_id {
+                clear_specific_item_from_equipment_slots(ctx, sender_id, item_instance_id);
+                log::debug!("[MoveToInventory] Cleared equipment slot {:?} for item {} after move.", data.slot_type, item_instance_id);
+            }
+        } else if was_active_item {
+            // If it was an active item (from inv/hotbar), clear active status
+            if let Err(e) = crate::active_equipment::clear_active_item_reducer(ctx, sender_id) {
+                log::warn!("[MoveToInventory] Failed to clear active status for item {}: {}", item_instance_id, e);
+            } else {
+                log::debug!("[MoveToInventory] Cleared active status for item {} after move.", item_instance_id);
+            }
+        }
+        Ok(())
+    } else {
+        Err("No available inventory slots".to_string())
+    }
+}
+
 // ... rest of items.rs ... 
