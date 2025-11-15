@@ -40,6 +40,7 @@ use crate::furnace::furnace as FurnaceTableTrait;
 use crate::wild_animal_npc::wild_animal as WildAnimalTableTrait;
 // Import homestead hearth table trait
 use crate::homestead_hearth::homestead_hearth as HomesteadHearthTableTrait;
+use crate::rune_stone::rune_stone as RuneStoneTableTrait;
 
 // Cell size should be larger than the largest collision radius to ensure
 // we only need to check adjacent cells. We use 8x the player radius for better performance with larger worlds.
@@ -76,6 +77,7 @@ pub enum EntityType {
     Furnace(u32), // ADDED Furnace entity type (assuming u32 ID)
     WildAnimal(u64), // ADDED WildAnimal entity type
     HomesteadHearth(u32), // ADDED HomesteadHearth entity type
+    RuneStone(u64), // ADDED RuneStone entity type
     // EXCLUDED: Grass - removed for performance to fix rubber-banding issues
 }
 
@@ -125,7 +127,8 @@ impl SpatialGrid {
                             + RainCollectorTableTrait
                             + FurnaceTableTrait
                             + WildAnimalTableTrait
-                            + HomesteadHearthTableTrait>
+                            + HomesteadHearthTableTrait
+                            + RuneStoneTableTrait>
                            (db: &DB, current_time: spacetimedb::Timestamp) -> Self {
         let mut grid = Self::new();
         grid.populate_from_world(db, current_time);
@@ -210,7 +213,8 @@ impl SpatialGrid {
                             + RainCollectorTableTrait
                             + FurnaceTableTrait
                             + WildAnimalTableTrait
-                            + HomesteadHearthTableTrait> // ADDED HomesteadHearthTableTrait to bounds
+                            + HomesteadHearthTableTrait
+                            + RuneStoneTableTrait> // ADDED RuneStoneTableTrait to bounds
                                  (&mut self, db: &DB, current_time: spacetimedb::Timestamp) {
         self.clear();
         
@@ -325,6 +329,11 @@ impl SpatialGrid {
                 self.add_entity(EntityType::HomesteadHearth(hearth.id), hearth.pos_x, hearth.pos_y);
             }
         }
+        
+        // Add rune stones
+        for rune_stone in db.rune_stone().iter() {
+            self.add_entity(EntityType::RuneStone(rune_stone.id), rune_stone.pos_x, rune_stone.pos_y);
+        }
     }
     
     // PERFORMANCE OPTIMIZED: Faster population method for high-density areas
@@ -336,7 +345,8 @@ impl SpatialGrid {
                                             + RainCollectorTableTrait
                                             + FurnaceTableTrait
                                             + WildAnimalTableTrait
-                                            + HomesteadHearthTableTrait>
+                                            + HomesteadHearthTableTrait
+                                            + RuneStoneTableTrait>
                                            (&mut self, db: &DB, current_time: spacetimedb::Timestamp) {
         self.clear();
         
@@ -439,6 +449,11 @@ impl SpatialGrid {
             }
         }
         
+        // Add rune stones
+        for rune_stone in db.rune_stone().iter() {
+            entities_to_add.push((EntityType::RuneStone(rune_stone.id), rune_stone.pos_x, rune_stone.pos_y));
+        }
+        
         // Batch add all simple entities
         for (entity_type, x, y) in entities_to_add {
             self.add_entity(entity_type, x, y);
@@ -494,7 +509,8 @@ pub fn get_cached_spatial_grid<DB: PlayerTableTrait + TreeTableTrait + StoneTabl
                                  + RainCollectorTableTrait
                                  + FurnaceTableTrait
                                  + WildAnimalTableTrait
-                                 + HomesteadHearthTableTrait>
+                                 + HomesteadHearthTableTrait
+                                 + RuneStoneTableTrait>
                               (db: &DB, current_time: spacetimedb::Timestamp) -> &'static SpatialGrid {
     unsafe {
         // Check if we need to refresh the cache

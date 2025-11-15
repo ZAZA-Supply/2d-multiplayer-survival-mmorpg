@@ -82,6 +82,7 @@ mod building; // <<< ADDED: Building system (foundations, walls, doors)
 mod building_enclosure; // <<< ADDED: Building enclosure detection (rain protection, "inside" logic)
 mod homestead_hearth; // <<< ADDED: Homestead Hearth for building privilege system
 mod building_decay; // <<< ADDED: Building decay system
+mod rune_stone; // <<< ADDED: Rune stone system
 
 // ADD: Re-export respawn reducer
 pub use respawn::respawn_randomly;
@@ -547,6 +548,11 @@ pub fn init_module(ctx: &ReducerContext) -> Result<(), String> {
     // ADD: Initialize barrel respawn system
     crate::barrel::init_barrel_system(ctx)?;
     
+    // ADD: Initialize rune stone spawning systems
+    crate::rune_stone::init_rune_stone_shard_spawning(ctx)?;
+    crate::rune_stone::init_rune_stone_item_spawning(ctx)?;
+    crate::rune_stone::init_rune_stone_plant_spawning(ctx)?;
+    
     // ADD: Initialize WorldState for scheduled systems
     crate::world_state::seed_world_state(ctx)?;
     
@@ -631,8 +637,10 @@ pub fn init_module(ctx: &ReducerContext) -> Result<(), String> {
 #[spacetimedb::reducer(client_connected)]
 pub fn identity_connected(ctx: &ReducerContext) -> Result<(), String> {
     // Call seeders using qualified paths
-    crate::environment::seed_environment(ctx)?; // Call the updated seeder
+    // IMPORTANT: seed_items must be called BEFORE seed_environment because
+    // seed_environment needs items to be seeded to configure red rune stones
     crate::items::seed_items(ctx)?; // Call the item seeder
+    crate::environment::seed_environment(ctx)?; // Call the updated seeder
     crate::items::seed_food_poisoning_risks(ctx)?; // Seed food poisoning risks
     crate::world_state::seed_world_state(ctx)?; // Call the world state seeder
     crate::crafting::seed_recipes(ctx)?; // Seed the crafting recipes

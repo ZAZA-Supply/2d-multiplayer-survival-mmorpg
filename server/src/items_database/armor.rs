@@ -15,7 +15,7 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .crafting_cost(vec![
                 CostIngredient { item_name: "Cloth".to_string(), quantity: 20 },
             ])
-            .crafting_time(10)
+            .crafting_output(1, 10)
             .respawn_time(420)
             .build(),
 
@@ -27,7 +27,7 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .crafting_cost(vec![
                 CostIngredient { item_name: "Cloth".to_string(), quantity: 40 },
             ])
-            .crafting_time(15)
+            .crafting_output(1, 15)
             .respawn_time(420)
             .build(),
 
@@ -39,7 +39,7 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .crafting_cost(vec![
                 CostIngredient { item_name: "Cloth".to_string(), quantity: 30 },
             ])
-            .crafting_time(15)
+            .crafting_output(1, 15)
             .respawn_time(420)
             .build(),
 
@@ -51,7 +51,7 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .crafting_cost(vec![
                 CostIngredient { item_name: "Cloth".to_string(), quantity: 15 },
             ])
-            .crafting_time(5)
+            .crafting_output(1, 5)
             .respawn_time(420)
             .build(),
 
@@ -63,7 +63,7 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .crafting_cost(vec![
                 CostIngredient { item_name: "Cloth".to_string(), quantity: 15 },
             ])
-            .crafting_time(5)
+            .crafting_output(1, 5)
             .respawn_time(420)
             .build(),
 
@@ -76,7 +76,7 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
                 CostIngredient { item_name: "Cloth".to_string(), quantity: 30 },
                 CostIngredient { item_name: "Plant Fiber".to_string(), quantity: 10 },
             ])
-            .crafting_time(20)
+            .crafting_output(1, 20)
             .respawn_time(420)
             .build(),
 
@@ -92,7 +92,7 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
                 CostIngredient { item_name: "Tallow".to_string(), quantity: 5 },
                 CostIngredient { item_name: "Plant Fiber".to_string(), quantity: 20 },
             ])
-            .crafting_time(15)
+            .crafting_output(1, 15)
             .respawn_time(480)
             .build(),
     ]

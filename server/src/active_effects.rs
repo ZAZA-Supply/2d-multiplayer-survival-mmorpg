@@ -53,6 +53,8 @@ pub enum EffectType {
     Venom, // Damage over time from Cable Viper strikes
     Exhausted, // Movement speed penalty from low hunger/thirst/warmth
     BuildingPrivilege, // Allows building structures near homestead hearths
+    ProductionRune, // Near a red production rune stone (2x crafting speed)
+    AgrarianRune, // Near a green agrarian rune stone (2x plant growth)
 }
 
 // Table defining food poisoning risks for different food items
@@ -108,9 +110,9 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
             continue;
         }
 
-        // Skip cozy, tree cover, exhausted, and building privilege effects - they are managed by the player stats system, not the effect tick system
+        // Skip cozy, tree cover, exhausted, building privilege, and rune stone effects - they are managed by other systems, not the effect tick system
         // Wet effects are now processed normally like other effects
-        if effect.effect_type == EffectType::Cozy || effect.effect_type == EffectType::TreeCover || effect.effect_type == EffectType::Exhausted || effect.effect_type == EffectType::BuildingPrivilege {
+        if effect.effect_type == EffectType::Cozy || effect.effect_type == EffectType::TreeCover || effect.effect_type == EffectType::Exhausted || effect.effect_type == EffectType::BuildingPrivilege || effect.effect_type == EffectType::ProductionRune || effect.effect_type == EffectType::AgrarianRune {
             continue;
         }
 
@@ -153,7 +155,7 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
                         effect.target_player_id
                     },
                     // Other effect types shouldn't reach this code path, but we need to handle them
-                    EffectType::HealthRegen | EffectType::Burn | EffectType::Bleed | EffectType::Venom | EffectType::SeawaterPoisoning | EffectType::FoodPoisoning | EffectType::Cozy | EffectType::Wet | EffectType::TreeCover | EffectType::WaterDrinking | EffectType::Exhausted | EffectType::BuildingPrivilege => {
+                    EffectType::HealthRegen | EffectType::Burn | EffectType::Bleed | EffectType::Venom | EffectType::SeawaterPoisoning | EffectType::FoodPoisoning | EffectType::Cozy | EffectType::Wet | EffectType::TreeCover | EffectType::WaterDrinking | EffectType::Exhausted | EffectType::BuildingPrivilege | EffectType::ProductionRune | EffectType::AgrarianRune => {
                         log::warn!("[EffectTick] Unexpected effect type {:?} in bandage processing", effect.effect_type);
                         Some(effect.player_id)
                     }
@@ -388,6 +390,18 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
                         EffectType::BuildingPrivilege => {
                             // BuildingPrivilege allows building structures near homestead hearths
                             // No health changes here, just a status flag
+                            amount_this_tick = 0.0;
+                        },
+                        EffectType::ProductionRune => {
+                            // ProductionRune provides 2x crafting speed in red rune stone zones
+                            // The crafting speed bonus is handled in crafting system
+                            // This effect doesn't consume amount_applied_so_far
+                            amount_this_tick = 0.0;
+                        },
+                        EffectType::AgrarianRune => {
+                            // AgrarianRune provides 2x plant growth in green rune stone zones
+                            // The growth speed bonus is handled in plant growth system
+                            // This effect doesn't consume amount_applied_so_far
                             amount_this_tick = 0.0;
                         },
                     }
@@ -1481,4 +1495,151 @@ pub fn clear_all_effects_on_death(ctx: &ReducerContext, player_id: Identity) {
     }
     
     log::info!("[PlayerDeath] Cleared all active effects for deceased player {:?}", player_id);
+}
+
+// Rune Stone Zone Effect Management
+// =================================
+
+/// Updates rune stone zone effects for a player based on their position
+/// This should be called periodically (e.g., from player stats system)
+pub fn update_player_rune_stone_zone_effects(ctx: &ReducerContext, player_id: Identity, player_x: f32, player_y: f32) -> Result<(), String> {
+    use crate::rune_stone::{rune_stone as RuneStoneTableTrait, RuneStoneType, RUNE_STONE_EFFECT_RADIUS_SQUARED};
+    
+    let mut in_production_zone = false;
+    let mut in_agrarian_zone = false;
+    
+    // Check all rune stones to see if player is in their effect radius
+    for rune_stone in ctx.db.rune_stone().iter() {
+        let dx = player_x - rune_stone.pos_x;
+        let dy = player_y - rune_stone.pos_y;
+        let distance_sq = dx * dx + dy * dy;
+        
+        if distance_sq <= RUNE_STONE_EFFECT_RADIUS_SQUARED {
+            match rune_stone.rune_type {
+                RuneStoneType::Red => in_production_zone = true,
+                RuneStoneType::Green => in_agrarian_zone = true,
+                RuneStoneType::Blue => {}, // Blue runes don't provide a status effect
+            }
+        }
+    }
+    
+    // Update production rune effect
+    let has_production_effect = player_has_production_rune_effect(ctx, player_id);
+    if in_production_zone && !has_production_effect {
+        apply_production_rune_effect(ctx, player_id)?;
+    } else if !in_production_zone && has_production_effect {
+        remove_production_rune_effect(ctx, player_id);
+    }
+    
+    // Update agrarian rune effect
+    let has_agrarian_effect = player_has_agrarian_rune_effect(ctx, player_id);
+    if in_agrarian_zone && !has_agrarian_effect {
+        apply_agrarian_rune_effect(ctx, player_id)?;
+    } else if !in_agrarian_zone && has_agrarian_effect {
+        remove_agrarian_rune_effect(ctx, player_id);
+    }
+    
+    Ok(())
+}
+
+/// Checks if a player has the production rune effect
+pub fn player_has_production_rune_effect(ctx: &ReducerContext, player_id: Identity) -> bool {
+    ctx.db.active_consumable_effect().iter()
+        .any(|effect| effect.player_id == player_id && effect.effect_type == EffectType::ProductionRune)
+}
+
+/// Checks if a player has the agrarian rune effect
+pub fn player_has_agrarian_rune_effect(ctx: &ReducerContext, player_id: Identity) -> bool {
+    ctx.db.active_consumable_effect().iter()
+        .any(|effect| effect.player_id == player_id && effect.effect_type == EffectType::AgrarianRune)
+}
+
+/// Applies production rune zone effect
+fn apply_production_rune_effect(ctx: &ReducerContext, player_id: Identity) -> Result<(), String> {
+    let current_time = ctx.timestamp;
+    let very_far_future = current_time + TimeDuration::from_micros(365 * 24 * 60 * 60 * 1_000_000i64);
+    
+    let effect = ActiveConsumableEffect {
+        effect_id: 0,
+        player_id,
+        target_player_id: None,
+        item_def_id: 0,
+        consuming_item_instance_id: None,
+        started_at: current_time,
+        ends_at: very_far_future,
+        total_amount: None,
+        amount_applied_so_far: None,
+        effect_type: EffectType::ProductionRune,
+        tick_interval_micros: 1_000_000,
+        next_tick_at: current_time + TimeDuration::from_micros(1_000_000),
+    };
+    
+    match ctx.db.active_consumable_effect().try_insert(effect) {
+        Ok(inserted) => {
+            log::info!("Applied production rune zone effect {} to player {:?}", inserted.effect_id, player_id);
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("Failed to apply production rune effect: {:?}", e);
+            Err("Failed to apply production rune effect".to_string())
+        }
+    }
+}
+
+/// Removes production rune zone effect
+fn remove_production_rune_effect(ctx: &ReducerContext, player_id: Identity) {
+    let effects_to_remove: Vec<_> = ctx.db.active_consumable_effect().iter()
+        .filter(|e| e.player_id == player_id && e.effect_type == EffectType::ProductionRune)
+        .map(|e| e.effect_id)
+        .collect();
+    
+    for effect_id in effects_to_remove {
+        ctx.db.active_consumable_effect().effect_id().delete(&effect_id);
+        log::info!("Removed production rune zone effect {} from player {:?}", effect_id, player_id);
+    }
+}
+
+/// Applies agrarian rune zone effect
+fn apply_agrarian_rune_effect(ctx: &ReducerContext, player_id: Identity) -> Result<(), String> {
+    let current_time = ctx.timestamp;
+    let very_far_future = current_time + TimeDuration::from_micros(365 * 24 * 60 * 60 * 1_000_000i64);
+    
+    let effect = ActiveConsumableEffect {
+        effect_id: 0,
+        player_id,
+        target_player_id: None,
+        item_def_id: 0,
+        consuming_item_instance_id: None,
+        started_at: current_time,
+        ends_at: very_far_future,
+        total_amount: None,
+        amount_applied_so_far: None,
+        effect_type: EffectType::AgrarianRune,
+        tick_interval_micros: 1_000_000,
+        next_tick_at: current_time + TimeDuration::from_micros(1_000_000),
+    };
+    
+    match ctx.db.active_consumable_effect().try_insert(effect) {
+        Ok(inserted) => {
+            log::info!("Applied agrarian rune zone effect {} to player {:?}", inserted.effect_id, player_id);
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("Failed to apply agrarian rune effect: {:?}", e);
+            Err("Failed to apply agrarian rune effect".to_string())
+        }
+    }
+}
+
+/// Removes agrarian rune zone effect
+fn remove_agrarian_rune_effect(ctx: &ReducerContext, player_id: Identity) {
+    let effects_to_remove: Vec<_> = ctx.db.active_consumable_effect().iter()
+        .filter(|e| e.player_id == player_id && e.effect_type == EffectType::AgrarianRune)
+        .map(|e| e.effect_id)
+        .collect();
+    
+    for effect_id in effects_to_remove {
+        ctx.db.active_consumable_effect().effect_id().delete(&effect_id);
+        log::info!("Removed agrarian rune zone effect {} from player {:?}", effect_id, player_id);
+    }
 }

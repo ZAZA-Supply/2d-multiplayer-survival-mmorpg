@@ -138,7 +138,17 @@ pub fn start_crafting(ctx: &ReducerContext, recipe_id: u64) -> Result<(), String
             last_finish_time = item.finish_time;
         }
     }
-    let crafting_duration = Duration::from_secs(recipe.crafting_time_secs as u64);
+    // Check for red rune stone production boost
+    let player = ctx.db.player().identity().find(&sender_id).ok_or("Player not found")?;
+    let red_rune_multiplier = crate::rune_stone::get_red_rune_crafting_time_multiplier(
+        ctx,
+        player.position_x,
+        player.position_y,
+        recipe.output_item_def_id,
+    );
+    let base_crafting_time = recipe.crafting_time_secs as f32;
+    let adjusted_crafting_time = (base_crafting_time * red_rune_multiplier) as u64;
+    let crafting_duration = Duration::from_secs(adjusted_crafting_time);
     let finish_time = last_finish_time + spacetimedb::TimeDuration::from(crafting_duration);
 
     // 5. Add to Queue
@@ -252,7 +262,17 @@ pub fn start_crafting_multiple(ctx: &ReducerContext, recipe_id: u64, quantity_to
         }
     }
 
-    let crafting_duration_per_item = TimeDuration::from(Duration::from_secs(recipe.crafting_time_secs as u64));
+    // Check for red rune stone production boost
+    let player = ctx.db.player().identity().find(&sender_id).ok_or("Player not found")?;
+    let red_rune_multiplier = crate::rune_stone::get_red_rune_crafting_time_multiplier(
+        ctx,
+        player.position_x,
+        player.position_y,
+        recipe.output_item_def_id,
+    );
+    let base_crafting_time = recipe.crafting_time_secs as f32;
+    let adjusted_crafting_time = (base_crafting_time * red_rune_multiplier) as u64;
+    let crafting_duration_per_item = TimeDuration::from(Duration::from_secs(adjusted_crafting_time));
 
     for i in 0..quantity_to_craft {
         let item_finish_time = current_item_start_time + crafting_duration_per_item;

@@ -193,13 +193,38 @@ pub fn process_player_stats(ctx: &ReducerContext, _schedule: PlayerStatSchedule)
         let mut player = players.identity().find(&player_id)
             .expect("Player should exist during stats processing");
 
+        // --- Clear stale hit time to prevent stuck white hit flash state ---
+        // Hit effect duration is ~500ms (200ms shake + 300ms latency buffer)
+        // Clear if older than 1 second to be safe
+        let mut should_clear_hit_time = false;
+        if let Some(last_hit_time) = player.last_hit_time {
+            let hit_age_micros = current_time.to_micros_since_unix_epoch()
+                .saturating_sub(last_hit_time.to_micros_since_unix_epoch());
+            let hit_age_ms = hit_age_micros / 1_000;
+            
+            if hit_age_ms > 1000 {
+                // Hit effect has expired - mark for clearing to prevent stuck white state
+                should_clear_hit_time = true;
+                player.last_hit_time = None;
+                log::trace!("Cleared stale last_hit_time for player {:?} (age: {}ms)", player_id, hit_age_ms);
+            }
+        }
+
         // --- Skip stat processing for offline players --- 
         if !player.is_online {
             log::trace!("Skipping stat processing for offline player {:?}", player_id);
+            // Still update player to persist last_hit_time cleanup if it was cleared
+            if should_clear_hit_time {
+                players.identity().update(player.clone());
+            }
             continue; // Move to the next player in the loop
         }
 
         if player.is_dead {
+            // Still update player to persist last_hit_time cleanup if it was cleared
+            if should_clear_hit_time {
+                players.identity().update(player.clone());
+            }
             continue;
         }
 
@@ -318,6 +343,13 @@ pub fn process_player_stats(ctx: &ReducerContext, _schedule: PlayerStatSchedule)
             log::warn!("Failed to update tree cover status for player {:?}: {}", player_id, e);
         }
         // <<< END TREE COVER EFFECT MANAGEMENT >>>
+
+        // <<< ADD RUNE STONE ZONE EFFECT MANAGEMENT >>>
+        // Update rune stone zone effects based on proximity to rune stones
+        if let Err(e) = crate::active_effects::update_player_rune_stone_zone_effects(ctx, player_id, player.position_x, player.position_y) {
+            log::warn!("Failed to update rune stone zone effects for player {:?}: {}", player_id, e);
+        }
+        // <<< END RUNE STONE ZONE EFFECT MANAGEMENT >>>
 
         // <<< WET EFFECT MANAGEMENT MOVED TO EFFECT PROCESSING SYSTEM >>>
         // Wet effects are now handled in active_effects.rs every 2 seconds
@@ -498,6 +530,20 @@ pub fn process_player_stats(ctx: &ReducerContext, _schedule: PlayerStatSchedule)
             current_player.is_dead = player.is_dead;
             current_player.death_timestamp = player.death_timestamp;
             current_player.last_stat_update = current_time;
+            // Preserve cleared last_hit_time if it was cleared above
+            // Only clear if the current player's hit time is still stale (to avoid overwriting new hits)
+            if should_clear_hit_time {
+                if let Some(current_hit_time) = current_player.last_hit_time {
+                    let current_hit_age_micros = current_time.to_micros_since_unix_epoch()
+                        .saturating_sub(current_hit_time.to_micros_since_unix_epoch());
+                    let current_hit_age_ms = current_hit_age_micros / 1_000;
+                    if current_hit_age_ms > 1000 {
+                        current_player.last_hit_time = None;
+                    }
+                } else {
+                    current_player.last_hit_time = None;
+                }
+            }
 
             players.identity().update(current_player);
             log::trace!("[StatsUpdate] Updated stats for player {:?}. Health: {:.1}, Hunger: {:.1}, Thirst: {:.1}, Warmth: {:.1}, Dead: {}",
@@ -508,6 +554,10 @@ pub fn process_player_stats(ctx: &ReducerContext, _schedule: PlayerStatSchedule)
              let mut current_player = players.identity().find(&player_id)
                  .expect("Player should exist during stats update");
              current_player.last_stat_update = current_time;
+             // Preserve cleared last_hit_time if it was cleared above
+             if player.last_hit_time.is_none() {
+                 current_player.last_hit_time = None;
+             }
              players.identity().update(current_player);
              log::trace!("Updated player {:?} last_stat_update timestamp anyway.", player_id);
         }

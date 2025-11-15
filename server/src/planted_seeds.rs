@@ -471,6 +471,54 @@ fn validate_reed_rhizome_planting(ctx: &ReducerContext, x: f32, y: f32) -> Resul
     Ok(())
 }
 
+/// Validate beach lyme grass planting location
+/// Beach lyme grass can only be planted on beach tiles
+fn validate_beach_lyme_grass_planting(ctx: &ReducerContext, x: f32, y: f32) -> Result<(), String> {
+    // Check if it's a beach tile
+    if !crate::environment::is_position_on_beach_tile(ctx, x, y) {
+        return Err("Beach Lyme Grass Seeds can only be planted on beach tiles".to_string());
+    }
+    
+    log::info!("Beach Lyme Grass planting validated at ({:.1}, {:.1})", x, y);
+    Ok(())
+}
+
+/// Validate scurvy grass planting location
+/// Scurvy grass can only be planted on beach tiles
+fn validate_scurvy_grass_planting(ctx: &ReducerContext, x: f32, y: f32) -> Result<(), String> {
+    // Check if it's a beach tile
+    if !crate::environment::is_position_on_beach_tile(ctx, x, y) {
+        return Err("Scurvy Grass Seeds can only be planted on beach tiles".to_string());
+    }
+    
+    log::info!("Scurvy Grass planting validated at ({:.1}, {:.1})", x, y);
+    Ok(())
+}
+
+/// Validate sea plantain planting location
+/// Sea plantain can only be planted on beach tiles
+fn validate_sea_plantain_planting(ctx: &ReducerContext, x: f32, y: f32) -> Result<(), String> {
+    // Check if it's a beach tile
+    if !crate::environment::is_position_on_beach_tile(ctx, x, y) {
+        return Err("Sea Plantain Seeds can only be planted on beach tiles".to_string());
+    }
+    
+    log::info!("Sea Plantain planting validated at ({:.1}, {:.1})", x, y);
+    Ok(())
+}
+
+/// Validate glasswort planting location
+/// Glasswort can only be planted on beach tiles
+fn validate_glasswort_planting(ctx: &ReducerContext, x: f32, y: f32) -> Result<(), String> {
+    // Check if it's a beach tile
+    if !crate::environment::is_position_on_beach_tile(ctx, x, y) {
+        return Err("Glasswort Seeds can only be planted on beach tiles".to_string());
+    }
+    
+    log::info!("Glasswort planting validated at ({:.1}, {:.1})", x, y);
+    Ok(())
+}
+
 // --- Planting Reducer ---
 
 /// Plants a seed item on the ground to grow into a resource
@@ -555,6 +603,52 @@ pub fn plant_seed(
         if let Err(e) = validate_reed_rhizome_planting(ctx, plant_pos_x, plant_pos_y) {
             log::error!("PLANT_SEED: Reed Rhizome validation failed: {}", e);
             return Err(e);
+        }
+    }
+    
+    // Special validation for Beach Lyme Grass Seeds - must be planted on beach tiles
+    if item_def.name == "Beach Lyme Grass Seeds" {
+        if let Err(e) = validate_beach_lyme_grass_planting(ctx, plant_pos_x, plant_pos_y) {
+            log::error!("PLANT_SEED: Beach Lyme Grass Seeds validation failed: {}", e);
+            return Err(e);
+        }
+    }
+
+    // Special validation for Scurvy Grass Seeds - must be planted on beach tiles
+    if item_def.name == "Scurvy Grass Seeds" {
+        if let Err(e) = validate_scurvy_grass_planting(ctx, plant_pos_x, plant_pos_y) {
+            log::error!("PLANT_SEED: Scurvy Grass Seeds validation failed: {}", e);
+            return Err(e);
+        }
+    }
+
+    // Special validation for Sea Plantain Seeds - must be planted on beach tiles
+    if item_def.name == "Sea Plantain Seeds" {
+        if let Err(e) = validate_sea_plantain_planting(ctx, plant_pos_x, plant_pos_y) {
+            log::error!("PLANT_SEED: Sea Plantain Seeds validation failed: {}", e);
+            return Err(e);
+        }
+    }
+
+    // Special validation for Glasswort Seeds - must be planted on beach tiles
+    if item_def.name == "Glasswort Seeds" {
+        if let Err(e) = validate_glasswort_planting(ctx, plant_pos_x, plant_pos_y) {
+            log::error!("PLANT_SEED: Glasswort Seeds validation failed: {}", e);
+            return Err(e);
+        }
+    }
+    
+    // Validation for normal plants (non-water, non-beach) - cannot be planted on water
+    // Reed Rhizome requires water, so skip this check for it
+    // Beach plants require beach tiles, so skip this check for them
+    if item_def.name != "Reed Rhizome" 
+        && item_def.name != "Beach Lyme Grass Seeds"
+        && item_def.name != "Scurvy Grass Seeds"
+        && item_def.name != "Sea Plantain Seeds"
+        && item_def.name != "Glasswort Seeds" {
+        if is_water_tile(ctx, plant_pos_x, plant_pos_y) {
+            log::error!("PLANT_SEED: {} cannot be planted on water tiles", item_def.name);
+            return Err(format!("{} cannot be planted on water tiles", item_def.name));
         }
     }
     
@@ -709,8 +803,17 @@ pub fn check_plant_growth(ctx: &ReducerContext, _args: PlantedSeedGrowthSchedule
             1.0
         };
         
-        // Combine all growth modifiers for this plant
-        let total_growth_multiplier = base_growth_multiplier * cloud_multiplier * light_multiplier * crowding_multiplier * shelter_multiplier * water_multiplier * mushroom_bonus;
+        // Calculate green rune stone bonus (agrarian effect)
+        let green_rune_multiplier = crate::rune_stone::get_green_rune_growth_multiplier(ctx, plant.pos_x, plant.pos_y, &plant.plant_type);
+        
+        // PvP-oriented: If green rune stone is active, guarantee 2x growth regardless of other conditions
+        let total_growth_multiplier = if green_rune_multiplier > 1.0 {
+            // Green rune stone active - guarantee 2x growth (ignore other penalties/bonuses)
+            green_rune_multiplier
+        } else {
+            // No green rune stone - apply all normal modifiers
+            base_growth_multiplier * cloud_multiplier * light_multiplier * crowding_multiplier * shelter_multiplier * water_multiplier * mushroom_bonus
+        };
         
         // Calculate growth progress increment
         let base_growth_rate = 1.0 / plant.base_growth_time_secs as f32; // Progress per second at 1x multiplier

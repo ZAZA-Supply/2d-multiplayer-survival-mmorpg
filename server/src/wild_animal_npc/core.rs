@@ -583,8 +583,38 @@ fn update_animal_ai_state(
         return Ok(());
     }
 
-    // CENTRALIZED FIRE FEAR LOGIC - Force animals into fleeing state when they detect fire
-    if should_fear_fire(ctx, animal) {
+    // CENTRALIZED FEAR LOGIC - Foundation fear applies to ALL animals regardless of group size
+    // Fire/torch fear can be ignored by groups (group courage), but foundations should always be feared
+    
+    // Check foundation fear first (applies to ALL animals, including walruses)
+    let should_fear_foundations = is_foundation_nearby(ctx, animal.pos_x, animal.pos_y);
+    
+    if should_fear_foundations {
+        // ALL animals flee from foundations (player structures) - no group courage exception
+        if let Some((foundation_x, foundation_y)) = find_closest_foundation_position(ctx, animal.pos_x, animal.pos_y) {
+            transition_to_state(animal, AnimalState::Fleeing, current_time, None, "fleeing from foundation");
+            
+            // Species-specific flee distances from foundations
+            let flee_distance = match animal.species {
+                AnimalSpecies::TundraWolf => 400.0,
+                AnimalSpecies::CinderFox => 320.0,
+                AnimalSpecies::CableViper => 300.0,
+                AnimalSpecies::ArcticWalrus => 300.0, // Walruses also fear foundations
+            };
+            
+            set_flee_destination_away_from_threat(animal, foundation_x, foundation_y, flee_distance, rng);
+            
+            log::info!("{:?} {} FLEEING from foundation - target: ({:.1}, {:.1})", 
+                      animal.species, animal.id,
+                      animal.investigation_x.unwrap_or(0.0), 
+                      animal.investigation_y.unwrap_or(0.0));
+            
+            return Ok(()); // Skip normal AI logic - animal is now fleeing from foundation
+        }
+    }
+    
+    // FIRE FEAR LOGIC - Only applies to non-walruses, and can be ignored by groups
+    if animal.species != AnimalSpecies::ArcticWalrus && should_fear_fire(ctx, animal) {
         // Check for fire from players with torches
         for player in nearby_players {
             let player_has_fire = is_fire_nearby(ctx, player.position_x, player.position_y);
@@ -602,19 +632,17 @@ fn update_animal_ai_state(
                         AnimalSpecies::TundraWolf => 950.0,   // 750 + 200 buffer
                         AnimalSpecies::CinderFox => 640.0,    // INCREASED: Proportional to new 240px chase range  
                         AnimalSpecies::CableViper => 500.0,   // 350 + 150 buffer
-                        AnimalSpecies::ArcticWalrus => 0.0,   // Walruses ignore fire
+                        AnimalSpecies::ArcticWalrus => unreachable!(), // Already handled above
                     };
                     
-                    if flee_distance > 0.0 {
-                        set_flee_destination_away_from_threat(animal, player.position_x, player.position_y, flee_distance, rng);
-                        
-                        log::info!("{:?} {} FLEEING from torch - target: ({:.1}, {:.1})", 
-                                  animal.species, animal.id, 
-                                  animal.investigation_x.unwrap_or(0.0), 
-                                  animal.investigation_y.unwrap_or(0.0));
-                        
-                        return Ok(()); // Skip normal AI logic - animal is now fleeing
-                    }
+                    set_flee_destination_away_from_threat(animal, player.position_x, player.position_y, flee_distance, rng);
+                    
+                    log::info!("{:?} {} FLEEING from torch - target: ({:.1}, {:.1})", 
+                              animal.species, animal.id, 
+                              animal.investigation_x.unwrap_or(0.0), 
+                              animal.investigation_y.unwrap_or(0.0));
+                    
+                    return Ok(()); // Skip normal AI logic - animal is now fleeing
                 }
             }
         }
@@ -647,19 +675,17 @@ fn update_animal_ai_state(
                     AnimalSpecies::TundraWolf => 950.0,
                     AnimalSpecies::CinderFox => 640.0,
                     AnimalSpecies::CableViper => 500.0,
-                    AnimalSpecies::ArcticWalrus => 0.0, // Walruses ignore fire
+                    AnimalSpecies::ArcticWalrus => unreachable!(), // Already handled above
                 };
                 
-                if flee_distance > 0.0 {
-                    set_flee_destination_away_from_threat(animal, fire_x, fire_y, flee_distance, rng);
-                    
-                    log::info!("{:?} {} FLEEING from campfire - target: ({:.1}, {:.1})", 
-                              animal.species, animal.id,
-                              animal.investigation_x.unwrap_or(0.0), 
-                              animal.investigation_y.unwrap_or(0.0));
-                    
-                    return Ok(()); // Skip normal AI logic - animal is now fleeing
-                }
+                set_flee_destination_away_from_threat(animal, fire_x, fire_y, flee_distance, rng);
+                
+                log::info!("{:?} {} FLEEING from campfire - target: ({:.1}, {:.1})", 
+                          animal.species, animal.id,
+                          animal.investigation_x.unwrap_or(0.0), 
+                          animal.investigation_y.unwrap_or(0.0));
+                
+                return Ok(()); // Skip normal AI logic - animal is now fleeing
             }
         }
     }
@@ -1401,6 +1427,58 @@ pub fn is_position_in_shelter(ctx: &ReducerContext, x: f32, y: f32) -> bool {
 }
 
 // Fire fear helper functions
+
+/// Check if there's a foundation within fear radius (separate from fire check for walruses)
+fn is_foundation_nearby(ctx: &ReducerContext, animal_x: f32, animal_y: f32) -> bool {
+    use crate::building::FOUNDATION_TILE_SIZE_PX;
+    for foundation in ctx.db.foundation_cell().iter() {
+        if foundation.is_destroyed {
+            continue;
+        }
+        
+        // Convert foundation cell coordinates to world pixel coordinates (center of foundation cell)
+        let foundation_world_x = (foundation.cell_x as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+        let foundation_world_y = (foundation.cell_y as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+        
+        let dx = animal_x - foundation_world_x;
+        let dy = animal_y - foundation_world_y;
+        let distance_sq = dx * dx + dy * dy;
+        
+        if distance_sq <= FOUNDATION_FEAR_RADIUS_SQUARED {
+            return true;
+        }
+    }
+    
+    false
+}
+
+/// Find the closest foundation position (for walrus flee behavior)
+fn find_closest_foundation_position(ctx: &ReducerContext, animal_x: f32, animal_y: f32) -> Option<(f32, f32)> {
+    use crate::building::FOUNDATION_TILE_SIZE_PX;
+    let mut closest_foundation_pos: Option<(f32, f32)> = None;
+    let mut closest_distance_sq = f32::MAX;
+    
+    for foundation in ctx.db.foundation_cell().iter() {
+        if foundation.is_destroyed {
+            continue;
+        }
+        
+        // Convert foundation cell coordinates to world pixel coordinates (center of foundation cell)
+        let foundation_world_x = (foundation.cell_x as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+        let foundation_world_y = (foundation.cell_y as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+        
+        let dx = animal_x - foundation_world_x;
+        let dy = animal_y - foundation_world_y;
+        let distance_sq = dx * dx + dy * dy;
+        
+        if distance_sq < closest_distance_sq && distance_sq <= FOUNDATION_FEAR_RADIUS_SQUARED {
+            closest_distance_sq = distance_sq;
+            closest_foundation_pos = Some((foundation_world_x, foundation_world_y));
+        }
+    }
+    
+    closest_foundation_pos
+}
 
 /// Check if there's a fire source (campfire or torch) or foundation within fear radius of an animal
 fn is_fire_nearby(ctx: &ReducerContext, animal_x: f32, animal_y: f32) -> bool {

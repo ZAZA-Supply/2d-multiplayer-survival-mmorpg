@@ -28,6 +28,7 @@ use crate::{
     barrel,
     plants_database,
     items::ItemDefinition,
+    rune_stone::{RuneStone, RuneStoneType},
     utils::*,
     WORLD_WIDTH_TILES, WORLD_HEIGHT_TILES, WORLD_WIDTH_PX, WORLD_HEIGHT_PX, TILE_SIZE_PX,
     PLAYER_RADIUS,
@@ -47,6 +48,8 @@ use crate::wild_animal_npc::core::AnimalBehavior;
 use crate::barrel::barrel as BarrelTableTrait;
 use crate::world_state::world_state as WorldStateTableTrait;
 use crate::sea_stack::sea_stack as SeaStackTableTrait;
+use crate::rune_stone::rune_stone as RuneStoneTableTrait;
+use crate::items::item_definition as ItemDefinitionTableTrait;
 
 // Import utils helpers and macro
 use crate::utils::{calculate_tile_bounds, attempt_single_spawn};
@@ -180,7 +183,7 @@ pub fn is_position_in_central_compound(pos_x: f32, pos_y: f32) -> bool {
 
 /// Checks if position is on a beach tile
 /// NEW: Uses compressed chunk data for better performance
-fn is_position_on_beach_tile(ctx: &ReducerContext, pos_x: f32, pos_y: f32) -> bool {
+pub fn is_position_on_beach_tile(ctx: &ReducerContext, pos_x: f32, pos_y: f32) -> bool {
     // Convert pixel position to tile coordinates
     let tile_x = (pos_x / crate::TILE_SIZE_PX as f32).floor() as i32;
     let tile_y = (pos_y / crate::TILE_SIZE_PX as f32).floor() as i32;
@@ -705,6 +708,48 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
     let grasses = ctx.db.grass();
     let wild_animals = ctx.db.wild_animal();
     let sea_stacks = ctx.db.sea_stack(); // Add sea stacks table
+
+    // --- Fix existing red rune stones with empty configs (race condition fix) ---
+    // This runs BEFORE the early return check to fix rune stones even if environment is already seeded
+    // Items must be seeded first (ensured by calling seed_items before seed_environment in identity_connected)
+    let rune_stones_table = ctx.db.rune_stone();
+    let mut craftable_item_ids_fix = Vec::new();
+    for item_def in ctx.db.item_definition().iter() {
+        if let Some(crafting_cost) = &item_def.crafting_cost {
+            if !crafting_cost.is_empty() {
+                // Include ALL craftable items regardless of category
+                craftable_item_ids_fix.push(item_def.id);
+            }
+        }
+    }
+    
+    // Fix any red rune stones with missing production configs
+    if !craftable_item_ids_fix.is_empty() {
+        let mut fixed_count = 0;
+        
+        for mut rune_stone in rune_stones_table.iter() {
+            if rune_stone.rune_type == crate::rune_stone::RuneStoneType::Red {
+                let needs_fix = rune_stone.production_config.is_none();
+                
+                if needs_fix {
+                    let rune_stone_id = rune_stone.id; // Capture ID before move
+                    // Create production config (no longer tracks specific items)
+                    rune_stone.production_config = Some(crate::rune_stone::ProductionEffectConfig {
+                        items_spawned_this_night: 0,
+                        last_item_spawn_time: None,
+                        night_start_time: None,
+                    });
+                    rune_stones_table.id().update(rune_stone);
+                    fixed_count += 1;
+                    log::info!("Fixed red rune stone {} with production config", rune_stone_id);
+                }
+            }
+        }
+        
+        if fixed_count > 0 {
+            log::info!("Fixed {} red rune stones with missing production configs", fixed_count);
+        }
+    }
 
     // Check if core environment is already seeded (exclude wild_animals since they can dynamically respawn, exclude grass since it's temporarily disabled)
     if trees.iter().count() > 0 || stones.iter().count() > 0 || harvestable_resources.iter().count() > 0 || clouds.iter().count() > 0 {
@@ -1613,6 +1658,270 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
         spawned_tree_count, spawned_stone_count, spawned_sea_stack_count, harvestable_summary,
         spawned_cloud_count, spawned_wild_animal_count, spawned_grass_count, ctx.db.barrel().iter().count()
     );
+
+    // --- Seed Rune Stones ---
+    log::info!("Seeding Rune Stones...");
+    let rune_stones = ctx.db.rune_stone();
+    
+    // Calculate map dimensions for scaling (use tiles, not pixels)
+    let map_area_tiles = total_tiles as f32; // Already calculated earlier in the function
+    
+    // Scale rune stone count with map size
+    // Target: 6 rune stones for 400x400 tile map (160k tiles²)
+    // Formula: base_count + (area_tiles / base_area) * additional_per_base_area
+    // For 400x400: 6 rune stones
+    // For 1000x1000: ~9-12 rune stones (scales with square root to avoid too many)
+    let base_area_tiles = 160000.0; // 400x400 = 160k tiles² (reference point)
+    let base_count = 6; // Minimum: 2 of each color (for 400x400 map)
+    
+    // Scale with square root to avoid exponential growth
+    // For 400x400: sqrt(160k/160k) = 1.0, so 6 rune stones
+    // For 1000x1000: sqrt(1M/160k) = sqrt(6.25) = 2.5, so ~15 rune stones
+    let scale_factor = (map_area_tiles / base_area_tiles).sqrt();
+    let target_rune_stone_count = ((base_count as f32) * scale_factor).round() as u32;
+    
+    // Ensure minimum of 6 (2 of each color) - smaller maps still get 6 rune stones
+    let target_rune_stone_count = target_rune_stone_count.max(6);
+    
+    // Ensure we have at least 2 of each color, then distribute remaining evenly
+    let min_per_color = 2;
+    let guaranteed_count = min_per_color * 3; // 6 guaranteed (2 of each)
+    let remaining_count = target_rune_stone_count.saturating_sub(guaranteed_count);
+    let per_color_extra = remaining_count / 3; // Distribute remaining evenly
+    let remainder_extra = remaining_count % 3; // Distribute remainder
+    
+    let target_green = min_per_color + per_color_extra + if remainder_extra > 0 { 1 } else { 0 };
+    let target_red = min_per_color + per_color_extra + if remainder_extra > 1 { 1 } else { 0 };
+    let target_blue = min_per_color + per_color_extra;
+    
+    log::info!(
+        "Rune stone targets - Total: {}, Green: {}, Red: {}, Blue: {} (Map: {}x{} tiles, Area: {:.0} tiles²)",
+        target_rune_stone_count, target_green, target_red, target_blue,
+        WORLD_WIDTH_TILES, WORLD_HEIGHT_TILES, map_area_tiles
+    );
+    
+    let (min_tile_x_rs, max_tile_x_rs, min_tile_y_rs, max_tile_y_rs) = 
+        calculate_tile_bounds(WORLD_WIDTH_TILES, WORLD_HEIGHT_TILES, crate::rune_stone::RUNE_STONE_SPAWN_WORLD_MARGIN_TILES);
+    
+    // Calculate spawnable area
+    let spawn_width_px = (max_tile_x_rs - min_tile_x_rs) as f32 * TILE_SIZE_PX as f32;
+    let spawn_height_px = (max_tile_y_rs - min_tile_y_rs) as f32 * TILE_SIZE_PX as f32;
+    
+    // Create intelligent grid-based placement system
+    // Divide map into grid cells - aim for roughly one rune stone per cell
+    let grid_cols = ((target_rune_stone_count as f32).sqrt() * (spawn_width_px / spawn_height_px).max(1.0)).ceil() as u32;
+    let grid_rows = ((target_rune_stone_count as f32 / grid_cols as f32).ceil() as u32).max(1);
+    let cell_width_px = spawn_width_px / grid_cols as f32;
+    let cell_height_px = spawn_height_px / grid_rows as f32;
+    
+    log::info!(
+        "Rune stone grid: {}x{} cells ({}x{} px per cell), Spawn area: {}x{} px",
+        grid_cols, grid_rows, cell_width_px, cell_height_px, spawn_width_px, spawn_height_px
+    );
+    
+    // Track grid cell usage to ensure distribution
+    let mut grid_cells_used: HashSet<(u32, u32)> = HashSet::new();
+    let mut spawned_rune_stone_positions = Vec::<(f32, f32)>::new();
+    
+    // Track counts per color
+    let mut spawned_green_count = 0;
+    let mut spawned_red_count = 0;
+    let mut spawned_blue_count = 0;
+    
+    let mut rune_stone_attempts = 0;
+    let max_rune_stone_attempts = target_rune_stone_count * crate::rune_stone::MAX_RUNE_STONE_SEEDING_ATTEMPTS_FACTOR * 3; // More attempts for grid-based placement
+    
+    // Get all craftable items for red rune stones (all categories)
+    // Simplified: Red and Green rune stones now boost ALL crafting/plants universally at 1.5x
+    // No need to track specific items or plants anymore
+    
+    while (spawned_green_count < target_green || spawned_red_count < target_red || spawned_blue_count < target_blue)
+        && rune_stone_attempts < max_rune_stone_attempts {
+        rune_stone_attempts += 1;
+        
+        // Determine which color to spawn next (prioritize minimums, then balance)
+        let rune_type = {
+            // First, ensure minimums are met
+            if spawned_green_count < min_per_color {
+                crate::rune_stone::RuneStoneType::Green
+            } else if spawned_red_count < min_per_color {
+                crate::rune_stone::RuneStoneType::Red
+            } else if spawned_blue_count < min_per_color {
+                crate::rune_stone::RuneStoneType::Blue
+            } else if spawned_green_count >= target_green && spawned_red_count >= target_red && spawned_blue_count >= target_blue {
+                // All targets met, break
+                break;
+            } else {
+                // Balance remaining: spawn the color that's furthest behind
+                let green_deficit = target_green.saturating_sub(spawned_green_count);
+                let red_deficit = target_red.saturating_sub(spawned_red_count);
+                let blue_deficit = target_blue.saturating_sub(spawned_blue_count);
+                
+                if green_deficit >= red_deficit && green_deficit >= blue_deficit && green_deficit > 0 {
+                    crate::rune_stone::RuneStoneType::Green
+                } else if red_deficit >= blue_deficit && red_deficit > 0 {
+                    crate::rune_stone::RuneStoneType::Red
+                } else if blue_deficit > 0 {
+                    crate::rune_stone::RuneStoneType::Blue
+                } else {
+                    // Shouldn't happen, but break if it does
+                    break;
+                }
+            }
+        };
+        
+        // Pre-generate effect configs BEFORE calling attempt_single_spawn to avoid borrowing rng twice
+        let (agrarian_config, production_config, memory_shard_config) = match rune_type {
+            crate::rune_stone::RuneStoneType::Green => {
+                // Simplified: Boosts ALL plants at 1.5x - no need to track specific plants
+                (Some(crate::rune_stone::AgrarianEffectConfig {
+                    plants_spawned_this_night: 0,
+                    last_plant_spawn_time: None,
+                    night_start_time: None,
+                }), None, None)
+            }
+            crate::rune_stone::RuneStoneType::Red => {
+                // Simplified: Boosts ALL crafting at 1.5x - no need to track specific items
+                (None, Some(crate::rune_stone::ProductionEffectConfig {
+                    items_spawned_this_night: 0,
+                    last_item_spawn_time: None,
+                    night_start_time: None,
+                }), None)
+            }
+            crate::rune_stone::RuneStoneType::Blue => {
+                (None, None, Some(crate::rune_stone::MemoryShardEffectConfig {
+                    shards_spawned_this_night: 0,
+                    last_shard_spawn_time: None,
+                    night_start_time: None,
+                }))
+            }
+        };
+        
+        // Try to find a good grid cell position
+        // Try unused cells first (prefer spreading out)
+        let mut available_cells: Vec<(u32, u32)> = (0..grid_rows)
+            .flat_map(|row| (0..grid_cols).map(move |col| (col, row)))
+            .filter(|cell| !grid_cells_used.contains(cell))
+            .collect();
+        
+        // If no unused cells, allow reusing cells (but still check distance)
+        if available_cells.is_empty() {
+            available_cells = (0..grid_rows)
+                .flat_map(|row| (0..grid_cols).map(move |col| (col, row)))
+                .collect();
+        }
+        
+        let mut found_position = false;
+        if !available_cells.is_empty() {
+            // Shuffle and try cells
+            use rand::seq::SliceRandom;
+            available_cells.shuffle(&mut rng);
+            
+            // Try up to 10 random cells
+            for (grid_col, grid_row) in available_cells.iter().take(10) {
+                // Calculate cell center position
+                let cell_min_x = min_tile_x_rs as f32 * TILE_SIZE_PX as f32 + *grid_col as f32 * cell_width_px;
+                let cell_min_y = min_tile_y_rs as f32 * TILE_SIZE_PX as f32 + *grid_row as f32 * cell_height_px;
+                
+                // Try multiple positions within the cell (center + some random offset)
+                for _attempt in 0..5 {
+                    let offset_x = rng.gen_range(-cell_width_px * 0.3..=cell_width_px * 0.3);
+                    let offset_y = rng.gen_range(-cell_height_px * 0.3..=cell_height_px * 0.3);
+                    
+                    let pos_x = cell_min_x + cell_width_px * 0.5 + offset_x;
+                    let pos_y = cell_min_y + cell_height_px * 0.5 + offset_y;
+                    
+                    // Validate position (not on water, not in central compound)
+                    if is_position_on_water(ctx, pos_x, pos_y) || is_position_in_central_compound(pos_x, pos_y) {
+                        continue;
+                    }
+                    
+                    // Check minimum distance from other rune stones
+                    let min_dist_sq = crate::rune_stone::MIN_RUNE_STONE_DISTANCE_SQ;
+                    let too_close = spawned_rune_stone_positions.iter().any(|(other_x, other_y)| {
+                        let dx = pos_x - other_x;
+                        let dy = pos_y - other_y;
+                        dx * dx + dy * dy < min_dist_sq
+                    });
+                    
+                    if !too_close {
+                        // Spawn the rune stone
+                        let chunk_idx = calculate_chunk_index(pos_x, pos_y);
+                        let new_rune_stone = crate::rune_stone::RuneStone {
+                            id: 0,
+                            pos_x,
+                            pos_y,
+                            chunk_index: chunk_idx,
+                            rune_type: rune_type.clone(),
+                            agrarian_config: agrarian_config.clone(),
+                            production_config: production_config.clone(),
+                            memory_shard_config: memory_shard_config.clone(),
+                        };
+                        
+                        match rune_stones.try_insert(new_rune_stone) {
+                            Ok(_inserted) => {
+                                // Successfully spawned
+                                spawned_rune_stone_positions.push((pos_x, pos_y));
+                                grid_cells_used.insert((*grid_col, *grid_row));
+                                
+                                // Track counts
+                                match rune_type {
+                                    crate::rune_stone::RuneStoneType::Green => spawned_green_count += 1,
+                                    crate::rune_stone::RuneStoneType::Red => spawned_red_count += 1,
+                                    crate::rune_stone::RuneStoneType::Blue => spawned_blue_count += 1,
+                                }
+                                
+                                log::info!(
+                                    "Spawned {:?} rune stone at ({:.1}, {:.1}) in grid cell ({}, {})",
+                                    rune_type, pos_x, pos_y, grid_col, grid_row
+                                );
+                                
+                                found_position = true;
+                                break;
+                            }
+                            Err(_) => {
+                                // Insert failed (shouldn't happen with auto_inc, but handle gracefully)
+                                log::warn!("Failed to insert rune stone at ({:.1}, {:.1})", pos_x, pos_y);
+                            }
+                        }
+                    }
+                    
+                    if found_position {
+                        break;
+                    }
+                }
+                
+                if found_position {
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Final summary logging
+    let total_spawned = spawned_green_count + spawned_red_count + spawned_blue_count;
+    let green_met = spawned_green_count >= min_per_color;
+    let red_met = spawned_red_count >= min_per_color;
+    let blue_met = spawned_blue_count >= min_per_color;
+    
+    if !green_met || !red_met || !blue_met {
+        log::warn!(
+            "Could not guarantee minimum rune stones. Green: {}/{} (target: {}), Red: {}/{} (target: {}), Blue: {}/{} (target: {})",
+            spawned_green_count, min_per_color, target_green,
+            spawned_red_count, min_per_color, target_red,
+            spawned_blue_count, min_per_color, target_blue
+        );
+    }
+    
+    log::info!(
+        "Finished seeding rune stones - Total: {} (target: {}), Green: {} (target: {}), Red: {} (target: {}), Blue: {} (target: {}), Attempts: {}",
+        total_spawned, target_rune_stone_count,
+        spawned_green_count, target_green,
+        spawned_red_count, target_red,
+        spawned_blue_count, target_blue,
+        rune_stone_attempts
+    );
+    
 
     // --- Wild Animal Population Maintenance ---
     // Periodically checks if more animals should be spawned to maintain population

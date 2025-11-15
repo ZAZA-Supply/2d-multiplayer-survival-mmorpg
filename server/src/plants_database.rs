@@ -214,8 +214,8 @@ lazy_static! {
             noise_threshold: 0.65,
             primary_yield: ("Plant Fiber".to_string(), 15, 15), // Fixed 15 fiber
             secondary_yield: None,
-            seed_type: "".to_string(), // No seeds
-            seed_drop_chance: 0.0, // No seed drops
+            seed_type: "Beach Lyme Grass Seeds".to_string(), // Can be planted from seeds
+            seed_drop_chance: 0.53, // 60% chance - coastal grass should be sustainable
             min_respawn_time_secs: 480,  // 8 minutes
             max_respawn_time_secs: 720,  // 12 minutes
             spawn_condition: SpawnCondition::Coastal, // Spawns on beach tiles
@@ -285,7 +285,7 @@ lazy_static! {
             primary_yield: ("Glasswort".to_string(), 2, 5),
             secondary_yield: None,
             seed_type: "Glasswort Seeds".to_string(),
-            seed_drop_chance: 0.50, // 50% chance - salt-tolerant succulent
+            seed_drop_chance: 0.53, // 53% chance - salt-tolerant succulent
             min_respawn_time_secs: 800,  // 13 minutes
             max_respawn_time_secs: 1200, // 20 minutes
             spawn_condition: SpawnCondition::Coastal, // Salt-tolerant, grows in maritime areas

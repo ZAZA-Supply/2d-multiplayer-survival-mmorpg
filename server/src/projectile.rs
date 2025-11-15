@@ -164,45 +164,103 @@ pub fn fire_projectile(ctx: &ReducerContext, target_world_x: f32, target_world_y
         .ok_or("Weapon is not loaded correctly (missing ammo def ID).")?;
 
     // --- Consume Ammunition ---
-    let inventory_items_table = ctx.db.inventory_item(); // Renamed for clarity
+    // Use the EXACT same search pattern as load_ranged_weapon_reducer to ensure consistency
+    let inventory_items_table = ctx.db.inventory_item();
+    
+    // DIAGNOSTIC: Log what we're looking for and what the player actually has
+    log::info!("[FireProjectile] Player {:?} firing with loaded_ammo_def_id={}", player_id, loaded_ammo_def_id);
+    
+    // Count all arrows player has (for debugging)
+    let mut all_player_arrows: Vec<(u64, u32, String)> = Vec::new(); // (def_id, quantity, location_desc)
+    for item_instance in inventory_items_table.iter() {
+        // Check if this is any type of arrow/ammunition
+        if let Some(item_def) = ctx.db.item_definition().id().find(item_instance.item_def_id) {
+            if item_def.category == crate::items::ItemCategory::Ammunition {
+                let is_player_owned = match &item_instance.location {
+                    crate::models::ItemLocation::Inventory(data) => data.owner_id == player_id,
+                    crate::models::ItemLocation::Hotbar(data) => data.owner_id == player_id,
+                    _ => false,
+                };
+                if is_player_owned {
+                    let location_desc = format!("{:?}", item_instance.location);
+                    all_player_arrows.push((item_instance.item_def_id, item_instance.quantity, location_desc));
+                }
+            }
+        }
+    }
+    log::info!("[FireProjectile] Player {:?} has {} arrow type(s) in inventory/hotbar: {:?}", 
+        player_id, all_player_arrows.len(), all_player_arrows);
+    
     let mut ammo_item_instance_id_to_consume: Option<u64> = None;
-    let mut ammo_item_current_quantity: u32 = 0;
+    
+    // Debug: Log all matching items to help diagnose the issue
+    let mut matching_items_found = 0;
+    let mut items_in_wrong_location = 0;
 
-    for item_instance in inventory_items_table.iter() { // Renamed for clarity
+    for item_instance in inventory_items_table.iter() {
         if item_instance.item_def_id == loaded_ammo_def_id && item_instance.quantity > 0 {
-            match &item_instance.location {
-                crate::models::ItemLocation::Inventory(loc_data) if loc_data.owner_id == player_id => {
-                    ammo_item_instance_id_to_consume = Some(item_instance.instance_id);
-                    ammo_item_current_quantity = item_instance.quantity;
-                    break;
-                }
-                crate::models::ItemLocation::Hotbar(loc_data) if loc_data.owner_id == player_id => {
-                    ammo_item_instance_id_to_consume = Some(item_instance.instance_id);
-                    ammo_item_current_quantity = item_instance.quantity;
-                    break;
-                }
-                _ => {} // Not in player's inventory or hotbar
+            matching_items_found += 1;
+            // Use EXACT same pattern as load_ranged_weapon_reducer (lines 326-330 in active_equipment.rs)
+            let is_player_owned = match &item_instance.location {
+                crate::models::ItemLocation::Inventory(data) => data.owner_id == player_id,
+                crate::models::ItemLocation::Hotbar(data) => data.owner_id == player_id,
+                _ => false,
+            };
+            
+            if is_player_owned {
+                ammo_item_instance_id_to_consume = Some(item_instance.instance_id);
+                log::debug!("Found ammunition for player {:?}: instance_id={}, quantity={}, location={:?}", 
+                    player_id, item_instance.instance_id, item_instance.quantity, item_instance.location);
+                break; // Found valid ammo, stop searching
+            } else {
+                items_in_wrong_location += 1;
+                log::debug!("Found matching ammo but not owned by player: instance_id={}, location={:?}, player_id={:?}", 
+                    item_instance.instance_id, item_instance.location, player_id);
             }
         }
     }
 
     if let Some(instance_id) = ammo_item_instance_id_to_consume {
-        if ammo_item_current_quantity > 1 {
-            let mut item_to_update = inventory_items_table.instance_id().find(instance_id).unwrap(); // Should exist
-            item_to_update.quantity -= 1;
-            inventory_items_table.instance_id().update(item_to_update);
-            log::info!("Player {:?} consumed 1 ammunition (def_id: {}). {} remaining.", 
-                player_id, loaded_ammo_def_id, ammo_item_current_quantity - 1);
+        // Double-check the item still exists before consuming (race condition protection)
+        if let Some(mut item_to_update) = inventory_items_table.instance_id().find(instance_id) {
+            if item_to_update.quantity > 1 {
+                item_to_update.quantity -= 1;
+                let remaining_quantity = item_to_update.quantity; // Capture before move
+                inventory_items_table.instance_id().update(item_to_update);
+                log::info!("Player {:?} consumed 1 ammunition (def_id: {}). {} remaining.", 
+                    player_id, loaded_ammo_def_id, remaining_quantity);
+            } else {
+                inventory_items_table.instance_id().delete(instance_id);
+                log::info!("Player {:?} consumed last ammunition (def_id: {}). Item instance deleted.", 
+                    player_id, loaded_ammo_def_id);
+            }
         } else {
-            inventory_items_table.instance_id().delete(instance_id);
-            log::info!("Player {:?} consumed last ammunition (def_id: {}). Item instance deleted.", 
-                player_id, loaded_ammo_def_id);
+            // Item disappeared between finding it and consuming it (race condition)
+            log::warn!("Ammunition item {} disappeared between search and consumption for player {:?}", 
+                instance_id, player_id);
+            equipment.is_ready_to_fire = false;
+            equipment.loaded_ammo_def_id = None;
+            ctx.db.active_equipment().player_identity().update(equipment);
+            // Use error message pattern that client recognizes as consumption error (no sound)
+            return Err("No loaded ammunition found in inventory to consume (item disappeared). Weapon unloaded.".to_string());
         }
     } else {
+        // Enhanced error message with diagnostic information
+        // Use error message pattern that client recognizes as consumption error (no sound)
+        let error_msg = if matching_items_found > 0 {
+            format!("No loaded ammunition found in inventory to consume (found {} matching item(s) but {} in wrong location). Weapon unloaded.", 
+                matching_items_found, items_in_wrong_location)
+        } else {
+            format!("No loaded ammunition found in inventory to consume (def_id: {}). Weapon unloaded.", loaded_ammo_def_id)
+        };
+        
+        log::warn!("Player {:?} tried to fire but ammunition not found. Matching items: {}, Wrong location: {}", 
+            player_id, matching_items_found, items_in_wrong_location);
+        
         equipment.is_ready_to_fire = false;
         equipment.loaded_ammo_def_id = None;
         ctx.db.active_equipment().player_identity().update(equipment);
-        return Err("No loaded ammunition found in inventory to consume, despite weapon being marked as ready. Weapon unloaded.".to_string());
+        return Err(error_msg);
     }
 
     equipment.is_ready_to_fire = false;

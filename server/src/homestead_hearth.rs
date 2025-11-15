@@ -26,7 +26,8 @@ pub(crate) const HEARTH_HEARTH_COLLISION_DISTANCE_SQUARED: f32 =
     (HEARTH_COLLISION_RADIUS * 2.0) * (HEARTH_COLLISION_RADIUS * 2.0);
 
 // --- Placement constants ---
-pub(crate) const HEARTH_PLACEMENT_MAX_DISTANCE: f32 = 96.0;
+// Increased from 96.0 to 200.0 to make placement easier (player collision was making it hard)
+pub(crate) const HEARTH_PLACEMENT_MAX_DISTANCE: f32 = 200.0;
 pub(crate) const HEARTH_PLACEMENT_MAX_DISTANCE_SQUARED: f32 = HEARTH_PLACEMENT_MAX_DISTANCE * HEARTH_PLACEMENT_MAX_DISTANCE;
 
 // --- Interaction constants ---
@@ -1142,22 +1143,31 @@ pub fn grant_building_privilege_from_hearth(
     let sender_id = ctx.sender;
     let (_player, hearth) = validate_hearth_interaction(ctx, hearth_id)?;
 
-    // Check if player is within building privilege radius
-    let dx = _player.position_x - hearth.pos_x;
-    let dy = _player.position_y - hearth.pos_y;
-    let distance_squared = dx * dx + dy * dy;
+    // Check if player already has building privilege
+    let already_has_privilege = player_has_building_privilege(ctx, sender_id);
+    
+    // If granting privilege (don't have it yet), check building privilege radius
+    // If revoking privilege (already have it), only need to be within interaction distance (already validated)
+    if !already_has_privilege {
+        // Re-fetch player position to ensure it's current (player might have moved slightly)
+        let players = ctx.db.player();
+        let player = players.identity().find(&sender_id)
+            .ok_or_else(|| "Player not found".to_string())?;
+        
+        let dx = player.position_x - hearth.pos_x;
+        let dy = player.position_y - hearth.pos_y;
+        let distance_squared = dx * dx + dy * dy;
 
-    if distance_squared > BUILDING_PRIVILEGE_RADIUS_SQUARED {
-        return Err("Too far from hearth to toggle building privilege.".to_string());
-    }
-
-    // Toggle building privilege: remove if player already has it, grant if they don't
-    if player_has_building_privilege(ctx, sender_id) {
-        remove_building_privilege(ctx, sender_id);
-        log::info!("Player {:?} revoked building privilege from hearth {}", sender_id, hearth_id);
-    } else {
+        if distance_squared > BUILDING_PRIVILEGE_RADIUS_SQUARED {
+            return Err("Too far from hearth to toggle building privilege.".to_string());
+        }
+        
         grant_building_privilege(ctx, sender_id)?;
         log::info!("Player {:?} granted building privilege from hearth {}", sender_id, hearth_id);
+    } else {
+        // Player already has privilege - can revoke from interaction distance (already validated)
+        remove_building_privilege(ctx, sender_id);
+        log::info!("Player {:?} revoked building privilege from hearth {}", sender_id, hearth_id);
     }
 
     Ok(())

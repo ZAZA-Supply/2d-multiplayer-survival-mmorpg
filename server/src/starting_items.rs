@@ -33,16 +33,16 @@ pub(crate) fn grant_starting_items(ctx: &ReducerContext, player_id: Identity, us
 
         // Starting materials in Inventory (Slots 0-23)
         ("Wood", 5000, None, Some(0u16)),
-        ("Stone", 5000, None, Some(1u16)),
-        ("Metal Fragments", 5000, None, Some(2u16)),
+        // ("Stone", 5000, None, Some(1u16)),
+        // ("Metal Fragments", 5000, None, Some(2u16)),
         ("Sleeping Bag", 1, None, Some(3u16)),
         ("Matron's Chest", 1, None, Some(4u16)),
-        ("Shelter", 1, None, Some(5u16)),
+        // ("Shelter", 1, None, Some(5u16)),
         // ("Hunting Bow", 1, None, Some(6u16)),
-        ("Wooden Arrow", 50, None, Some(7u16)),
+        ("Wooden Arrow", 20, None, Some(7u16)),
         // ("Reed Water Bottle", 1, None, Some(8u16)),
         // ("Shelter", 1, None, Some(9u16)),
-        // ("Memory Shard", 5000, None, Some(10u16)),
+        ("Primitive Reed Fishing Rod", 1, None, Some(10u16)),
     ];
 
     log::info!("[GrantItems] Defined {} starting inventory/hotbar item entries.", starting_inv_items.len());

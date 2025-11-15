@@ -651,5 +651,13 @@ pub fn get_seed_definitions() -> Vec<ItemDefinition> {
             .respawn_time(720) // 12 minutes - specialized coastal plant
             .consumable(1.0, 1.0, -2.0) // health, hunger, thirst - very salty
             .build(),
+
+        // Beach Lyme Grass Seeds - Coastal grass seeds (beach-only planting)
+        ItemBuilder::new("Beach Lyme Grass Seeds", "Seeds for growing beach lyme grass. Can only be planted on beach tiles. Can be eaten but are fibrous and not very nutritious.", ItemCategory::Placeable)
+            .icon("beach_lyme_grass_seeds.png")
+            .stackable(60)
+            .respawn_time(480) // 8 minutes - fast-growing coastal grass
+            .consumable(0.5, 0.5, 0.0) // health, hunger, thirst - minimal nutrition
+            .build(),
     ]
 }

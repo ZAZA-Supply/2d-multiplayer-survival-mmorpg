@@ -68,7 +68,8 @@ pub(crate) const SHELTER_AABB_CENTER_Y_OFFSET_FROM_POS_Y: f32 = 200.0; // Keep t
 
 /// Buffer zone around shelter for resource clearing (in pixels)
 /// This extends the clearing area beyond the shelter's collision boundaries
-pub(crate) const SHELTER_RESOURCE_CLEARING_BUFFER: f32 = 300.0; // 300px buffer around shelter (3x increase)
+/// Reduced from 300px to 75px to be less aggressive - only clears resources immediately adjacent to shelter
+pub(crate) const SHELTER_RESOURCE_CLEARING_BUFFER: f32 = 75.0;
 
 /// --- Shelter Data Structure ---
 /// Represents a player-built shelter in the game world.
@@ -277,6 +278,8 @@ pub fn place_shelter(ctx: &ReducerContext, item_instance_id: u64, world_x: f32, 
 /// 
 /// NEW RULE: Players inside their own shelter CANNOT attack players or objects outside of it.
 /// This creates a safe zone mechanic where shelter owners must leave their shelter to attack.
+///
+/// PERFORMANCE OPTIMIZED: Single iteration with early distance checks and reduced logging
 pub fn is_line_blocked_by_shelter(
     ctx: &ReducerContext,
     attacker_id: Identity,
@@ -286,65 +289,24 @@ pub fn is_line_blocked_by_shelter(
     end_x: f32,
     end_y: f32,
 ) -> bool {
-    log::debug!(
-        "[LineOfSight] Checking line from Player {:?} at ({:.1}, {:.1}) to target at ({:.1}, {:.1})",
-        attacker_id, start_x, start_y, end_x, end_y
-    );
+    // Calculate line segment bounding box for early rejection
+    let line_min_x = start_x.min(end_x);
+    let line_max_x = start_x.max(end_x);
+    let line_min_y = start_y.min(end_y);
+    let line_max_y = start_y.max(end_y);
     
-    // NEW: Check if attacker is inside their own shelter and targeting something outside
+    // Maximum distance a shelter could be from the line and still intersect
+    // Use shelter AABB diagonal + buffer for conservative early rejection
+    let max_shelter_extent = (SHELTER_AABB_HALF_WIDTH * SHELTER_AABB_HALF_WIDTH + 
+                               SHELTER_AABB_HALF_HEIGHT * SHELTER_AABB_HALF_HEIGHT).sqrt() + 50.0;
+    
+    // Single iteration combining both owner check and wall blocking
     for shelter in ctx.db.shelter().iter() {
         if shelter.is_destroyed {
             continue;
         }
         
-        // If attacker is the owner and is inside their shelter
-        if shelter.placed_by == attacker_id && is_player_inside_shelter(start_x, start_y, &shelter) {
-            // Check if the target is outside this shelter
-            let target_inside_same_shelter = is_player_inside_shelter(end_x, end_y, &shelter);
-            
-            if !target_inside_same_shelter {
-                log::info!(
-                    "[ShelterProtection] Player {:?} (owner) is inside Shelter {} but targeting outside - ATTACK BLOCKED for PvP protection",
-                    attacker_id, shelter.id
-                );
-                return true; // Block the attack - no attacking from inside shelter to outside
-            } else {
-                log::debug!(
-                    "[ShelterProtection] Player {:?} (owner) is inside Shelter {} targeting inside same shelter - attack allowed",
-                    attacker_id, shelter.id
-                );
-                // Target is also inside the same shelter, continue checking other shelters for wall blocking
-            }
-        }
-    }
-    
-    // Original wall blocking logic - check if any shelter walls physically block the line
-    for shelter in ctx.db.shelter().iter() {
-        if shelter.is_destroyed {
-            continue;
-        }
-        
-        log::debug!(
-            "[LineOfSight] Checking Shelter {} placed by {:?} at ({:.1}, {:.1})",
-            shelter.id, shelter.placed_by, shelter.pos_x, shelter.pos_y
-        );
-        
-        // If the attacker is the owner and is inside their shelter, 
-        // their own shelter walls don't block their line of sight to targets INSIDE the same shelter
-        if shelter.placed_by == attacker_id && is_player_inside_shelter(start_x, start_y, &shelter) {
-            let target_inside_same_shelter = is_player_inside_shelter(end_x, end_y, &shelter);
-            if target_inside_same_shelter {
-                log::debug!(
-                    "[LineOfSight] Attacker {:?} is owner inside Shelter {} targeting inside same shelter, shelter walls do not block line of sight",
-                    attacker_id, shelter.id
-                );
-                continue; // Skip wall blocking check for this shelter - owner inside can attack targets inside
-            }
-        }
-        
-        // All other cases: shelter walls block attacks (including owner inside attacking outside, handled above)
-        
-        // Calculate shelter AABB bounds
+        // Calculate shelter AABB bounds (needed for both checks)
         let shelter_aabb_center_x = shelter.pos_x;
         let shelter_aabb_center_y = shelter.pos_y - SHELTER_AABB_CENTER_Y_OFFSET_FROM_POS_Y;
         let aabb_left = shelter_aabb_center_x - SHELTER_AABB_HALF_WIDTH;
@@ -352,31 +314,40 @@ pub fn is_line_blocked_by_shelter(
         let aabb_top = shelter_aabb_center_y - SHELTER_AABB_HALF_HEIGHT;
         let aabb_bottom = shelter_aabb_center_y + SHELTER_AABB_HALF_HEIGHT;
         
-        log::debug!(
-            "[LineOfSight] Shelter {} AABB: Center({:.1}, {:.1}), Bounds({:.1}-{:.1}, {:.1}-{:.1})",
-            shelter.id, shelter_aabb_center_x, shelter_aabb_center_y,
-            aabb_left, aabb_right, aabb_top, aabb_bottom
-        );
+        // EARLY REJECTION: Quick bounding box check - skip shelters clearly too far from line
+        if aabb_right < line_min_x - max_shelter_extent ||
+           aabb_left > line_max_x + max_shelter_extent ||
+           aabb_bottom < line_min_y - max_shelter_extent ||
+           aabb_top > line_max_y + max_shelter_extent {
+            continue; // Shelter is too far from line segment, skip expensive checks
+        }
+        
+        // Check if attacker is the owner and is inside their shelter
+        let attacker_is_owner_inside = shelter.placed_by == attacker_id && 
+            is_player_inside_shelter(start_x, start_y, &shelter);
+        
+        if attacker_is_owner_inside {
+            // Check if the target is outside this shelter
+            let target_inside_same_shelter = is_player_inside_shelter(end_x, end_y, &shelter);
+            
+            if !target_inside_same_shelter {
+                // Owner inside attacking outside - block for PvP protection
+                return true;
+            }
+            // Target is also inside same shelter - continue to wall blocking check below
+        }
+        
+        // Wall blocking check: If attacker is owner inside targeting inside, skip wall blocking
+        if attacker_is_owner_inside && is_player_inside_shelter(end_x, end_y, &shelter) {
+            continue; // Owner inside can attack targets inside, skip wall blocking
+        }
         
         // Check if line segment intersects with shelter AABB
         if line_intersects_aabb(start_x, start_y, end_x, end_y, aabb_left, aabb_right, aabb_top, aabb_bottom) {
-            log::info!(
-                "[LineOfSight] BLOCKED! Line from ({:.1}, {:.1}) to ({:.1}, {:.1}) intersects Shelter {} AABB",
-                start_x, start_y, end_x, end_y, shelter.id
-            );
             return true; // Line is blocked
-        } else {
-            log::debug!(
-                "[LineOfSight] Line does not intersect Shelter {} AABB",
-                shelter.id
-            );
         }
     }
     
-    log::debug!(
-        "[LineOfSight] Line from ({:.1}, {:.1}) to ({:.1}, {:.1}) is NOT blocked by any shelter",
-        start_x, start_y, end_x, end_y
-    );
     false // Line is not blocked
 }
 
@@ -444,6 +415,7 @@ fn line_intersects_aabb(
 /// Adds shelter targets to the targeting cone if they are within range and angle
 ///
 /// This function should be called from the main targeting logic in combat.rs
+/// PERFORMANCE OPTIMIZED: Early range check and reduced logging
 pub fn add_shelter_targets_to_cone(
     ctx: &ReducerContext,
     player: &Player,
@@ -453,20 +425,11 @@ pub fn add_shelter_targets_to_cone(
     forward_y: f32,
     targets: &mut Vec<crate::combat::Target>
 ) {
+    let attack_range_sq = attack_range * attack_range;
+    
     // Check Shelters
     for shelter_entity in ctx.db.shelter().iter() {
         if shelter_entity.is_destroyed { continue; } // Skip destroyed shelters
-        
-        // NEW: If player is the owner and is inside the shelter, they cannot attack their own shelter
-        if shelter_entity.placed_by == player.identity {
-            if is_player_inside_shelter(player.position_x, player.position_y, &shelter_entity) {
-                log::debug!(
-                    "[ShelterTargeting] Player {:?} is owner and inside Shelter {}, cannot attack own shelter from inside",
-                    player.identity, shelter_entity.id
-                );
-                continue; // Skip targeting this shelter
-            }
-        }
         
         // Use the collision center for targeting, not the base position
         let shelter_collision_center_x = shelter_entity.pos_x;
@@ -476,46 +439,31 @@ pub fn add_shelter_targets_to_cone(
         let dy = shelter_collision_center_y - player.position_y; 
         let dist_sq = dx * dx + dy * dy;
         
-        log::debug!(
-            "[ShelterTargeting] Player {:?} checking Shelter {} at base({:.1}, {:.1}) collision_center({:.1}, {:.1}). Distance: {:.1}, Attack Range: {:.1}",
-            player.identity, shelter_entity.id, shelter_entity.pos_x, shelter_entity.pos_y, 
-            shelter_collision_center_x, shelter_collision_center_y, dist_sq.sqrt(), attack_range
-        );
+        // Early range check - skip shelters clearly out of range
+        if dist_sq >= attack_range_sq || dist_sq <= 0.0 {
+            continue;
+        }
         
-        if dist_sq < (attack_range * attack_range) && dist_sq > 0.0 {
-            let distance = dist_sq.sqrt();
-            let target_vec_x = dx / distance;
-            let target_vec_y = dy / distance;
-
-            let dot_product = forward_x * target_vec_x + forward_y * target_vec_y;
-            let angle_rad = dot_product.acos();
-
-            log::debug!(
-                "[ShelterTargeting] Shelter {} within range. Angle: {:.2} rad, Half attack angle: {:.2} rad",
-                shelter_entity.id, angle_rad, half_attack_angle_rad
-            );
-
-            if angle_rad <= half_attack_angle_rad {
-                log::info!(
-                    "[ShelterTargeting] Adding Shelter {} as target for Player {:?}",
-                    shelter_entity.id, player.identity
-                );
-                targets.push(crate::combat::Target {
-                    target_type: TargetType::Shelter,
-                    id: crate::combat::TargetId::Shelter(shelter_entity.id),
-                    distance_sq: dist_sq,
-                });
-            } else {
-                log::debug!(
-                    "[ShelterTargeting] Shelter {} outside attack angle for Player {:?}",
-                    shelter_entity.id, player.identity
-                );
+        // NEW: If player is the owner and is inside the shelter, they cannot attack their own shelter
+        if shelter_entity.placed_by == player.identity {
+            if is_player_inside_shelter(player.position_x, player.position_y, &shelter_entity) {
+                continue; // Skip targeting this shelter
             }
-        } else {
-            log::debug!(
-                "[ShelterTargeting] Shelter {} outside attack range for Player {:?}",
-                shelter_entity.id, player.identity
-            );
+        }
+        
+        let distance = dist_sq.sqrt();
+        let target_vec_x = dx / distance;
+        let target_vec_y = dy / distance;
+
+        let dot_product = forward_x * target_vec_x + forward_y * target_vec_y;
+        let angle_rad = dot_product.acos();
+
+        if angle_rad <= half_attack_angle_rad {
+            targets.push(crate::combat::Target {
+                target_type: TargetType::Shelter,
+                id: crate::combat::TargetId::Shelter(shelter_entity.id),
+                distance_sq: dist_sq,
+            });
         }
     }
 }
@@ -546,10 +494,28 @@ pub fn is_player_inside_shelter(player_x: f32, player_y: f32, shelter: &Shelter)
 /// Checks if a player is the owner of a shelter and is inside it
 ///
 /// Returns true if the player owns the shelter and is currently inside its boundaries
+/// PERFORMANCE OPTIMIZED: Early distance check to skip shelters far from player
 pub fn is_owner_inside_shelter(ctx: &ReducerContext, player_id: Identity, player_x: f32, player_y: f32) -> Option<u32> {
+    // Maximum distance from shelter center to still be inside
+    let max_distance_sq = (SHELTER_AABB_HALF_WIDTH * SHELTER_AABB_HALF_WIDTH + 
+                           SHELTER_AABB_HALF_HEIGHT * SHELTER_AABB_HALF_HEIGHT) + 100.0;
+    
     for shelter in ctx.db.shelter().iter() {
         if shelter.is_destroyed { continue; }
-        if shelter.placed_by == player_id && is_player_inside_shelter(player_x, player_y, &shelter) {
+        
+        // Only check shelters owned by this player
+        if shelter.placed_by != player_id { continue; }
+        
+        // Early distance check - skip shelters clearly too far
+        let shelter_aabb_center_x = shelter.pos_x;
+        let shelter_aabb_center_y = shelter.pos_y - SHELTER_AABB_CENTER_Y_OFFSET_FROM_POS_Y;
+        let dx = player_x - shelter_aabb_center_x;
+        let dy = player_y - shelter_aabb_center_y;
+        let dist_sq = dx * dx + dy * dy;
+        
+        if dist_sq > max_distance_sq { continue; }
+        
+        if is_player_inside_shelter(player_x, player_y, &shelter) {
             return Some(shelter.id);
         }
     }
@@ -709,6 +675,7 @@ pub fn check_projectile_position_in_shelter(
 /// Calculates warmth bonus for a player if they are inside their own shelter
 ///
 /// Returns the warmth bonus per second (0.5 if inside own shelter, 0.0 otherwise)
+/// PERFORMANCE OPTIMIZED: Early distance check to skip shelters far from player
 pub fn calculate_shelter_warmth_bonus(
     ctx: &ReducerContext,
     player_id: Identity,
@@ -717,15 +684,27 @@ pub fn calculate_shelter_warmth_bonus(
 ) -> f32 {
     const SHELTER_WARMTH_BONUS_PER_SECOND: f32 = 0.5;
     
+    // Maximum distance player could be from shelter center and still be inside
+    let max_distance_sq = (SHELTER_AABB_HALF_WIDTH * SHELTER_AABB_HALF_WIDTH + 
+                           SHELTER_AABB_HALF_HEIGHT * SHELTER_AABB_HALF_HEIGHT) + 100.0;
+    
     for shelter in ctx.db.shelter().iter() {
         if shelter.is_destroyed { continue; }
         
-        // Check if player is the owner and is inside the shelter
-        if shelter.placed_by == player_id && is_player_inside_shelter(player_x, player_y, &shelter) {
-            log::trace!(
-                "[ShelterWarmth] Player {:?} is inside their own Shelter {}, granting {:.1} warmth/sec",
-                player_id, shelter.id, SHELTER_WARMTH_BONUS_PER_SECOND
-            );
+        // Only check shelters owned by this player
+        if shelter.placed_by != player_id { continue; }
+        
+        // Early distance check - skip shelters clearly too far
+        let shelter_aabb_center_x = shelter.pos_x;
+        let shelter_aabb_center_y = shelter.pos_y - SHELTER_AABB_CENTER_Y_OFFSET_FROM_POS_Y;
+        let dx = player_x - shelter_aabb_center_x;
+        let dy = player_y - shelter_aabb_center_y;
+        let dist_sq = dx * dx + dy * dy;
+        
+        if dist_sq > max_distance_sq { continue; }
+        
+        // Check if player is inside the shelter
+        if is_player_inside_shelter(player_x, player_y, &shelter) {
             return SHELTER_WARMTH_BONUS_PER_SECOND;
         }
     }
@@ -738,6 +717,7 @@ pub fn calculate_shelter_warmth_bonus(
 /// Returns true if:
 /// - The object is not inside any shelter, OR
 /// - The player is the owner of the shelter containing the object and is also inside that shelter
+/// PERFORMANCE OPTIMIZED: Early distance checks to skip shelters far from object/player
 pub fn can_player_interact_with_object_in_shelter(
     ctx: &ReducerContext,
     player_id: Identity,
@@ -746,48 +726,40 @@ pub fn can_player_interact_with_object_in_shelter(
     object_x: f32,
     object_y: f32,
 ) -> bool {
+    // Maximum distance from shelter center to still be inside
+    let max_distance_sq = (SHELTER_AABB_HALF_WIDTH * SHELTER_AABB_HALF_WIDTH + 
+                           SHELTER_AABB_HALF_HEIGHT * SHELTER_AABB_HALF_HEIGHT) + 100.0;
+    
     // Check if the object is inside any shelter
     for shelter in ctx.db.shelter().iter() {
         if shelter.is_destroyed { continue; }
         
+        // Early distance check for object - skip shelters clearly too far
+        let shelter_aabb_center_x = shelter.pos_x;
+        let shelter_aabb_center_y = shelter.pos_y - SHELTER_AABB_CENTER_Y_OFFSET_FROM_POS_Y;
+        let obj_dx = object_x - shelter_aabb_center_x;
+        let obj_dy = object_y - shelter_aabb_center_y;
+        let obj_dist_sq = obj_dx * obj_dx + obj_dy * obj_dy;
+        
+        if obj_dist_sq > max_distance_sq { continue; }
+        
         // Check if the object is inside this shelter
         if is_player_inside_shelter(object_x, object_y, &shelter) {
-            log::debug!(
-                "[ShelterInteraction] Object at ({:.1}, {:.1}) is inside Shelter {} owned by {:?}",
-                object_x, object_y, shelter.id, shelter.placed_by
-            );
-            
             // Object is inside a shelter - check if player is the owner and is also inside
             if shelter.placed_by == player_id {
                 // Player owns the shelter, check if they're inside it
                 if is_player_inside_shelter(player_x, player_y, &shelter) {
-                    log::debug!(
-                        "[ShelterInteraction] Player {:?} (owner) is inside Shelter {} and can interact with object",
-                        player_id, shelter.id
-                    );
                     return true; // Owner inside their shelter can interact
                 } else {
-                    log::info!(
-                        "[ShelterInteraction] Player {:?} (owner) is outside Shelter {} and cannot interact with object inside",
-                        player_id, shelter.id
-                    );
                     return false; // Owner outside their shelter cannot interact
                 }
             } else {
-                log::info!(
-                    "[ShelterInteraction] Player {:?} is not the owner of Shelter {} and cannot interact with object inside",
-                    player_id, shelter.id
-                );
                 return false; // Non-owner cannot interact with objects inside shelter
             }
         }
     }
     
     // Object is not inside any shelter, interaction is allowed
-    log::trace!(
-        "[ShelterInteraction] Object at ({:.1}, {:.1}) is not inside any shelter, interaction allowed",
-        object_x, object_y
-    );
     true
 }
 
