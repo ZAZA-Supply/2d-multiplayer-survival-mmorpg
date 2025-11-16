@@ -191,9 +191,9 @@ spacetime generate --lang typescript --out-dir ../client/src/generated --project
 *   🛏️ Sleeping Bags: Placeable respawn points that persist between deaths
 *   🏗️ Construction System: Base building (walls, floors, etc.)
 *   🌱 Farming System: Planting, growing, harvesting crops
-*   🦌 Hunting System: NPC animals (deer, wolves, etc.), tracking, hunting mechanics
+*   🦌 Hunting System: NPC animals (foxes, wolves, etc.), tracking, hunting mechanics
 *   🎨 Terrain Autotiling: Edge detection, Wang tiles, seamless transitions between biomes
-*   🛡️ Advanced Armor System: Comprehensive armor stats (defense, warmth, weight, durability), armor condition degradation, repair mechanics, and visual damage indicators
+*   🛡️ Advanced Armor System: Damage resistance by type (melee, projectile, fire, blunt, slash, pierce), warmth bonuses, movement speed modifiers, stamina regen modifiers, set-based immunities (burn, cold, wetness, knockback, bleed), special effects (melee damage reflection, detection radius, low health damage bonus, silent movement, animal intimidation), cold resistance scaling, and drying speed modifiers
 *   🌦️ Dynamic Chunk-Based Weather: Evolving weather patterns with chunk-level granularity, smooth transitions, and gameplay effects (rain intensity, temperature, visibility)
 
 **Planned (📋):** 
