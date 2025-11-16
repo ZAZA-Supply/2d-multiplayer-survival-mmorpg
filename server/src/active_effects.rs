@@ -16,6 +16,10 @@ use crate::tree::tree as TreeTableTrait;
 // Import sound system for throwing up sound when poisoned
 use crate::sound_events::emit_throwing_up_sound;
 
+// Import armor module for immunity checks
+use crate::armor;
+use crate::models::ImmunityType;
+
 #[table(name = active_consumable_effect, public)] // public for client UI if needed
 #[derive(Clone, Debug)]
 pub struct ActiveConsumableEffect {
@@ -304,6 +308,21 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
                                 if effect.effect_type == EffectType::Venom {
                                     amount_this_tick = 1.0; // Fixed 1 damage per tick for persistent venom
                                 }
+                                
+                                // <<< APPLY FIRE DAMAGE MULTIPLIER FOR BURN EFFECTS (WOODEN ARMOR VULNERABILITY) >>>
+                                if effect.effect_type == EffectType::Burn {
+                                    let fire_multiplier = armor::calculate_fire_damage_multiplier(ctx, effect.player_id);
+                                    if fire_multiplier != 1.0 {
+                                        let original_damage = amount_this_tick;
+                                        amount_this_tick *= fire_multiplier;
+                                        log::info!(
+                                            "Player {:?} has fire damage multiplier {:.1}x (wooden armor). Burn damage: {:.1} -> {:.1}",
+                                            effect.player_id, fire_multiplier, original_damage, amount_this_tick
+                                        );
+                                    }
+                                }
+                                // <<< END FIRE DAMAGE MULTIPLIER >>>
+                                
                                 // Normal damage application for conscious players
                                 player_to_update.health = (player_to_update.health - amount_this_tick).clamp(MIN_STAT_VALUE, MAX_HEALTH_VALUE);
                             }
@@ -1382,6 +1401,13 @@ pub fn apply_burn_effect(
     source_item_def_id: u64 // 0 for environmental sources like campfires
 ) -> Result<(), String> {
     let current_time = ctx.timestamp;
+    
+    // <<< CHECK BURN IMMUNITY FROM ARMOR >>>
+    if armor::has_armor_immunity(ctx, player_id, ImmunityType::Burn) {
+        log::info!("Player {:?} is immune to burn effects (armor immunity)", player_id);
+        return Ok(()); // Silently ignore burn effect application
+    }
+    // <<< END BURN IMMUNITY CHECK >>>
     
     // Check if player already has a burn effect from the same source type
     let existing_burn_effects: Vec<_> = ctx.db.active_consumable_effect().iter()

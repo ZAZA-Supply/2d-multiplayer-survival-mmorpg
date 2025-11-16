@@ -293,7 +293,14 @@ impl AnimalBehavior for CinderFoxBehavior {
         }
     }
 
-    fn should_chase_player(&self, animal: &WildAnimal, stats: &AnimalStats, player: &Player) -> bool {
+    fn should_chase_player(&self, ctx: &ReducerContext, animal: &WildAnimal, stats: &AnimalStats, player: &Player) -> bool {
+        // 🐺 WOLF FUR INTIMIDATION: Animals are intimidated by players wearing wolf fur
+        if crate::armor::intimidates_animals(ctx, player.identity) {
+            log::debug!("🦊 Fox {} intimidated by player {} wearing wolf fur - will not chase",
+                       animal.id, player.identity);
+            return false;
+        }
+        
         let distance_sq = get_distance_squared(
             animal.pos_x, animal.pos_y,
             player.position_x, player.position_y

@@ -121,6 +121,7 @@ pub struct ItemDefinition {
     pub grants_knockback_immunity: bool, // Full scale set grants knockback immunity
     pub grants_bleed_immunity: bool, // Leather armor grants bleed immunity
     pub noise_on_sprint: bool, // Bone armor makes noise when sprinting
+    pub silences_movement: bool, // Fox fur boots silence footsteps
     pub intimidates_animals: bool, // Wolf fur intimidates animals
 }
 

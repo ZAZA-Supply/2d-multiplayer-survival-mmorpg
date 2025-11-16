@@ -402,26 +402,51 @@ pub fn process_player_stats(ctx: &ReducerContext, _schedule: PlayerStatSchedule)
         } else if new_hunger < low_need_threshold {
             health_change_per_sec -= HEALTH_LOSS_PER_SEC_LOW_HUNGER;
         }
+        // <<< CHECK COLD IMMUNITY AND RESISTANCE FROM ARMOR >>>
+        let has_cold_immunity = crate::armor::has_armor_immunity(ctx, player_id, crate::models::ImmunityType::Cold);
+        let cold_resistance = crate::armor::calculate_cold_resistance(ctx, player_id);
+        
         if new_warmth <= 0.0 {
-            let mut cold_damage = HEALTH_LOSS_PER_SEC_LOW_WARMTH * HEALTH_LOSS_MULTIPLIER_AT_ZERO;
-            // Apply wet effect multiplier to cold damage
-            if crate::active_effects::player_has_wet_effect(ctx, player_id) {
-                cold_damage *= crate::wet::WET_COLD_DAMAGE_MULTIPLIER;
-                log::trace!("Player {:?} has wet effect - cold damage multiplied by {:.1}x (from {:.3} to {:.3}/sec)", 
-                    player_id, crate::wet::WET_COLD_DAMAGE_MULTIPLIER, 
-                    HEALTH_LOSS_PER_SEC_LOW_WARMTH * HEALTH_LOSS_MULTIPLIER_AT_ZERO, cold_damage);
+            if has_cold_immunity {
+                log::trace!("Player {:?} is immune to cold damage (armor immunity) despite warmth at {:.1}", player_id, new_warmth);
+            } else {
+                let mut cold_damage = HEALTH_LOSS_PER_SEC_LOW_WARMTH * HEALTH_LOSS_MULTIPLIER_AT_ZERO;
+                // Apply wet effect multiplier to cold damage
+                if crate::active_effects::player_has_wet_effect(ctx, player_id) {
+                    cold_damage *= crate::wet::WET_COLD_DAMAGE_MULTIPLIER;
+                    log::trace!("Player {:?} has wet effect - cold damage multiplied by {:.1}x (from {:.3} to {:.3}/sec)", 
+                        player_id, crate::wet::WET_COLD_DAMAGE_MULTIPLIER, 
+                        HEALTH_LOSS_PER_SEC_LOW_WARMTH * HEALTH_LOSS_MULTIPLIER_AT_ZERO, cold_damage);
+                }
+                // Apply cold resistance from armor (graduated based on pieces worn)
+                cold_damage *= 1.0 - cold_resistance;
+                if cold_resistance > 0.0 {
+                    log::trace!("Player {:?} has {:.1}% cold resistance from armor, reducing cold damage to {:.3}/sec", 
+                        player_id, cold_resistance * 100.0, cold_damage);
+                }
+                health_change_per_sec -= cold_damage;
             }
-            health_change_per_sec -= cold_damage;
         } else if new_warmth < low_need_threshold {
-            let mut cold_damage = HEALTH_LOSS_PER_SEC_LOW_WARMTH;
-            // Apply wet effect multiplier to cold damage
-            if crate::active_effects::player_has_wet_effect(ctx, player_id) {
-                cold_damage *= crate::wet::WET_COLD_DAMAGE_MULTIPLIER;
-                log::trace!("Player {:?} has wet effect - cold damage multiplied by {:.1}x (from {:.3} to {:.3}/sec)", 
-                    player_id, crate::wet::WET_COLD_DAMAGE_MULTIPLIER, HEALTH_LOSS_PER_SEC_LOW_WARMTH, cold_damage);
+            if has_cold_immunity {
+                log::trace!("Player {:?} is immune to cold damage (armor immunity) despite low warmth at {:.1}", player_id, new_warmth);
+            } else {
+                let mut cold_damage = HEALTH_LOSS_PER_SEC_LOW_WARMTH;
+                // Apply wet effect multiplier to cold damage
+                if crate::active_effects::player_has_wet_effect(ctx, player_id) {
+                    cold_damage *= crate::wet::WET_COLD_DAMAGE_MULTIPLIER;
+                    log::trace!("Player {:?} has wet effect - cold damage multiplied by {:.1}x (from {:.3} to {:.3}/sec)", 
+                        player_id, crate::wet::WET_COLD_DAMAGE_MULTIPLIER, HEALTH_LOSS_PER_SEC_LOW_WARMTH, cold_damage);
+                }
+                // Apply cold resistance from armor (graduated based on pieces worn)
+                cold_damage *= 1.0 - cold_resistance;
+                if cold_resistance > 0.0 {
+                    log::trace!("Player {:?} has {:.1}% cold resistance from armor, reducing cold damage to {:.3}/sec", 
+                        player_id, cold_resistance * 100.0, cold_damage);
+                }
+                health_change_per_sec -= cold_damage;
             }
-            health_change_per_sec -= cold_damage;
         }
+        // <<< END COLD IMMUNITY CHECK >>>
 
         // Health recovery only if needs are met and not taking damage from any source
         if health_change_per_sec == 0.0 && // No damage from needs

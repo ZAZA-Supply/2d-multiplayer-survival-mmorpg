@@ -775,15 +775,23 @@ pub fn update_player_position_simple(
             if walking_state.total_distance_since_last_sound >= distance_threshold && 
                time_since_last_footstep >= time_threshold_ms {
                 
-                // Emit walking sound
-                emit_walking_sound(ctx, final_x, final_y, sender_id);
+                // Check for silent movement (Fox Fur Boots)
+                let has_silent_movement = crate::armor::has_silent_movement(ctx, sender_id);
                 
-                // Reset accumulated distance and update time
+                if !has_silent_movement {
+                    // Emit walking sound only if not wearing fox fur boots
+                    emit_walking_sound(ctx, final_x, final_y, sender_id);
+                    
+                    log::debug!("Player {:?} footstep at ({:.1}, {:.1}) - sprinting: {}, distance: {:.1}", 
+                               sender_id, final_x, final_y, is_sprinting, movement_distance);
+                } else {
+                    log::debug!("Player {:?} silent footstep at ({:.1}, {:.1}) - fox fur boots equipped", 
+                               sender_id, final_x, final_y);
+                }
+                
+                // Reset accumulated distance and update time (regardless of sound emission)
                 walking_state.total_distance_since_last_sound = 0.0;
                 walking_state.last_walking_sound_time_ms = now_ms;
-                
-                log::debug!("Player {:?} footstep at ({:.1}, {:.1}) - sprinting: {}, distance: {:.1}", 
-                           sender_id, final_x, final_y, is_sprinting, movement_distance);
             }
         }
         

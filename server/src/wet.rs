@@ -4,6 +4,9 @@ use crate::active_effects::{ActiveConsumableEffect, EffectType, active_consumabl
 use crate::Player;
 use crate::player;
 use crate::shelter::shelter;
+// Import armor module for immunity checks
+use crate::armor;
+use crate::models::ImmunityType;
 
 // Constants for wet effect
 pub const WET_COLD_DAMAGE_MULTIPLIER: f32 = 2.0; // Double cold damage when wet
@@ -17,6 +20,13 @@ pub const WET_TREE_DECAY_RATE_SECONDS: u32 = 3; // How many seconds to remove fr
 /// Applies a wet effect to a player
 /// This creates a long-duration effect that will be removed by environmental conditions
 pub fn apply_wet_effect(ctx: &ReducerContext, player_id: Identity, reason: &str) -> Result<(), String> {
+    // <<< CHECK WETNESS IMMUNITY FROM ARMOR >>>
+    if armor::has_armor_immunity(ctx, player_id, ImmunityType::Wetness) {
+        log::info!("Player {:?} is immune to wetness effects (armor immunity)", player_id);
+        return Ok(()); // Silently ignore wet effect application
+    }
+    // <<< END WETNESS IMMUNITY CHECK >>>
+    
     // Check if player already has wet effect - if so, just refresh the duration
     let existing_wet_effects: Vec<_> = ctx.db.active_consumable_effect().iter()
         .filter(|e| e.player_id == player_id && e.effect_type == EffectType::Wet)
@@ -289,6 +299,17 @@ pub fn check_and_remove_wet_from_environment(ctx: &ReducerContext) -> Result<(),
                 // Tree cover provides moderate drying (can stack with cozy!)
                 accelerated_decay_amount += WET_TREE_DECAY_RATE_SECONDS - WET_NORMAL_DECAY_RATE_SECONDS;
                 decay_reasons.push("tree cover");
+            }
+            
+            // 👕 ARMOR-BASED DRYING: Cloth armor dries faster
+            let armor_drying_multiplier = armor::calculate_drying_speed_multiplier(ctx, player_id);
+            if armor_drying_multiplier > 1.0 {
+                // Apply cloth armor bonus to the base decay rate
+                let armor_bonus = ((WET_NORMAL_DECAY_RATE_SECONDS as f32) * (armor_drying_multiplier - 1.0)) as u32;
+                if armor_bonus > 0 {
+                    accelerated_decay_amount += armor_bonus;
+                    decay_reasons.push("cloth armor (fast drying)");
+                }
             }
             
             let decay_reason = if decay_reasons.len() > 1 {

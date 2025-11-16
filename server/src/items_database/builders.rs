@@ -58,6 +58,7 @@ impl ItemBuilder {
                 grants_knockback_immunity: false,
                 grants_bleed_immunity: false,
                 noise_on_sprint: false,
+                silences_movement: false,
                 intimidates_animals: false,
             }
         }
@@ -275,6 +276,11 @@ impl ItemBuilder {
     
     pub fn noise_on_sprint(mut self, value: bool) -> Self {
         self.inner.noise_on_sprint = value;
+        self
+    }
+    
+    pub fn silences_movement(mut self, value: bool) -> Self {
+        self.inner.silences_movement = value;
         self
     }
     

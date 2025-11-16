@@ -304,10 +304,11 @@ impl AnimalBehavior for ArcticWalrusBehavior {
         }
     }
 
-    fn should_chase_player(&self, animal: &WildAnimal, stats: &AnimalStats, player: &Player) -> bool {
+    fn should_chase_player(&self, ctx: &ReducerContext, animal: &WildAnimal, stats: &AnimalStats, player: &Player) -> bool {
         // Walruses never chase unprovoked - they only attack when damaged first
         // This function should only return true if the walrus is already in a hostile state
         // due to being attacked (which is handled in handle_damage_response)
+        // Note: Intimidation doesn't apply to walruses since they don't chase anyway
         false
     }
 

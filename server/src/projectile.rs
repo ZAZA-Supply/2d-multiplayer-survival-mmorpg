@@ -505,6 +505,13 @@ fn apply_projectile_bleed_effect(
         return Ok(());
     }
 
+    // <<< CHECK BLEED IMMUNITY FROM ARMOR >>>
+    if crate::armor::has_armor_immunity(ctx, target_player_id, crate::models::ImmunityType::Bleed) {
+        log::info!("Player {:?} is immune to bleed effects (armor immunity) from ammo '{}'", target_player_id, ammo_item_def.name);
+        return Ok(());
+    }
+    // <<< END BLEED IMMUNITY CHECK >>>
+    
     if let (Some(bleed_damage_per_tick), Some(bleed_duration_seconds), Some(bleed_tick_interval_seconds)) = (
         ammo_item_def.bleed_damage_per_tick,
         ammo_item_def.bleed_duration_seconds,
@@ -1419,7 +1426,8 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
                 }
 
                 // Apply combined damage via combat::damage_player
-                match combat::damage_player(ctx, projectile.owner_id, player_to_check.identity, final_damage, &ammo_item_def, current_time) {
+                // IMPORTANT: Pass weapon_item_def (not ammo) for damage type - bows/crossbows have DamageType::Projectile
+                match combat::damage_player(ctx, projectile.owner_id, player_to_check.identity, final_damage, &weapon_item_def, current_time) {
                     Ok(attack_result) => {
                         if attack_result.hit {
                             log::info!("Projectile from {:?} (weapon: {} + ammo: {}) dealt {:.1} damage to player {:?}.", 

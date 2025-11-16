@@ -1,6 +1,6 @@
 use super::builders::{ItemBuilder, basic_weapon};
 use crate::items::{ItemDefinition, ItemCategory, CostIngredient};
-use crate::models::TargetType;
+use crate::models::{TargetType, DamageType};
 
 pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
     vec![
@@ -11,6 +11,7 @@ pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
         ItemBuilder::new("Naval Cutlass", "A ceremonial naval sword from the old Soviet Pacific Fleet. Tarnished but still deadly sharp. Slower strikes but devastating damage.", ItemCategory::Weapon)
             .icon("naval_cutlass.png")
             .weapon(48, 52, 1.0) // Highest melee damage, slow deliberate strikes
+            .damage_type(DamageType::Slash) // Slashing weapon
             .bleed_effect(3.0, 12.0, 1.0) // Standard bleed, longer duration
             .build(),
 
@@ -18,6 +19,7 @@ pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
         ItemBuilder::new("AK74 Bayonet", "A detached bayonet from an AK-74 rifle. Compact, balanced, and brutally effective in close combat. Lightning-fast strikes with vicious bleeding.", ItemCategory::Weapon)
             .icon("soviet_bayonet.png")
             .weapon(30, 34, 0.55) // Lower per-hit damage, FASTEST weapon
+            .damage_type(DamageType::Slash) // Slashing weapon
             .bleed_effect(4.0, 12.0, 1.0) // High bleed damage, long duration
             .build(),
 
@@ -25,6 +27,7 @@ pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
         ItemBuilder::new("Engineers Maul", "A heavy demolition hammer used by Soviet military engineers. Built for breaking through concrete and steel, it's devastatingly effective in combat.", ItemCategory::Weapon)
             .icon("engineers_maul.png")
             .weapon(40, 45, 0.85) // High damage, slow but powerful
+            .damage_type(DamageType::Blunt) // Blunt weapon
             .bleed_effect(2.5, 10.0, 1.0) // Moderate bleed
             .build(),
 
@@ -32,6 +35,7 @@ pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
         ItemBuilder::new("Military Crowbar", "A heavy-duty crowbar from Soviet military engineering corps. Built for breaching and demolition, it delivers devastating blows in combat.", ItemCategory::Weapon)
             .icon("military_crowbar.png")
             .weapon(55, 60, 1.2) // HIGHEST damage in game, SLOWEST weapon
+            .damage_type(DamageType::Blunt) // Blunt weapon
             .bleed_effect(1.5, 8.0, 1.0) // Lower bleed (blunt force trauma)
             .build(),
 
@@ -42,6 +46,7 @@ pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
         ItemBuilder::new("Human Skull", "The surprisingly intact skull of a former human. Grim, but effective in a pinch.", ItemCategory::Weapon)
             .icon("skull.png")
             .weapon(30, 30, 2.0) // Fixed damage, very slow
+            .damage_type(DamageType::Blunt) // Blunt weapon
             .build(),
 
         // Fox Skull - Light but cunning weapon
@@ -49,6 +54,7 @@ pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
             .icon("fox_skull.png")
             .stackable(10)
             .weapon(25, 25, 1.8) // Lighter/faster than human skull
+            .damage_type(DamageType::Blunt) // Blunt weapon
             .build(),
 
         // Wolf Skull - Fierce predator weapon
@@ -56,6 +62,7 @@ pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
             .icon("wolf_skull.png")
             .stackable(10)
             .weapon(35, 35, 2.2) // Stronger but slower than human skull
+            .damage_type(DamageType::Blunt) // Blunt weapon
             .build(),
 
         // Viper Skull - Venomous weapon with bleed effect
@@ -63,6 +70,7 @@ pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
             .icon("viper_skull.png")
             .stackable(10)
             .weapon(28, 28, 1.9) // Moderate damage and speed
+            .damage_type(DamageType::Pierce) // Pierce weapon (fangs)
             .bleed_effect(2.0, 6.0, 1.0) // Venom effect - moderate bleed
             .build(),
 
@@ -71,6 +79,7 @@ pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
             .icon("walrus_skull.png")
             .stackable(10)
             .weapon(40, 40, 2.5) // High damage but very slow due to weight
+            .damage_type(DamageType::Pierce) // Pierce weapon (tusks)
             .build(),
 
         // === CRAFTABLE SPEARS ===
@@ -80,6 +89,7 @@ pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
         ItemBuilder::new("Wooden Spear", "A sharpened stick. Better than throwing rocks.", ItemCategory::Weapon)
             .icon("spear.png")
             .weapon(25, 25, 1.5) // Fixed moderate damage, very slow due to reach
+            .damage_type(DamageType::Pierce) // Pierce weapon
             .bleed_effect(2.0, 8.0, 1.0) // Standard bleed
             .crafting_cost(vec![
                 CostIngredient { item_name: "Wood".to_string(), quantity: 300 },
@@ -92,6 +102,7 @@ pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
         ItemBuilder::new("Stone Spear", "A basic spear tipped with sharpened stone. Has a longer reach and causes bleeding.", ItemCategory::Weapon)
             .icon("stone_spear.png")
             .weapon(35, 35, 1.3) // Fixed higher damage, slow but faster than wooden spear
+            .damage_type(DamageType::Pierce) // Pierce weapon
             .bleed_effect(3.0, 8.0, 1.0) // Better bleed
             .crafting_cost(vec![
                 CostIngredient { item_name: "Wood".to_string(), quantity: 300 },
@@ -109,6 +120,7 @@ pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
             .icon("bow.png")
             .stackable(1)
             .weapon(50, 50, 0.0) // 50 base damage, no melee speed (ranged only)
+            .damage_type(DamageType::Projectile) // Projectile weapon
             .equippable(None) // RangedWeapons are equippable
             .crafting_cost(vec![
                 CostIngredient { item_name: "Wood".to_string(), quantity: 400 },
@@ -124,6 +136,7 @@ pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
             .icon("crossbow.png")
             .stackable(1)
             .weapon(75, 75, 0.0) // 75 base damage, no melee speed (ranged only)
+            .damage_type(DamageType::Projectile) // Projectile weapon
             .equippable(None) // RangedWeapons are equippable
             .crafting_cost(vec![
                 CostIngredient { item_name: "Wood".to_string(), quantity: 600 },

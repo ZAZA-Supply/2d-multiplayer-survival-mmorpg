@@ -131,7 +131,7 @@ impl AnimalBehavior for TundraWolfBehavior {
                     
                     // 🐺 PACK COMBAT: Wolves maintain aggressive behavior regardless of pack status
                     // Pack behavior does NOT interfere with hunting - all wolves chase independently
-                    if self.should_chase_player(animal, stats, player) {
+                    if self.should_chase_player(ctx, animal, stats, player) {
                         transition_to_state(animal, AnimalState::Chasing, current_time, Some(player.identity), "player in range");
                         
                         // 🔊 WOLF GROWL: Emit intimidating growl when starting to chase
@@ -178,7 +178,7 @@ impl AnimalBehavior for TundraWolfBehavior {
                 
                                     if time_in_state > 1500 { // Reduced from 4000ms to 1.5 seconds - wolves are aggressive
                         if let Some(player) = detected_player {
-                            if self.should_chase_player(animal, stats, player) {
+                            if self.should_chase_player(ctx, animal, stats, player) {
                                 transition_to_state(animal, AnimalState::Chasing, current_time, Some(player.identity), "alert timeout - chase");
                                 
                                 // 🔊 WOLF GROWL: Emit intimidating growl when transitioning to chase
@@ -364,7 +364,15 @@ impl AnimalBehavior for TundraWolfBehavior {
         }
     }
 
-    fn should_chase_player(&self, animal: &WildAnimal, stats: &AnimalStats, player: &Player) -> bool {
+    fn should_chase_player(&self, ctx: &ReducerContext, animal: &WildAnimal, stats: &AnimalStats, player: &Player) -> bool {
+        // 🐺 WOLF FUR INTIMIDATION: Animals are intimidated by players wearing wolf fur
+        // This makes animals less likely to attack and more likely to flee
+        if crate::armor::intimidates_animals(ctx, player.identity) {
+            log::debug!("🐺 Animal {} intimidated by player {} wearing wolf fur - will not chase",
+                       animal.id, player.identity);
+            return false; // Intimidated animals will not chase
+        }
+        
         let distance_sq = get_distance_squared(
             animal.pos_x, animal.pos_y,
             player.position_x, player.position_y

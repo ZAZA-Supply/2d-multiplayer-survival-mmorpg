@@ -21,7 +21,7 @@ use crate::Player;
 use crate::PLAYER_RADIUS;
 use crate::{WORLD_WIDTH_PX, WORLD_HEIGHT_PX};
 use crate::items::{ItemDefinition, ItemCategory};
-use crate::models::TargetType;
+use crate::models::{TargetType, DamageType, ImmunityType};
 use crate::tree;
 use crate::stone;
 use crate::wooden_storage_box;
@@ -1435,16 +1435,38 @@ pub fn damage_player(
 
     let mut final_damage = damage; // Start with the damage passed in (already calculated from weapon stats)
 
-    // <<< APPLY ARMOR RESISTANCE >>>
-    let resistance = armor::calculate_total_damage_resistance(ctx, target_id);
+    // <<< APPLY LOW HEALTH DAMAGE BONUS (WOLF FUR ARMOR) >>>
+    // Check if attacker has low health damage bonus and is below 30% health
+    if let Some(attacker_player) = attacker_player_opt.as_ref() {
+        const LOW_HEALTH_THRESHOLD: f32 = 30.0; // 30% health threshold
+        if attacker_player.health <= LOW_HEALTH_THRESHOLD {
+            let damage_bonus = armor::calculate_low_health_damage_bonus(ctx, attacker_id);
+            if damage_bonus > 0.0 {
+                let bonus_damage = final_damage * damage_bonus;
+                final_damage += bonus_damage;
+                log::info!(
+                    "Player {:?} has low health ({:.1} HP) - gained +{:.0}% damage bonus ({:.1} extra damage) from wolf fur armor",
+                    attacker_id, attacker_player.health, damage_bonus * 100.0, bonus_damage
+                );
+            }
+        }
+    }
+    // <<< END LOW HEALTH DAMAGE BONUS >>>
+
+    // <<< APPLY TYPED ARMOR RESISTANCE >>>
+    // Determine damage type from weapon (default to Melee if not specified)
+    let damage_type = item_def.damage_type.unwrap_or(DamageType::Melee);
+    let resistance = armor::calculate_resistance_for_damage_type(ctx, target_id, damage_type);
+    
     if resistance > 0.0 {
         let damage_reduction = final_damage * resistance;
         let resisted_damage = final_damage - damage_reduction;
         
         log::info!(
-            "Player {:?} attacking Player {:?}. Initial Damage: {:.2}, Resistance: {:.2} ({:.0}%), Final Damage after resistance: {:.2}",
-            attacker_id, target_id, 
-            final_damage, // Log the damage before resistance
+            "Player {:?} attacking Player {:?} with {:?}. Initial Damage: {:.2}, {:?} Resistance: {:.2} ({:.0}%), Final Damage: {:.2}",
+            attacker_id, target_id, damage_type,
+            final_damage,
+            damage_type,
             resistance,
             resistance * 100.0,
             resisted_damage.max(0.0)
@@ -1452,13 +1474,13 @@ pub fn damage_player(
         final_damage = resisted_damage.max(0.0); // Damage cannot be negative
     } else {
         log::info!(
-            "Player {:?} attacking Player {:?}. Initial Damage: {:.2} (No resistance). Final Damage: {:.2}",
-            attacker_id, target_id, 
+            "Player {:?} attacking Player {:?} with {:?}. Initial Damage: {:.2} (No resistance). Final Damage: {:.2}",
+            attacker_id, target_id, damage_type,
             final_damage, 
             final_damage
         );
     }
-    // <<< END APPLY ARMOR RESISTANCE >>>
+    // <<< END APPLY TYPED ARMOR RESISTANCE >>>
 
     // A "hit" has occurred. Set last_hit_time immediately for client visuals.
     target_player.last_hit_time = Some(timestamp);
@@ -1467,13 +1489,54 @@ pub fn damage_player(
     target_player.health = (target_player.health - final_damage).clamp(0.0, MAX_HEALTH_VALUE);
     let actual_damage_applied = old_health - target_player.health; // This is essentially final_damage clamped by remaining health
 
+    // <<< APPLY MELEE DAMAGE REFLECTION (WOODEN ARMOR) >>>
+    // Only reflect damage from melee attacks (not projectiles)
+    if actual_damage_applied > 0.0 && damage_type == DamageType::Melee {
+        let reflection_percent = armor::calculate_melee_damage_reflection(ctx, target_id);
+        if reflection_percent > 0.0 {
+            let reflected_damage = actual_damage_applied * reflection_percent;
+            
+            // Apply reflected damage to attacker
+            if let Some(mut attacker_to_damage) = players.identity().find(&attacker_id) {
+                if !attacker_to_damage.is_dead {
+                    let attacker_old_health = attacker_to_damage.health;
+                    attacker_to_damage.health = (attacker_to_damage.health - reflected_damage).clamp(0.0, MAX_HEALTH_VALUE);
+                    let attacker_actual_reflected = attacker_old_health - attacker_to_damage.health;
+                    
+                    log::info!(
+                        "Player {:?} reflected {:.1} damage ({:.0}%) back to attacker {:?} (wooden armor reflection)",
+                        target_id, attacker_actual_reflected, reflection_percent * 100.0, attacker_id
+                    );
+                    
+                    // Check if attacker died from reflection
+                    if attacker_to_damage.health <= 0.0 && !attacker_to_damage.is_dead {
+                        attacker_to_damage.is_dead = true;
+                        log::info!("Attacker {:?} killed by reflected damage from {:?}!", attacker_id, target_id);
+                        // Note: We don't create corpse here to avoid complexity, just mark as dead
+                    }
+                    
+                    players.identity().update(attacker_to_damage);
+                }
+            }
+        }
+    }
+    // <<< END MELEE DAMAGE REFLECTION >>>
+
     // --- APPLY KNOCKBACK and update timestamp if damage was dealt ---
     if actual_damage_applied > 0.0 { // Only apply knockback and update timestamp if actual damage occurred
         target_player.last_update = timestamp; // Update target's timestamp due to health change and potential knockback
 
         if let Some(mut attacker) = attacker_player_opt.clone() { // Clone attacker_player_opt to get a mutable attacker if needed
-            // --- CHECK: Only apply knockback if both players are online ---
-            let should_apply_knockback = attacker.is_online && target_player.is_online;
+            // <<< CHECK KNOCKBACK IMMUNITY FROM ARMOR >>>
+            let has_knockback_immunity = armor::has_armor_immunity(ctx, target_id, ImmunityType::Knockback);
+            
+            // Only apply knockback if both players are online AND target doesn't have knockback immunity
+            let should_apply_knockback = attacker.is_online && target_player.is_online && !has_knockback_immunity;
+            
+            if has_knockback_immunity {
+                log::debug!("Player {:?} is immune to knockback (armor immunity)", target_id);
+            }
+            // <<< END KNOCKBACK IMMUNITY CHECK >>>
             
             if should_apply_knockback {
                 let dx_target_from_attacker = target_player.position_x - attacker.position_x;
@@ -1569,6 +1632,15 @@ pub fn damage_player(
         item_def.bleed_tick_interval_seconds
     ) {
         if dmg_per_tick > 0.0 && duration_sec > 0.0 && interval_sec > 0.0 {
+            // <<< CHECK BLEED IMMUNITY FROM ARMOR >>>
+            if armor::has_armor_immunity(ctx, target_id, ImmunityType::Bleed) {
+                log::info!(
+                    "[BleedCheck] Player {:?} is immune to bleed effects (armor immunity) from item '{}' (Def ID: {})", 
+                    target_id, item_def.name, item_def.id
+                );
+                // Skip bleed application
+            } else {
+            // <<< END BLEED IMMUNITY CHECK >>>
             log::info!(
                 "[BleedCheck] Item '{}' (Def ID: {}) has positive bleed properties (Dmg: {}, Dur: {}, Int: {}). Attempting to apply bleed effect to player {:?}.", 
                 item_def.name, item_def.id, dmg_per_tick, duration_sec, interval_sec, target_id
@@ -1606,6 +1678,7 @@ pub fn damage_player(
                     log::error!("Failed to apply bleed effect to player {:?} from item '{}': {:?}", target_id, item_def.name, e);
                 }
             }
+            } // Close the else block for bleed immunity check
         } else {
             log::info!("[BleedCheck] Item '{}' has bleed properties, but one or more are zero. Not applying bleed.", item_def.name);
         }

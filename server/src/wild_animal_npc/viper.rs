@@ -496,7 +496,14 @@
          }
      }
  
-     fn should_chase_player(&self, animal: &WildAnimal, stats: &AnimalStats, _player: &Player) -> bool {
+     fn should_chase_player(&self, ctx: &ReducerContext, animal: &WildAnimal, stats: &AnimalStats, _player: &Player) -> bool {
+         // 🐺 WOLF FUR INTIMIDATION: Animals are intimidated by players wearing wolf fur
+         if crate::armor::intimidates_animals(ctx, _player.identity) {
+             log::debug!("🐍 Viper {} intimidated by player {} wearing wolf fur - will not chase",
+                        animal.id, _player.identity);
+             return false;
+         }
+         
          let distance_sq = get_distance_squared(
              animal.pos_x, animal.pos_y,
              _player.position_x, _player.position_y

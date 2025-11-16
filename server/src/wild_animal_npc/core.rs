@@ -257,7 +257,7 @@ pub trait AnimalBehavior {
     );
     
     /// Determine if should chase player based on species behavior
-    fn should_chase_player(&self, animal: &WildAnimal, stats: &AnimalStats, player: &Player) -> bool;
+    fn should_chase_player(&self, ctx: &ReducerContext, animal: &WildAnimal, stats: &AnimalStats, player: &Player) -> bool;
     
     /// Handle species-specific damage response
     fn handle_damage_response(
@@ -382,12 +382,12 @@ impl AnimalBehavior for AnimalBehaviorEnum {
         }
     }
 
-    fn should_chase_player(&self, animal: &WildAnimal, stats: &AnimalStats, player: &Player) -> bool {
+    fn should_chase_player(&self, ctx: &ReducerContext, animal: &WildAnimal, stats: &AnimalStats, player: &Player) -> bool {
         match self {
-            AnimalBehaviorEnum::CinderFox(behavior) => behavior.should_chase_player(animal, stats, player),
-            AnimalBehaviorEnum::TundraWolf(behavior) => behavior.should_chase_player(animal, stats, player),
-            AnimalBehaviorEnum::CableViper(behavior) => behavior.should_chase_player(animal, stats, player),
-            AnimalBehaviorEnum::ArcticWalrus(behavior) => behavior.should_chase_player(animal, stats, player),
+            AnimalBehaviorEnum::CinderFox(behavior) => behavior.should_chase_player(ctx, animal, stats, player),
+            AnimalBehaviorEnum::TundraWolf(behavior) => behavior.should_chase_player(ctx, animal, stats, player),
+            AnimalBehaviorEnum::CableViper(behavior) => behavior.should_chase_player(ctx, animal, stats, player),
+            AnimalBehaviorEnum::ArcticWalrus(behavior) => behavior.should_chase_player(ctx, animal, stats, player),
         }
     }
 
@@ -707,7 +707,7 @@ fn update_animal_ai_state(
     }
     
     // Use fire-safe players for AI logic
-    let detected_player = find_detected_player(animal, stats, &fire_safe_players);
+    let detected_player = find_detected_player(ctx, animal, stats, &fire_safe_players);
     behavior.update_ai_state_logic(ctx, animal, stats, detected_player.as_ref(), current_time, rng)?;
 
     Ok(())
@@ -830,11 +830,31 @@ fn execute_attack(
     // Apply damage to player
     if let Some(mut target) = ctx.db.player().identity().find(&target_player.identity) {
         // Get species-specific damage and effects
-        let damage = behavior.execute_attack_effects(ctx, animal, target_player, stats, current_time, rng)?;
+        let raw_damage = behavior.execute_attack_effects(ctx, animal, target_player, stats, current_time, rng)?;
+        
+        // <<< APPLY TYPED ARMOR RESISTANCE >>>
+        // Animals use Melee damage type for their attacks
+        let resistance = crate::armor::calculate_resistance_for_damage_type(ctx, target.identity, crate::models::DamageType::Melee);
+        let mut final_damage = raw_damage;
+        
+        if resistance > 0.0 {
+            let damage_reduction = raw_damage * resistance;
+            final_damage = (raw_damage - damage_reduction).max(0.0);
+            
+            log::info!(
+                "Animal {:?} {} attacking Player {:?}. Raw Damage: {:.2}, Melee Resistance: {:.2} ({:.0}%), Final Damage: {:.2}",
+                animal.species, animal.id, target.identity,
+                raw_damage,
+                resistance,
+                resistance * 100.0,
+                final_damage
+            );
+        }
+        // <<< END APPLY TYPED ARMOR RESISTANCE >>>
         
         // Apply damage
         let old_health = target.health;
-        target.health = (target.health - damage).max(0.0);
+        target.health = (target.health - final_damage).max(0.0);
         target.last_hit_time = Some(current_time);
         let actual_damage = old_health - target.health;
         
@@ -879,7 +899,7 @@ fn find_nearby_players(ctx: &ReducerContext, animal: &WildAnimal, stats: &Animal
         .collect()
 }
 
-fn find_detected_player(animal: &WildAnimal, stats: &AnimalStats, nearby_players: &[Player]) -> Option<Player> {
+fn find_detected_player(ctx: &ReducerContext, animal: &WildAnimal, stats: &AnimalStats, nearby_players: &[Player]) -> Option<Player> {
     for player in nearby_players {
         let distance_sq = get_distance_squared(
             animal.pos_x, animal.pos_y,
@@ -887,11 +907,29 @@ fn find_detected_player(animal: &WildAnimal, stats: &AnimalStats, nearby_players
         );
         
         // 🥷 STEALTH MECHANIC: Crouching reduces animal detection radius by 50%
-        let effective_perception_range = if player.is_crouching {
+        let mut effective_perception_range = if player.is_crouching {
             stats.perception_range * 0.5 // 50% reduction when crouching
         } else {
             stats.perception_range
         };
+        
+        // 🦊 FOX FUR ARMOR: Detection radius bonus makes animals less likely to detect you
+        // Each piece of Fox Fur armor reduces animal detection range by the bonus percentage
+        let detection_bonus = crate::armor::calculate_detection_radius_bonus(ctx, player.identity);
+        if detection_bonus > 0.0 {
+            // Detection bonus REDUCES the animal's perception range (makes you harder to detect)
+            effective_perception_range *= 1.0 - detection_bonus;
+            log::debug!("🦊 Player {} has {:.1}% detection bonus, reducing animal perception to {:.1}px",
+                       player.identity, detection_bonus * 100.0, effective_perception_range);
+        }
+        
+        // 🦊 FOX FUR BOOTS: Silent movement further reduces detection range
+        // Players wearing fox fur boots make no sound, reducing detection by an additional 30%
+        if crate::armor::has_silent_movement(ctx, player.identity) {
+            effective_perception_range *= 0.7; // 30% additional reduction
+            log::debug!("🦊 Player {} has silent movement (fox fur boots), further reducing perception to {:.1}px",
+                       player.identity, effective_perception_range);
+        }
         
         if distance_sq <= effective_perception_range * effective_perception_range {
             // Check if within perception cone (except for Cable Viper which has 360° detection)

@@ -259,6 +259,63 @@ pub fn makes_noise_on_sprint(ctx: &ReducerContext, player_id: Identity) -> bool 
     false
 }
 
+/// Checks if player has silent movement (fox fur boots)
+pub fn has_silent_movement(ctx: &ReducerContext, player_id: Identity) -> bool {
+    let armor_pieces = get_equipped_armor_pieces(ctx, player_id);
+    
+    for armor_piece in armor_pieces {
+        if armor_piece.silences_movement {
+            return true;
+        }
+    }
+    
+    false
+}
+
+/// Calculates total cold resistance from all equipped armor (graduated, not immunity)
+/// Each piece of Fox/Wolf Fur provides 20% cold resistance (up to 100%)
+pub fn calculate_cold_resistance(ctx: &ReducerContext, player_id: Identity) -> f32 {
+    let armor_pieces = get_equipped_armor_pieces(ctx, player_id);
+    let mut total_resistance = 0.0;
+
+    for armor_piece in armor_pieces {
+        if let Some(resistances) = &armor_piece.armor_resistances {
+            total_resistance += resistances.cold_resistance;
+        }
+    }
+
+    // Cap resistance at 100% (1.0) 
+    total_resistance.min(1.0)
+}
+
+/// Calculates drying speed multiplier based on armor type
+/// Cloth armor dries faster (1.5x) because it's lightweight and breathable
+pub fn calculate_drying_speed_multiplier(ctx: &ReducerContext, player_id: Identity) -> f32 {
+    let armor_pieces = get_equipped_armor_pieces(ctx, player_id);
+    
+    if armor_pieces.is_empty() {
+        return 1.0; // No armor = normal drying
+    }
+    
+    // Count cloth armor pieces
+    let mut cloth_count = 0;
+    let mut total_count = 0;
+    
+    for armor_piece in armor_pieces {
+        total_count += 1;
+        if armor_piece.name.contains("Cloth") {
+            cloth_count += 1;
+        }
+    }
+    
+    // Cloth armor dries faster (majority cloth = 1.5x speed)
+    if cloth_count > total_count / 2 {
+        1.5 // Cloth dries 50% faster
+    } else {
+        1.0 // All other armor = normal drying
+    }
+}
+
 /// Checks if player intimidates animals (wolf fur)
 pub fn intimidates_animals(ctx: &ReducerContext, player_id: Identity) -> bool {
     let armor_pieces = get_equipped_armor_pieces(ctx, player_id);
