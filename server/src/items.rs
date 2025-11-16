@@ -99,10 +99,29 @@ pub struct ItemDefinition {
     pub consumable_duration_secs: Option<f32>, // For effects over time, 0 or None for instant
     pub cook_time_secs: Option<f32>,           // Time to cook this item if it's cookable
     pub cooked_item_def_name: Option<String>, // Name of the ItemDefinition this item cooks into
-    pub damage_resistance: Option<f32>, // <<< ADDED: e.g., 0.05 for 5% damage reduction
+    pub damage_resistance: Option<f32>, // <<< DEPRECATED: Use armor_resistances instead
     pub warmth_bonus: Option<f32>,      // <<< ADDED: e.g., 0.2 warmth points per effect interval
     pub respawn_time_seconds: Option<u32>, // Time for the item/resource node to respawn in the world
     pub attack_interval_secs: Option<f32>, // Minimum time between attacks for this item
+    
+    // NEW ARMOR SYSTEM FIELDS
+    pub damage_type: Option<crate::models::DamageType>, // What type of damage this weapon deals
+    pub armor_resistances: Option<crate::models::ArmorResistances>, // Typed resistance values
+    pub movement_speed_modifier: Option<f32>, // -0.2 = -20% speed, 0.1 = +10% speed
+    pub stamina_regen_modifier: Option<f32>, // 0.1 = +10% stamina regen
+    pub reflects_melee_damage: Option<f32>, // % of melee damage reflected back to attacker
+    pub fire_damage_multiplier: Option<f32>, // 2.0 = double fire damage taken
+    pub detection_radius_bonus: Option<f32>, // 0.1 = +10% detection radius
+    pub low_health_damage_bonus: Option<f32>, // 0.2 = +20% damage when health < 30%
+    
+    // ARMOR SPECIAL PROPERTIES (booleans default to false)
+    pub grants_burn_immunity: bool, // Full bone set grants burn immunity
+    pub grants_cold_immunity: bool, // Full fur set grants cold immunity
+    pub grants_wetness_immunity: bool, // Full scale set grants wetness immunity
+    pub grants_knockback_immunity: bool, // Full scale set grants knockback immunity
+    pub grants_bleed_immunity: bool, // Leather armor grants bleed immunity
+    pub noise_on_sprint: bool, // Bone armor makes noise when sprinting
+    pub intimidates_animals: bool, // Wolf fur intimidates animals
 }
 
 // --- Inventory Table ---

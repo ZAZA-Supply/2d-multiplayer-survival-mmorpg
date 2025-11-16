@@ -1,5 +1,5 @@
 use crate::items::{ItemDefinition, ItemCategory, CostIngredient};
-use crate::models::{EquipmentSlotType, TargetType};
+use crate::models::{EquipmentSlotType, TargetType, DamageType, ArmorResistances};
 
 pub struct ItemBuilder {
     inner: ItemDefinition,
@@ -43,6 +43,22 @@ impl ItemBuilder {
                 warmth_bonus: None,
                 respawn_time_seconds: None,
                 attack_interval_secs: None,
+                // New armor system fields
+                damage_type: None,
+                armor_resistances: None,
+                movement_speed_modifier: None,
+                stamina_regen_modifier: None,
+                reflects_melee_damage: None,
+                fire_damage_multiplier: None,
+                detection_radius_bonus: None,
+                low_health_damage_bonus: None,
+                grants_burn_immunity: false,
+                grants_cold_immunity: false,
+                grants_wetness_immunity: false,
+                grants_knockback_immunity: false,
+                grants_bleed_immunity: false,
+                noise_on_sprint: false,
+                intimidates_animals: false,
             }
         }
     }
@@ -187,6 +203,83 @@ impl ItemBuilder {
         // This was used in old system as separate from crafting_output time
         // We'll just adjust the existing crafting_time_secs
         self.inner.crafting_time_secs = Some(time_secs);
+        self
+    }
+
+    // NEW ARMOR SYSTEM BUILDER METHODS
+    
+    pub fn damage_type(mut self, dmg_type: DamageType) -> Self {
+        self.inner.damage_type = Some(dmg_type);
+        self
+    }
+    
+    pub fn armor_resistances(mut self, resistances: ArmorResistances) -> Self {
+        self.inner.armor_resistances = Some(resistances);
+        self
+    }
+    
+    pub fn movement_speed_modifier(mut self, modifier: f32) -> Self {
+        self.inner.movement_speed_modifier = Some(modifier);
+        self
+    }
+    
+    pub fn stamina_regen_modifier(mut self, modifier: f32) -> Self {
+        self.inner.stamina_regen_modifier = Some(modifier);
+        self
+    }
+    
+    pub fn reflects_melee_damage(mut self, percent: f32) -> Self {
+        self.inner.reflects_melee_damage = Some(percent);
+        self
+    }
+    
+    pub fn fire_damage_multiplier(mut self, multiplier: f32) -> Self {
+        self.inner.fire_damage_multiplier = Some(multiplier);
+        self
+    }
+    
+    pub fn detection_radius_bonus(mut self, bonus: f32) -> Self {
+        self.inner.detection_radius_bonus = Some(bonus);
+        self
+    }
+    
+    pub fn low_health_damage_bonus(mut self, bonus: f32) -> Self {
+        self.inner.low_health_damage_bonus = Some(bonus);
+        self
+    }
+    
+    pub fn grants_burn_immunity(mut self, value: bool) -> Self {
+        self.inner.grants_burn_immunity = value;
+        self
+    }
+    
+    pub fn grants_cold_immunity(mut self, value: bool) -> Self {
+        self.inner.grants_cold_immunity = value;
+        self
+    }
+    
+    pub fn grants_wetness_immunity(mut self, value: bool) -> Self {
+        self.inner.grants_wetness_immunity = value;
+        self
+    }
+    
+    pub fn grants_knockback_immunity(mut self, value: bool) -> Self {
+        self.inner.grants_knockback_immunity = value;
+        self
+    }
+    
+    pub fn grants_bleed_immunity(mut self, value: bool) -> Self {
+        self.inner.grants_bleed_immunity = value;
+        self
+    }
+    
+    pub fn noise_on_sprint(mut self, value: bool) -> Self {
+        self.inner.noise_on_sprint = value;
+        self
+    }
+    
+    pub fn intimidates_animals(mut self, value: bool) -> Self {
+        self.inner.intimidates_animals = value;
         self
     }
 

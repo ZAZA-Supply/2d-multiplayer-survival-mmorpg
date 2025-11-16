@@ -154,5 +154,67 @@ pub enum BuildingTier {
     Metal = 3,
 }
 
+/// Enum to represent different types of damage for combat calculations
+#[derive(SpacetimeType, Serialize, Deserialize, Copy, Clone, Debug, PartialEq)]
+pub enum DamageType {
+    Melee,        // General melee damage
+    Projectile,   // Arrows, thrown weapons
+    Fire,         // Fire-based damage
+    Blunt,        // Clubs, hammers
+    Slash,        // Swords, axes
+    Pierce,       // Spears, arrows
+    Environmental, // Cold, poison, etc.
+}
+
+/// Enum to represent different types of armor immunities
+#[derive(SpacetimeType, Serialize, Deserialize, Copy, Clone, Debug, PartialEq)]
+pub enum ImmunityType {
+    Burn,      // Immunity to fire/burn damage
+    Cold,      // Immunity to cold damage
+    Wetness,   // Immunity to rain/water effects
+    Knockback, // Immunity to knockback effects
+    Bleed,     // Immunity to bleed effects
+}
+
+/// Struct containing all armor resistance values for different damage types
+#[derive(SpacetimeType, Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct ArmorResistances {
+    pub melee_resistance: f32,      // 0.0 to 1.0 (0% to 100%)
+    pub projectile_resistance: f32,
+    pub fire_resistance: f32,       // Can be negative for vulnerability
+    pub blunt_resistance: f32,
+    pub slash_resistance: f32,
+    pub pierce_resistance: f32,
+    pub cold_resistance: f32,
+}
+
+impl ArmorResistances {
+    /// Creates a new ArmorResistances with all values set to zero
+    pub fn zero() -> Self {
+        Self {
+            melee_resistance: 0.0,
+            projectile_resistance: 0.0,
+            fire_resistance: 0.0,
+            blunt_resistance: 0.0,
+            slash_resistance: 0.0,
+            pierce_resistance: 0.0,
+            cold_resistance: 0.0,
+        }
+    }
+    
+    /// Creates a new ArmorResistances with uniform values across all types
+    pub fn uniform(value: f32) -> Self {
+        Self {
+            melee_resistance: value,
+            projectile_resistance: value,
+            fire_resistance: value,
+            blunt_resistance: value,
+            slash_resistance: value,
+            pierce_resistance: value,
+            cold_resistance: value,
+        }
+    }
+}
+
 // Enum to represent the type of an active consumable effect
 // ... existing code ...

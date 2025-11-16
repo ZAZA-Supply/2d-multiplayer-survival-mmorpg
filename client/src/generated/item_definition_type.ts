@@ -39,6 +39,12 @@ declare type __keep_TargetType = TargetType;
 import { CostIngredient } from "./cost_ingredient_type";
 // Mark import as potentially unused
 declare type __keep_CostIngredient = CostIngredient;
+import { DamageType } from "./damage_type_type";
+// Mark import as potentially unused
+declare type __keep_DamageType = DamageType;
+import { ArmorResistances } from "./armor_resistances_type";
+// Mark import as potentially unused
+declare type __keep_ArmorResistances = ArmorResistances;
 
 
 export type ItemDefinition = {
@@ -76,6 +82,21 @@ export type ItemDefinition = {
   warmthBonus: number | undefined,
   respawnTimeSeconds: number | undefined,
   attackIntervalSecs: number | undefined,
+  damageType: DamageType | undefined,
+  armorResistances: ArmorResistances | undefined,
+  movementSpeedModifier: number | undefined,
+  staminaRegenModifier: number | undefined,
+  reflectsMeleeDamage: number | undefined,
+  fireDamageMultiplier: number | undefined,
+  detectionRadiusBonus: number | undefined,
+  lowHealthDamageBonus: number | undefined,
+  grantsBurnImmunity: boolean,
+  grantsColdImmunity: boolean,
+  grantsWetnessImmunity: boolean,
+  grantsKnockbackImmunity: boolean,
+  grantsBleedImmunity: boolean,
+  noiseOnSprint: boolean,
+  intimidatesAnimals: boolean,
 };
 let _cached_ItemDefinition_type_value: __AlgebraicTypeType | null = null;
 
@@ -125,6 +146,21 @@ export const ItemDefinition = {
       { name: "warmthBonus", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.F32) },
       { name: "respawnTimeSeconds", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.U32) },
       { name: "attackIntervalSecs", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.F32) },
+      { name: "damageType", algebraicType: __AlgebraicTypeValue.createOptionType(DamageType.getTypeScriptAlgebraicType()) },
+      { name: "armorResistances", algebraicType: __AlgebraicTypeValue.createOptionType(ArmorResistances.getTypeScriptAlgebraicType()) },
+      { name: "movementSpeedModifier", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.F32) },
+      { name: "staminaRegenModifier", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.F32) },
+      { name: "reflectsMeleeDamage", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.F32) },
+      { name: "fireDamageMultiplier", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.F32) },
+      { name: "detectionRadiusBonus", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.F32) },
+      { name: "lowHealthDamageBonus", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.F32) },
+      { name: "grantsBurnImmunity", algebraicType: __AlgebraicTypeValue.Bool },
+      { name: "grantsColdImmunity", algebraicType: __AlgebraicTypeValue.Bool },
+      { name: "grantsWetnessImmunity", algebraicType: __AlgebraicTypeValue.Bool },
+      { name: "grantsKnockbackImmunity", algebraicType: __AlgebraicTypeValue.Bool },
+      { name: "grantsBleedImmunity", algebraicType: __AlgebraicTypeValue.Bool },
+      { name: "noiseOnSprint", algebraicType: __AlgebraicTypeValue.Bool },
+      { name: "intimidatesAnimals", algebraicType: __AlgebraicTypeValue.Bool },
     );
     return _cached_ItemDefinition_type_value;
   },

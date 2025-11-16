@@ -1,6 +1,6 @@
 use super::builders::{ItemBuilder};
 use crate::items::{ItemDefinition, ItemCategory, CostIngredient};
-use crate::models::EquipmentSlotType;
+use crate::models::{EquipmentSlotType, ArmorResistances};
 
 pub fn get_armor_definitions() -> Vec<ItemDefinition> {
     vec![
@@ -8,10 +8,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
         // Complete set of basic cloth armor providing warmth and minimal protection
 
         // Cloth Hood - Head protection
-        ItemBuilder::new("Cloth Hood", "Basic head covering.", ItemCategory::Armor)
+        ItemBuilder::new("Cloth Hood", "Basic head covering. Light and fast-drying.", ItemCategory::Armor)
             .icon("cloth_hood.png")
             .equippable(Some(EquipmentSlotType::Head))
-            .armor(0.01, Some(0.2))
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.01,
+                projectile_resistance: 0.01,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.01,
+                slash_resistance: 0.01,
+                pierce_resistance: 0.01,
+                cold_resistance: 0.0,
+            })
+            .warmth_bonus(0.2)
+            .movement_speed_modifier(0.02) // +2% speed per piece
             .crafting_cost(vec![
                 CostIngredient { item_name: "Cloth".to_string(), quantity: 20 },
             ])
@@ -20,10 +30,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .build(),
 
         // Cloth Shirt - Chest protection
-        ItemBuilder::new("Cloth Shirt", "Simple protection for the torso.", ItemCategory::Armor)
+        ItemBuilder::new("Cloth Shirt", "Simple protection for the torso. Light and breathable.", ItemCategory::Armor)
             .icon("cloth_shirt.png")
             .equippable(Some(EquipmentSlotType::Chest))
-            .armor(0.01, Some(0.2))
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.01,
+                projectile_resistance: 0.01,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.01,
+                slash_resistance: 0.01,
+                pierce_resistance: 0.01,
+                cold_resistance: 0.0,
+            })
+            .warmth_bonus(0.2)
+            .movement_speed_modifier(0.02)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Cloth".to_string(), quantity: 40 },
             ])
@@ -32,10 +52,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .build(),
 
         // Cloth Pants - Leg protection
-        ItemBuilder::new("Cloth Pants", "Simple protection for the legs.", ItemCategory::Armor)
+        ItemBuilder::new("Cloth Pants", "Simple protection for the legs. Allows quick movement.", ItemCategory::Armor)
             .icon("cloth_pants.png")
             .equippable(Some(EquipmentSlotType::Legs))
-            .armor(0.01, Some(0.2))
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.01,
+                projectile_resistance: 0.01,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.01,
+                slash_resistance: 0.01,
+                pierce_resistance: 0.01,
+                cold_resistance: 0.0,
+            })
+            .warmth_bonus(0.2)
+            .movement_speed_modifier(0.02)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Cloth".to_string(), quantity: 30 },
             ])
@@ -44,10 +74,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .build(),
 
         // Cloth Gloves - Hand protection
-        ItemBuilder::new("Cloth Gloves", "Basic hand coverings.", ItemCategory::Armor)
+        ItemBuilder::new("Cloth Gloves", "Basic hand coverings. Lightweight and flexible.", ItemCategory::Armor)
             .icon("cloth_gloves.png")
             .equippable(Some(EquipmentSlotType::Hands))
-            .armor(0.01, Some(0.2))
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.01,
+                projectile_resistance: 0.01,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.01,
+                slash_resistance: 0.01,
+                pierce_resistance: 0.01,
+                cold_resistance: 0.0,
+            })
+            .warmth_bonus(0.2)
+            .movement_speed_modifier(0.02)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Cloth".to_string(), quantity: 15 },
             ])
@@ -56,10 +96,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .build(),
 
         // Cloth Boots - Foot protection
-        ItemBuilder::new("Cloth Boots", "Simple footwear.", ItemCategory::Armor)
+        ItemBuilder::new("Cloth Boots", "Simple footwear. Easy to move in.", ItemCategory::Armor)
             .icon("cloth_boots.png")
             .equippable(Some(EquipmentSlotType::Feet))
-            .armor(0.01, Some(0.2))
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.01,
+                projectile_resistance: 0.01,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.01,
+                slash_resistance: 0.01,
+                pierce_resistance: 0.01,
+                cold_resistance: 0.0,
+            })
+            .warmth_bonus(0.2)
+            .movement_speed_modifier(0.02)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Cloth".to_string(), quantity: 15 },
             ])
@@ -68,10 +118,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .build(),
 
         // Cloth Cape - Back protection with extra warmth
-        ItemBuilder::new("Cloth Cape", "A simple cape made of cloth.", ItemCategory::Armor)
+        ItemBuilder::new("Cloth Cape", "A simple cape made of cloth. Provides extra warmth.", ItemCategory::Armor)
             .icon("burlap_cape.png")
             .equippable(Some(EquipmentSlotType::Back))
-            .armor(0.01, Some(0.25))
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.01,
+                projectile_resistance: 0.01,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.01,
+                slash_resistance: 0.01,
+                pierce_resistance: 0.01,
+                cold_resistance: 0.0,
+            })
+            .warmth_bonus(0.25)
+            .movement_speed_modifier(0.02)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Cloth".to_string(), quantity: 30 },
                 CostIngredient { item_name: "Plant Fiber".to_string(), quantity: 10 },
@@ -86,7 +146,16 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
         ItemBuilder::new("Headlamp", "A head-mounted lamp that provides hands-free lighting. Burns tallow or olive oil for fuel and offers basic head protection.", ItemCategory::Armor)
             .icon("tallow_head_lamp.png")
             .equippable(Some(EquipmentSlotType::Head))
-            .armor(0.02, Some(0.3))
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.02,
+                projectile_resistance: 0.02,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.02,
+                slash_resistance: 0.02,
+                pierce_resistance: 0.02,
+                cold_resistance: 0.0,
+            })
+            .warmth_bonus(0.3)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Cloth".to_string(), quantity: 15 },
                 CostIngredient { item_name: "Tallow".to_string(), quantity: 5 },
@@ -100,10 +169,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
         // High projectile resistance, moderate melee protection
         // Full set provides strong defense against ranged attacks
 
-        ItemBuilder::new("Bone Helmet", "A helmet crafted from animal bones. Excellent projectile resistance.", ItemCategory::Armor)
+        ItemBuilder::new("Bone Helmet", "A helmet crafted from animal bones. Excellent projectile resistance. Rattles when sprinting.", ItemCategory::Armor)
             .icon("bone_helmet.png")
             .equippable(Some(EquipmentSlotType::Head))
-            .armor(0.08, None) // 8% damage resistance, no warmth
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.08,
+                projectile_resistance: 0.15, // High projectile resist
+                fire_resistance: -0.5,       // Vulnerable to fire
+                blunt_resistance: 0.05,      // Weak to blunt
+                slash_resistance: 0.08,
+                pierce_resistance: 0.12,     // Good vs pierce
+                cold_resistance: 0.0,
+            })
+            .noise_on_sprint(true)
+            .grants_burn_immunity(true) // Each piece contributes to full set immunity
             .crafting_cost(vec![
                 CostIngredient { item_name: "Animal Bone".to_string(), quantity: 40 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 5 },
@@ -112,10 +191,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(480)
             .build(),
 
-        ItemBuilder::new("Bone Chestplate", "A chestplate made from reinforced animal bones.", ItemCategory::Armor)
+        ItemBuilder::new("Bone Chestplate", "A chestplate made from reinforced animal bones. Strong against arrows.", ItemCategory::Armor)
             .icon("bone_chestplate.png")
             .equippable(Some(EquipmentSlotType::Chest))
-            .armor(0.12, None) // 12% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.12,
+                projectile_resistance: 0.20, // Very high projectile resist
+                fire_resistance: -0.5,
+                blunt_resistance: 0.08,
+                slash_resistance: 0.12,
+                pierce_resistance: 0.16,
+                cold_resistance: 0.0,
+            })
+            .noise_on_sprint(true)
+            .grants_burn_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Animal Bone".to_string(), quantity: 80 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 10 },
@@ -124,10 +213,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(480)
             .build(),
 
-        ItemBuilder::new("Bone Leggings", "Leg protection crafted from sturdy animal bones.", ItemCategory::Armor)
+        ItemBuilder::new("Bone Leggings", "Leg protection crafted from sturdy animal bones. Deflects projectiles.", ItemCategory::Armor)
             .icon("bone_leggings.png")
             .equippable(Some(EquipmentSlotType::Legs))
-            .armor(0.10, None) // 10% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.10,
+                projectile_resistance: 0.18,
+                fire_resistance: -0.5,
+                blunt_resistance: 0.06,
+                slash_resistance: 0.10,
+                pierce_resistance: 0.14,
+                cold_resistance: 0.0,
+            })
+            .noise_on_sprint(true)
+            .grants_burn_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Animal Bone".to_string(), quantity: 60 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 8 },
@@ -136,10 +235,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(480)
             .build(),
 
-        ItemBuilder::new("Bone Gauntlets", "Hand protection made from carved bone pieces.", ItemCategory::Armor)
+        ItemBuilder::new("Bone Gauntlets", "Hand protection made from carved bone pieces. Brittle but effective.", ItemCategory::Armor)
             .icon("bone_gauntlets.png")
             .equippable(Some(EquipmentSlotType::Hands))
-            .armor(0.06, None) // 6% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.06,
+                projectile_resistance: 0.12,
+                fire_resistance: -0.5,
+                blunt_resistance: 0.04,
+                slash_resistance: 0.06,
+                pierce_resistance: 0.10,
+                cold_resistance: 0.0,
+            })
+            .noise_on_sprint(true)
+            .grants_burn_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Animal Bone".to_string(), quantity: 30 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 4 },
@@ -148,10 +257,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(480)
             .build(),
 
-        ItemBuilder::new("Bone Boots", "Reinforced footwear with bone plating.", ItemCategory::Armor)
+        ItemBuilder::new("Bone Boots", "Reinforced footwear with bone plating. Makes noise when running.", ItemCategory::Armor)
             .icon("bone_boots.png")
             .equippable(Some(EquipmentSlotType::Feet))
-            .armor(0.06, None) // 6% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.06,
+                projectile_resistance: 0.12,
+                fire_resistance: -0.5,
+                blunt_resistance: 0.04,
+                slash_resistance: 0.06,
+                pierce_resistance: 0.10,
+                cold_resistance: 0.0,
+            })
+            .noise_on_sprint(true)
+            .grants_burn_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Animal Bone".to_string(), quantity: 30 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 4 },
@@ -164,10 +283,21 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
         // Strong melee protection but vulnerable to fire
         // Provides good physical defense
 
-        ItemBuilder::new("Wooden Helmet", "A helmet carved from hardwood. Strong against melee.", ItemCategory::Armor)
+        ItemBuilder::new("Wooden Helmet", "A helmet carved from hardwood. Strong against melee but flammable.", ItemCategory::Armor)
             .icon("wooden_helmet.png")
             .equippable(Some(EquipmentSlotType::Head))
-            .armor(0.10, None) // 10% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.10,
+                projectile_resistance: 0.08,
+                fire_resistance: -1.0,      // Double fire damage
+                blunt_resistance: 0.18,     // Very strong vs blunt
+                slash_resistance: 0.10,
+                pierce_resistance: 0.08,
+                cold_resistance: 0.0,
+            })
+            .reflects_melee_damage(0.03) // 3% reflection per piece
+            .fire_damage_multiplier(2.0) // Takes double fire damage
+            .movement_speed_modifier(-0.04) // -4% speed per piece
             .crafting_cost(vec![
                 CostIngredient { item_name: "Wood".to_string(), quantity: 100 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 5 },
@@ -176,10 +306,21 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(450)
             .build(),
 
-        ItemBuilder::new("Wooden Chestplate", "A sturdy chestplate made from thick wooden planks.", ItemCategory::Armor)
+        ItemBuilder::new("Wooden Chestplate", "A sturdy chestplate made from thick wooden planks. Reflects melee damage.", ItemCategory::Armor)
             .icon("wooden_chestplate.png")
             .equippable(Some(EquipmentSlotType::Chest))
-            .armor(0.15, None) // 15% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.15,
+                projectile_resistance: 0.12,
+                fire_resistance: -1.0,
+                blunt_resistance: 0.22,
+                slash_resistance: 0.15,
+                pierce_resistance: 0.12,
+                cold_resistance: 0.0,
+            })
+            .reflects_melee_damage(0.03)
+            .fire_damage_multiplier(2.0)
+            .movement_speed_modifier(-0.04)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Wood".to_string(), quantity: 200 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 10 },
@@ -188,10 +329,21 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(450)
             .build(),
 
-        ItemBuilder::new("Wooden Leggings", "Leg protection crafted from reinforced wood.", ItemCategory::Armor)
+        ItemBuilder::new("Wooden Leggings", "Leg protection crafted from reinforced wood. Heavy but protective.", ItemCategory::Armor)
             .icon("wooden_leggings.png")
             .equippable(Some(EquipmentSlotType::Legs))
-            .armor(0.12, None) // 12% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.12,
+                projectile_resistance: 0.10,
+                fire_resistance: -1.0,
+                blunt_resistance: 0.20,
+                slash_resistance: 0.12,
+                pierce_resistance: 0.10,
+                cold_resistance: 0.0,
+            })
+            .reflects_melee_damage(0.03)
+            .fire_damage_multiplier(2.0)
+            .movement_speed_modifier(-0.04)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Wood".to_string(), quantity: 150 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 8 },
@@ -200,10 +352,21 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(450)
             .build(),
 
-        ItemBuilder::new("Wooden Gauntlets", "Hand guards made from carved hardwood.", ItemCategory::Armor)
+        ItemBuilder::new("Wooden Gauntlets", "Hand guards made from carved hardwood. Splinters attackers.", ItemCategory::Armor)
             .icon("wooden_gauntlets.png")
             .equippable(Some(EquipmentSlotType::Hands))
-            .armor(0.08, None) // 8% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.08,
+                projectile_resistance: 0.06,
+                fire_resistance: -1.0,
+                blunt_resistance: 0.16,
+                slash_resistance: 0.08,
+                pierce_resistance: 0.06,
+                cold_resistance: 0.0,
+            })
+            .reflects_melee_damage(0.03)
+            .fire_damage_multiplier(2.0)
+            .movement_speed_modifier(-0.04)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Wood".to_string(), quantity: 80 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 4 },
@@ -212,10 +375,21 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(450)
             .build(),
 
-        ItemBuilder::new("Wooden Boots", "Sturdy footwear reinforced with wooden plates.", ItemCategory::Armor)
+        ItemBuilder::new("Wooden Boots", "Sturdy footwear reinforced with wooden plates. Slows movement.", ItemCategory::Armor)
             .icon("wooden_boots.png")
             .equippable(Some(EquipmentSlotType::Feet))
-            .armor(0.08, None) // 8% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.08,
+                projectile_resistance: 0.06,
+                fire_resistance: -1.0,
+                blunt_resistance: 0.16,
+                slash_resistance: 0.08,
+                pierce_resistance: 0.06,
+                cold_resistance: 0.0,
+            })
+            .reflects_melee_damage(0.03)
+            .fire_damage_multiplier(2.0)
+            .movement_speed_modifier(-0.04)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Wood".to_string(), quantity: 80 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 4 },
@@ -228,10 +402,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
         // Balanced protection with good durability
         // Moderate defense across the board
 
-        ItemBuilder::new("Leather Helmet", "A helmet made from cured animal leather.", ItemCategory::Armor)
+        ItemBuilder::new("Leather Helmet", "A helmet made from cured animal leather. Balanced and durable.", ItemCategory::Armor)
             .icon("leather_helmet.png")
             .equippable(Some(EquipmentSlotType::Head))
-            .armor(0.07, None) // 7% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.07,
+                projectile_resistance: 0.05,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.06,
+                slash_resistance: 0.08,
+                pierce_resistance: 0.06,
+                cold_resistance: 0.0,
+            })
+            .stamina_regen_modifier(0.02) // +2% stamina regen per piece
+            .grants_bleed_immunity(true) // 3 pieces needed for full immunity
             .crafting_cost(vec![
                 CostIngredient { item_name: "Animal Leather".to_string(), quantity: 15 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 3 },
@@ -240,10 +424,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(420)
             .build(),
 
-        ItemBuilder::new("Leather Chestplate", "A durable chestplate crafted from thick leather.", ItemCategory::Armor)
+        ItemBuilder::new("Leather Chestplate", "A durable chestplate crafted from thick leather. Resists minor bleeds.", ItemCategory::Armor)
             .icon("leather_chestplate.png")
             .equippable(Some(EquipmentSlotType::Chest))
-            .armor(0.11, None) // 11% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.11,
+                projectile_resistance: 0.08,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.10,
+                slash_resistance: 0.12,
+                pierce_resistance: 0.09,
+                cold_resistance: 0.0,
+            })
+            .stamina_regen_modifier(0.02)
+            .grants_bleed_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Animal Leather".to_string(), quantity: 30 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 6 },
@@ -252,10 +446,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(420)
             .build(),
 
-        ItemBuilder::new("Leather Leggings", "Flexible leg protection made from leather.", ItemCategory::Armor)
+        ItemBuilder::new("Leather Leggings", "Flexible leg protection made from leather. Ideal for sustained movement.", ItemCategory::Armor)
             .icon("leather_leggings.png")
             .equippable(Some(EquipmentSlotType::Legs))
-            .armor(0.09, None) // 9% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.09,
+                projectile_resistance: 0.07,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.08,
+                slash_resistance: 0.10,
+                pierce_resistance: 0.08,
+                cold_resistance: 0.0,
+            })
+            .stamina_regen_modifier(0.02)
+            .grants_bleed_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Animal Leather".to_string(), quantity: 22 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 5 },
@@ -264,10 +468,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(420)
             .build(),
 
-        ItemBuilder::new("Leather Gauntlets", "Hand protection crafted from supple leather.", ItemCategory::Armor)
+        ItemBuilder::new("Leather Gauntlets", "Hand protection crafted from supple leather. Enhances endurance.", ItemCategory::Armor)
             .icon("leather_gauntlets.png")
             .equippable(Some(EquipmentSlotType::Hands))
-            .armor(0.05, None) // 5% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.05,
+                projectile_resistance: 0.04,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.05,
+                slash_resistance: 0.06,
+                pierce_resistance: 0.05,
+                cold_resistance: 0.0,
+            })
+            .stamina_regen_modifier(0.02)
+            .grants_bleed_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Animal Leather".to_string(), quantity: 12 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 2 },
@@ -276,10 +490,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(420)
             .build(),
 
-        ItemBuilder::new("Leather Boots", "Comfortable boots made from treated leather.", ItemCategory::Armor)
+        ItemBuilder::new("Leather Boots", "Comfortable boots made from treated leather. Perfect for long hunts.", ItemCategory::Armor)
             .icon("leather_boots.png")
             .equippable(Some(EquipmentSlotType::Feet))
-            .armor(0.05, None) // 5% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.05,
+                projectile_resistance: 0.04,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.05,
+                slash_resistance: 0.06,
+                pierce_resistance: 0.05,
+                cold_resistance: 0.0,
+            })
+            .stamina_regen_modifier(0.02)
+            .grants_bleed_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Animal Leather".to_string(), quantity: 12 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 2 },
@@ -288,10 +512,20 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(420)
             .build(),
 
-        ItemBuilder::new("Leather Mantle", "A protective leather covering for the back.", ItemCategory::Armor)
+        ItemBuilder::new("Leather Mantle", "A protective leather covering for the back. Boosts stamina recovery.", ItemCategory::Armor)
             .icon("leather_mantle.png")
             .equippable(Some(EquipmentSlotType::Back))
-            .armor(0.07, None) // 7% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.07,
+                projectile_resistance: 0.05,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.06,
+                slash_resistance: 0.08,
+                pierce_resistance: 0.06,
+                cold_resistance: 0.0,
+            })
+            .stamina_regen_modifier(0.02)
+            .grants_bleed_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Animal Leather".to_string(), quantity: 18 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 4 },
@@ -304,10 +538,21 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
         // Heavy armor with strong slash and projectile resistance
         // Best overall protection but no warmth
 
-        ItemBuilder::new("Scale Helmet", "A helmet covered in overlapping viper scales.", ItemCategory::Armor)
+        ItemBuilder::new("Scale Helmet", "A helmet covered in overlapping viper scales. Waterproof and heavy.", ItemCategory::Armor)
             .icon("scale_helmet.png")
             .equippable(Some(EquipmentSlotType::Head))
-            .armor(0.12, None) // 12% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.12,
+                projectile_resistance: 0.14,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.08,      // Weak to blunt
+                slash_resistance: 0.18,      // Very strong vs slash
+                pierce_resistance: 0.14,
+                cold_resistance: 0.0,
+            })
+            .movement_speed_modifier(-0.03) // -3% speed per piece
+            .grants_wetness_immunity(true) // 5 pieces for full immunity
+            .grants_knockback_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Viper Scale".to_string(), quantity: 60 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 8 },
@@ -317,10 +562,21 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(540)
             .build(),
 
-        ItemBuilder::new("Scale Chestplate", "A heavy chestplate armored with layered scales.", ItemCategory::Armor)
+        ItemBuilder::new("Scale Chestplate", "A heavy chestplate armored with layered scales. Impervious to water.", ItemCategory::Armor)
             .icon("scale_chestplate.png")
             .equippable(Some(EquipmentSlotType::Chest))
-            .armor(0.18, None) // 18% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.18,
+                projectile_resistance: 0.20,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.12,
+                slash_resistance: 0.24,
+                pierce_resistance: 0.20,
+                cold_resistance: 0.0,
+            })
+            .movement_speed_modifier(-0.03)
+            .grants_wetness_immunity(true)
+            .grants_knockback_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Viper Scale".to_string(), quantity: 120 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 15 },
@@ -330,10 +586,21 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(540)
             .build(),
 
-        ItemBuilder::new("Scale Leggings", "Leg armor reinforced with protective scales.", ItemCategory::Armor)
+        ItemBuilder::new("Scale Leggings", "Leg armor reinforced with protective scales. Resists knockback.", ItemCategory::Armor)
             .icon("scale_leggings.png")
             .equippable(Some(EquipmentSlotType::Legs))
-            .armor(0.15, None) // 15% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.15,
+                projectile_resistance: 0.17,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.10,
+                slash_resistance: 0.21,
+                pierce_resistance: 0.17,
+                cold_resistance: 0.0,
+            })
+            .movement_speed_modifier(-0.03)
+            .grants_wetness_immunity(true)
+            .grants_knockback_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Viper Scale".to_string(), quantity: 90 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 12 },
@@ -343,10 +610,21 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(540)
             .build(),
 
-        ItemBuilder::new("Scale Gauntlets", "Hand guards covered in interlocking scales.", ItemCategory::Armor)
+        ItemBuilder::new("Scale Gauntlets", "Hand guards covered in interlocking scales. Deflects slashing attacks.", ItemCategory::Armor)
             .icon("scale_gauntlets.png")
             .equippable(Some(EquipmentSlotType::Hands))
-            .armor(0.10, None) // 10% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.10,
+                projectile_resistance: 0.12,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.07,
+                slash_resistance: 0.16,
+                pierce_resistance: 0.12,
+                cold_resistance: 0.0,
+            })
+            .movement_speed_modifier(-0.03)
+            .grants_wetness_immunity(true)
+            .grants_knockback_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Viper Scale".to_string(), quantity: 45 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 6 },
@@ -356,10 +634,21 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(540)
             .build(),
 
-        ItemBuilder::new("Scale Boots", "Heavy boots reinforced with scale plating.", ItemCategory::Armor)
+        ItemBuilder::new("Scale Boots", "Heavy boots reinforced with scale plating. Anchors you firmly.", ItemCategory::Armor)
             .icon("scale_boots.png")
             .equippable(Some(EquipmentSlotType::Feet))
-            .armor(0.10, None) // 10% damage resistance
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.10,
+                projectile_resistance: 0.12,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.07,
+                slash_resistance: 0.16,
+                pierce_resistance: 0.12,
+                cold_resistance: 0.0,
+            })
+            .movement_speed_modifier(-0.03)
+            .grants_wetness_immunity(true)
+            .grants_knockback_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Viper Scale".to_string(), quantity: 45 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 6 },
@@ -373,10 +662,21 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
         // Light insulating armor with cold resistance
         // Low protection but excellent warmth
 
-        ItemBuilder::new("Fox Fur Hood", "A warm hood lined with soft fox fur.", ItemCategory::Armor)
+        ItemBuilder::new("Fox Fur Hood", "A warm hood lined with soft fox fur. Enhances hearing.", ItemCategory::Armor)
             .icon("fox_fur_hood.png")
             .equippable(Some(EquipmentSlotType::Head))
-            .armor(0.03, Some(0.8)) // 3% damage resistance, 0.8 warmth/sec
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.03,
+                projectile_resistance: 0.02,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.02,
+                slash_resistance: 0.03,
+                pierce_resistance: 0.02,
+                cold_resistance: 0.20, // 20% cold resist per piece
+            })
+            .warmth_bonus(0.8)
+            .detection_radius_bonus(0.10) // +10% detection per piece
+            .grants_cold_immunity(true) // 5 pieces for full immunity
             .crafting_cost(vec![
                 CostIngredient { item_name: "Fox Fur".to_string(), quantity: 20 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 3 },
@@ -385,10 +685,21 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(420)
             .build(),
 
-        ItemBuilder::new("Fox Fur Coat", "A lightweight coat made from fox pelts.", ItemCategory::Armor)
+        ItemBuilder::new("Fox Fur Coat", "A lightweight coat made from fox pelts. Excellent for scouting.", ItemCategory::Armor)
             .icon("fox_fur_coat.png")
             .equippable(Some(EquipmentSlotType::Chest))
-            .armor(0.04, Some(1.2)) // 4% damage resistance, 1.2 warmth/sec
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.04,
+                projectile_resistance: 0.03,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.03,
+                slash_resistance: 0.04,
+                pierce_resistance: 0.03,
+                cold_resistance: 0.20,
+            })
+            .warmth_bonus(1.2)
+            .detection_radius_bonus(0.10)
+            .grants_cold_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Fox Fur".to_string(), quantity: 40 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 6 },
@@ -397,10 +708,21 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(420)
             .build(),
 
-        ItemBuilder::new("Fox Fur Leggings", "Warm leg coverings made from fox fur.", ItemCategory::Armor)
+        ItemBuilder::new("Fox Fur Leggings", "Warm leg coverings made from fox fur. Light and quiet.", ItemCategory::Armor)
             .icon("fox_fur_leggings.png")
             .equippable(Some(EquipmentSlotType::Legs))
-            .armor(0.03, Some(0.9)) // 3% damage resistance, 0.9 warmth/sec
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.03,
+                projectile_resistance: 0.02,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.02,
+                slash_resistance: 0.03,
+                pierce_resistance: 0.02,
+                cold_resistance: 0.20,
+            })
+            .warmth_bonus(0.9)
+            .detection_radius_bonus(0.10)
+            .grants_cold_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Fox Fur".to_string(), quantity: 30 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 5 },
@@ -409,10 +731,21 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(420)
             .build(),
 
-        ItemBuilder::new("Fox Fur Gloves", "Insulated gloves lined with fox fur.", ItemCategory::Armor)
+        ItemBuilder::new("Fox Fur Gloves", "Insulated gloves lined with fox fur. Sensitive to touch.", ItemCategory::Armor)
             .icon("fox_fur_gloves.png")
             .equippable(Some(EquipmentSlotType::Hands))
-            .armor(0.02, Some(0.5)) // 2% damage resistance, 0.5 warmth/sec
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.02,
+                projectile_resistance: 0.01,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.01,
+                slash_resistance: 0.02,
+                pierce_resistance: 0.01,
+                cold_resistance: 0.20,
+            })
+            .warmth_bonus(0.5)
+            .detection_radius_bonus(0.10)
+            .grants_cold_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Fox Fur".to_string(), quantity: 15 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 2 },
@@ -421,10 +754,21 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(420)
             .build(),
 
-        ItemBuilder::new("Fox Fur Boots", "Warm boots lined with soft fox fur.", ItemCategory::Armor)
+        ItemBuilder::new("Fox Fur Boots", "Warm boots lined with soft fox fur. Silent footsteps.", ItemCategory::Armor)
             .icon("fox_fur_boots.png")
             .equippable(Some(EquipmentSlotType::Feet))
-            .armor(0.02, Some(0.5)) // 2% damage resistance, 0.5 warmth/sec
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.02,
+                projectile_resistance: 0.01,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.01,
+                slash_resistance: 0.02,
+                pierce_resistance: 0.01,
+                cold_resistance: 0.20,
+            })
+            .warmth_bonus(0.5)
+            .detection_radius_bonus(0.10)
+            .grants_cold_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Fox Fur".to_string(), quantity: 15 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 2 },
@@ -437,10 +781,22 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
         // Thick insulating armor with moderate protection
         // Good balance of warmth and defense
 
-        ItemBuilder::new("Wolf Fur Hood", "A thick hood made from wolf pelts.", ItemCategory::Armor)
+        ItemBuilder::new("Wolf Fur Hood", "A thick hood made from wolf pelts. Intimidating and warm.", ItemCategory::Armor)
             .icon("wolf_fur_hood.png")
             .equippable(Some(EquipmentSlotType::Head))
-            .armor(0.06, Some(1.0)) // 6% damage resistance, 1.0 warmth/sec
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.06,
+                projectile_resistance: 0.04,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.05,
+                slash_resistance: 0.07,
+                pierce_resistance: 0.05,
+                cold_resistance: 0.20, // 20% cold resist per piece
+            })
+            .warmth_bonus(1.0)
+            .low_health_damage_bonus(0.04) // +4% damage per piece when low health
+            .intimidates_animals(true)
+            .grants_cold_immunity(true) // 5 pieces for full immunity
             .crafting_cost(vec![
                 CostIngredient { item_name: "Wolf Fur".to_string(), quantity: 25 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 4 },
@@ -449,10 +805,22 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(480)
             .build(),
 
-        ItemBuilder::new("Wolf Fur Coat", "A heavy coat made from thick wolf fur.", ItemCategory::Armor)
+        ItemBuilder::new("Wolf Fur Coat", "A heavy coat made from thick wolf fur. Grants ferocity when wounded.", ItemCategory::Armor)
             .icon("wolf_fur_coat.png")
             .equippable(Some(EquipmentSlotType::Chest))
-            .armor(0.09, Some(1.5)) // 9% damage resistance, 1.5 warmth/sec
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.09,
+                projectile_resistance: 0.06,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.08,
+                slash_resistance: 0.10,
+                pierce_resistance: 0.07,
+                cold_resistance: 0.20,
+            })
+            .warmth_bonus(1.5)
+            .low_health_damage_bonus(0.04)
+            .intimidates_animals(true)
+            .grants_cold_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Wolf Fur".to_string(), quantity: 50 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 8 },
@@ -461,10 +829,22 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(480)
             .build(),
 
-        ItemBuilder::new("Wolf Fur Leggings", "Durable leg coverings made from wolf pelts.", ItemCategory::Armor)
+        ItemBuilder::new("Wolf Fur Leggings", "Durable leg coverings made from wolf pelts. Fierce and protective.", ItemCategory::Armor)
             .icon("wolf_fur_leggings.png")
             .equippable(Some(EquipmentSlotType::Legs))
-            .armor(0.07, Some(1.2)) // 7% damage resistance, 1.2 warmth/sec
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.07,
+                projectile_resistance: 0.05,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.06,
+                slash_resistance: 0.08,
+                pierce_resistance: 0.06,
+                cold_resistance: 0.20,
+            })
+            .warmth_bonus(1.2)
+            .low_health_damage_bonus(0.04)
+            .intimidates_animals(true)
+            .grants_cold_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Wolf Fur".to_string(), quantity: 38 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 6 },
@@ -473,10 +853,22 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(480)
             .build(),
 
-        ItemBuilder::new("Wolf Fur Gloves", "Thick gloves lined with wolf fur.", ItemCategory::Armor)
+        ItemBuilder::new("Wolf Fur Gloves", "Thick gloves lined with wolf fur. Channels predatory instinct.", ItemCategory::Armor)
             .icon("wolf_fur_gloves.png")
             .equippable(Some(EquipmentSlotType::Hands))
-            .armor(0.04, Some(0.7)) // 4% damage resistance, 0.7 warmth/sec
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.04,
+                projectile_resistance: 0.03,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.03,
+                slash_resistance: 0.05,
+                pierce_resistance: 0.04,
+                cold_resistance: 0.20,
+            })
+            .warmth_bonus(0.7)
+            .low_health_damage_bonus(0.04)
+            .intimidates_animals(true)
+            .grants_cold_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Wolf Fur".to_string(), quantity: 18 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 3 },
@@ -485,10 +877,22 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .respawn_time(480)
             .build(),
 
-        ItemBuilder::new("Wolf Fur Boots", "Sturdy boots lined with warm wolf fur.", ItemCategory::Armor)
+        ItemBuilder::new("Wolf Fur Boots", "Sturdy boots lined with warm wolf fur. Embodies the wolf's spirit.", ItemCategory::Armor)
             .icon("wolf_fur_boots.png")
             .equippable(Some(EquipmentSlotType::Feet))
-            .armor(0.04, Some(0.7)) // 4% damage resistance, 0.7 warmth/sec
+            .armor_resistances(ArmorResistances {
+                melee_resistance: 0.04,
+                projectile_resistance: 0.03,
+                fire_resistance: 0.0,
+                blunt_resistance: 0.03,
+                slash_resistance: 0.05,
+                pierce_resistance: 0.04,
+                cold_resistance: 0.20,
+            })
+            .warmth_bonus(0.7)
+            .low_health_damage_bonus(0.04)
+            .intimidates_animals(true)
+            .grants_cold_immunity(true)
             .crafting_cost(vec![
                 CostIngredient { item_name: "Wolf Fur".to_string(), quantity: 18 },
                 CostIngredient { item_name: "Rope".to_string(), quantity: 3 },

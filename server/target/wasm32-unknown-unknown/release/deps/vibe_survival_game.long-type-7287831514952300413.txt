@@ -1,1 +1,0 @@
-for<'a> fn(&'a ReducerContext, u32) -> Result<(u32, u32, u32, u32, u32, u32), std::string::String> {query_hearth_upkeep_costs}

@@ -20,8 +20,11 @@ dist/
 
 # Rust
 /target/
+**/target/
 **/*.rs.bk
 Cargo.lock
+*.wasm
+**/*.wasm
 
 # Build outputs
 /dist/

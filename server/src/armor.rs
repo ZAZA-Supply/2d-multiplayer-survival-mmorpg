@@ -1,7 +1,7 @@
 use spacetimedb::{Identity, ReducerContext, Table};
 use crate::active_equipment::{ActiveEquipment, active_equipment as ActiveEquipmentTableTrait};
 use crate::items::{ItemDefinition, item_definition as ItemDefinitionTableTrait, InventoryItem, inventory_item as InventoryItemTableTrait};
-use crate::models::EquipmentSlotType; // For matching slot types if needed in future extensions
+use crate::models::{EquipmentSlotType, DamageType, ImmunityType, ArmorResistances}; // For matching slot types and new armor system
 use log;
 
 /// Calculates the total damage resistance from all equipped armor pieces.
@@ -69,4 +69,205 @@ pub fn calculate_total_warmth_bonus(ctx: &ReducerContext, player_id: Identity) -
         }
     }
     total_warmth_bonus
+}
+
+/// Helper function to get all equipped armor pieces for a player
+pub fn get_equipped_armor_pieces(ctx: &ReducerContext, player_id: Identity) -> Vec<ItemDefinition> {
+    let active_equipments = ctx.db.active_equipment();
+    let inventory_items = ctx.db.inventory_item();
+    let item_defs = ctx.db.item_definition();
+    let mut armor_pieces = Vec::new();
+
+    if let Some(equipment) = active_equipments.player_identity().find(&player_id) {
+        let armor_instance_ids = [
+            equipment.head_item_instance_id,
+            equipment.chest_item_instance_id,
+            equipment.legs_item_instance_id,
+            equipment.feet_item_instance_id,
+            equipment.hands_item_instance_id,
+            equipment.back_item_instance_id,
+        ];
+
+        for maybe_instance_id in armor_instance_ids.iter().flatten() {
+            if let Some(item_instance) = inventory_items.instance_id().find(maybe_instance_id) {
+                if let Some(item_def) = item_defs.id().find(&item_instance.item_def_id) {
+                    armor_pieces.push(item_def);
+                }
+            }
+        }
+    }
+    armor_pieces
+}
+
+/// Calculates total resistance for a specific damage type from all equipped armor
+pub fn calculate_resistance_for_damage_type(
+    ctx: &ReducerContext,
+    player_id: Identity,
+    damage_type: DamageType,
+) -> f32 {
+    let armor_pieces = get_equipped_armor_pieces(ctx, player_id);
+    let mut total_resistance = 0.0;
+
+    for armor_piece in armor_pieces {
+        if let Some(resistances) = &armor_piece.armor_resistances {
+            let resistance = match damage_type {
+                DamageType::Melee => resistances.melee_resistance,
+                DamageType::Projectile => resistances.projectile_resistance,
+                DamageType::Fire => resistances.fire_resistance,
+                DamageType::Blunt => resistances.blunt_resistance,
+                DamageType::Slash => resistances.slash_resistance,
+                DamageType::Pierce => resistances.pierce_resistance,
+                DamageType::Environmental => 0.0, // Environmental damage not affected by armor
+            };
+            total_resistance += resistance;
+        }
+    }
+
+    // Cap resistance at 90% (0.9) to prevent invulnerability
+    total_resistance.min(0.9)
+}
+
+/// Checks if player has a specific immunity based on equipped armor
+pub fn has_armor_immunity(
+    ctx: &ReducerContext,
+    player_id: Identity,
+    immunity_type: ImmunityType,
+) -> bool {
+    let armor_pieces = get_equipped_armor_pieces(ctx, player_id);
+    
+    // Count pieces that grant the immunity
+    let mut immunity_count = 0;
+    
+    // Different immunities require different numbers of pieces
+    let required_pieces = match immunity_type {
+        ImmunityType::Burn => 5,      // Need 5 bone pieces for burn immunity
+        ImmunityType::Cold => 5,      // Need 5 fur pieces for cold immunity
+        ImmunityType::Wetness => 5,   // Need 5 scale pieces for wetness immunity
+        ImmunityType::Knockback => 5, // Need 5 scale pieces for knockback immunity
+        ImmunityType::Bleed => 3,     // Need 3 leather pieces for bleed immunity
+    };
+    
+    for armor_piece in armor_pieces {
+        match immunity_type {
+            ImmunityType::Burn if armor_piece.grants_burn_immunity => immunity_count += 1,
+            ImmunityType::Cold if armor_piece.grants_cold_immunity => immunity_count += 1,
+            ImmunityType::Wetness if armor_piece.grants_wetness_immunity => immunity_count += 1,
+            ImmunityType::Knockback if armor_piece.grants_knockback_immunity => immunity_count += 1,
+            ImmunityType::Bleed if armor_piece.grants_bleed_immunity => immunity_count += 1,
+            _ => {}
+        }
+    }
+    
+    immunity_count >= required_pieces
+}
+
+/// Calculates fire damage multiplier from equipped armor (for wooden armor vulnerability)
+pub fn calculate_fire_damage_multiplier(ctx: &ReducerContext, player_id: Identity) -> f32 {
+    let armor_pieces = get_equipped_armor_pieces(ctx, player_id);
+    let mut multiplier = 1.0;
+    
+    for armor_piece in armor_pieces {
+        if let Some(fire_mult) = armor_piece.fire_damage_multiplier {
+            multiplier *= fire_mult;
+        }
+    }
+    
+    multiplier
+}
+
+/// Calculates total movement speed modifier from equipped armor
+pub fn calculate_movement_speed_modifier(ctx: &ReducerContext, player_id: Identity) -> f32 {
+    let armor_pieces = get_equipped_armor_pieces(ctx, player_id);
+    let mut speed_modifier = 0.0; // Additive modifier
+    
+    for armor_piece in armor_pieces {
+        if let Some(modifier) = armor_piece.movement_speed_modifier {
+            speed_modifier += modifier;
+        }
+    }
+    
+    speed_modifier
+}
+
+/// Calculates total stamina regeneration modifier from equipped armor
+pub fn calculate_stamina_regen_modifier(ctx: &ReducerContext, player_id: Identity) -> f32 {
+    let armor_pieces = get_equipped_armor_pieces(ctx, player_id);
+    let mut stamina_modifier = 0.0; // Additive modifier
+    
+    for armor_piece in armor_pieces {
+        if let Some(modifier) = armor_piece.stamina_regen_modifier {
+            stamina_modifier += modifier;
+        }
+    }
+    
+    stamina_modifier
+}
+
+/// Calculates total melee damage reflection from equipped armor (wooden armor)
+pub fn calculate_melee_damage_reflection(ctx: &ReducerContext, player_id: Identity) -> f32 {
+    let armor_pieces = get_equipped_armor_pieces(ctx, player_id);
+    let mut reflection = 0.0;
+    
+    for armor_piece in armor_pieces {
+        if let Some(reflect) = armor_piece.reflects_melee_damage {
+            reflection += reflect;
+        }
+    }
+    
+    // Cap at 50% reflection to prevent abuse
+    reflection.min(0.5)
+}
+
+/// Calculates detection radius bonus from equipped armor (fox fur)
+pub fn calculate_detection_radius_bonus(ctx: &ReducerContext, player_id: Identity) -> f32 {
+    let armor_pieces = get_equipped_armor_pieces(ctx, player_id);
+    let mut bonus = 0.0;
+    
+    for armor_piece in armor_pieces {
+        if let Some(detection_bonus) = armor_piece.detection_radius_bonus {
+            bonus += detection_bonus;
+        }
+    }
+    
+    bonus
+}
+
+/// Calculates low health damage bonus from equipped armor (wolf fur)
+pub fn calculate_low_health_damage_bonus(ctx: &ReducerContext, player_id: Identity) -> f32 {
+    let armor_pieces = get_equipped_armor_pieces(ctx, player_id);
+    let mut bonus = 0.0;
+    
+    for armor_piece in armor_pieces {
+        if let Some(dmg_bonus) = armor_piece.low_health_damage_bonus {
+            bonus += dmg_bonus;
+        }
+    }
+    
+    bonus
+}
+
+/// Checks if player makes noise when sprinting (bone armor)
+pub fn makes_noise_on_sprint(ctx: &ReducerContext, player_id: Identity) -> bool {
+    let armor_pieces = get_equipped_armor_pieces(ctx, player_id);
+    
+    for armor_piece in armor_pieces {
+        if armor_piece.noise_on_sprint {
+            return true;
+        }
+    }
+    
+    false
+}
+
+/// Checks if player intimidates animals (wolf fur)
+pub fn intimidates_animals(ctx: &ReducerContext, player_id: Identity) -> bool {
+    let armor_pieces = get_equipped_armor_pieces(ctx, player_id);
+    
+    for armor_piece in armor_pieces {
+        if armor_piece.intimidates_animals {
+            return true;
+        }
+    }
+    
+    false
 }

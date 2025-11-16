@@ -40,6 +40,12 @@ declare type __keep_TargetType = TargetType;
 import { CostIngredient } from "./cost_ingredient_type";
 // Mark import as potentially unused
 declare type __keep_CostIngredient = CostIngredient;
+import { DamageType } from "./damage_type_type";
+// Mark import as potentially unused
+declare type __keep_DamageType = DamageType;
+import { ArmorResistances } from "./armor_resistances_type";
+// Mark import as potentially unused
+declare type __keep_ArmorResistances = ArmorResistances;
 
 import { type EventContext, type Reducer, RemoteReducers, RemoteTables } from ".";
 declare type __keep = [EventContext, Reducer, RemoteReducers, RemoteTables];

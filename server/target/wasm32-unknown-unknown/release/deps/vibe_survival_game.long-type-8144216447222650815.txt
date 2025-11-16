@@ -1,2 +1,0 @@
-&rune_stone::rune_stone__TableHandle
-&rune_stone::rune_stone__TableHandle: Table
