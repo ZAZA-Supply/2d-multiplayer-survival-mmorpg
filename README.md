@@ -189,17 +189,18 @@ spacetime generate --lang typescript --out-dir ../client/src/generated --project
 *   😵 Knock Out System: Combat state with temporary incapacitation and a chance to spontaneously recover
 *   🏠 Player Shelter: Personal shelter system where only the owner can enter and keep their campfire safe from the rain
 *   🛏️ Sleeping Bags: Placeable respawn points that persist between deaths
+*   🏗️ Construction System: Base building (walls, floors, etc.)
+*   🌱 Farming System: Planting, growing, harvesting crops
+*   🦌 Hunting System: NPC animals (deer, wolves, etc.), tracking, hunting mechanics
+*   🎨 Terrain Autotiling: Edge detection, Wang tiles, seamless transitions between biomes
+*   🛡️ Advanced Armor System: Comprehensive armor stats (defense, warmth, weight, durability), armor condition degradation, repair mechanics, and visual damage indicators
+*   🌦️ Dynamic Chunk-Based Weather: Evolving weather patterns with chunk-level granularity, smooth transitions, and gameplay effects (rain intensity, temperature, visibility)
 
 **Planned (📋):** 
 *   **Core Systems & World:**
     *   🌍 World Generation: Procedural generation, biomes, monuments
-    *   🎨 Terrain Autotiling: Edge detection, Wang tiles, seamless transitions between biomes
     *   🤖 Advanced AI: Hostile NPCs behaviors, pathfinding
     *   👥 Team/Social Features: Shared map markers, team chat, private messaging, player notes, and group formation
-*   **Gameplay Loops & Interaction:**
-    *   🏗️ Construction System: Base building (walls, floors, etc.)
-    *   🌱 Farming System: Planting, growing, harvesting crops
-    *   🦌 Hunting System: NPC animals (deer, wolves, etc.), tracking, hunting mechanics
 *   **Combat & Items:**
     *   ⚔️ Tool/Weapon Durability
     *   🔫 Firearm System: Guns with ammo types, reloading mechanics, and recoil
