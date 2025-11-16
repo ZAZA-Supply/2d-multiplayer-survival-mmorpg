@@ -121,16 +121,11 @@ export const useMovementInput = ({
 
       let x = 0, y = 0;
       
-      // Sprinting logic: if auto-walking, persist sprint state; otherwise use current shift keys
+      // Sprinting logic: if auto-walking, use persisted sprint state; otherwise use current shift keys
       let sprinting = keysPressed.current.has('ShiftLeft') || keysPressed.current.has('ShiftRight');
       if (isAutoWalking) {
-        if (sprinting) {
-          // Shift is pressed - update persisted sprint state
-          autoWalkSprinting.current = true;
-        } else {
-          // Shift not pressed - use persisted sprint state
-          sprinting = autoWalkSprinting.current;
-        }
+        // Use persisted sprint state (toggled via SHIFT key press)
+        sprinting = autoWalkSprinting.current;
       }
 
       // Check if any movement keys are pressed
@@ -303,6 +298,14 @@ export const useMovementInput = ({
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'].includes(key)) {
         if (!keysPressed.current.has(key)) {
           keysPressed.current.add(key);
+
+          // 🔥 AUTO-WALK: If auto-walk is ON and SHIFT is pressed, toggle sprint
+          if (isAutoWalking && (key === 'ShiftLeft' || key === 'ShiftRight')) {
+            autoWalkSprinting.current = !autoWalkSprinting.current;
+            console.log(`🏃 [AUTO-WALK SPRINT] Toggled to: ${autoWalkSprinting.current}`);
+            throttledProcessKeys();
+            return;
+          }
 
           // 🔥 AUTO-WALK: If auto-walk is ON and a movement key is pressed, update direction
           if (isAutoWalking && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key)) {
