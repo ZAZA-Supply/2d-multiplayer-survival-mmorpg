@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { WorldState, TimeOfDay, Season } from '../generated';
+import React, { useState, useMemo } from 'react';
+import { WorldState, TimeOfDay, Season, Player } from '../generated';
+import { calculateChunkIndex } from '../utils/chunkUtils';
 
 // Style constants
 const UI_BG_COLOR = 'linear-gradient(135deg, rgba(30, 15, 50, 0.9), rgba(20, 10, 40, 0.95))';
@@ -31,12 +32,32 @@ const SEASON_COLORS = {
 
 interface DayNightCycleTrackerProps {
   worldState: WorldState | null;
+  chunkWeather: Map<string, any>;
+  localPlayer: Player | undefined;
 }
 
-const DayNightCycleTracker: React.FC<DayNightCycleTrackerProps> = ({ worldState }) => {
+const DayNightCycleTracker: React.FC<DayNightCycleTrackerProps> = ({ worldState, chunkWeather, localPlayer }) => {
   const [isMinimized, setIsMinimized] = useState(false);
+  const [hoveredElement, setHoveredElement] = useState<'season' | 'timeOfDay' | null>(null);
 
   if (!worldState) return null;
+
+  // Calculate current chunk index and get chunk weather
+  const currentChunkWeather = useMemo(() => {
+    if (!localPlayer) return null;
+    
+    const chunkIndex = calculateChunkIndex(localPlayer.positionX, localPlayer.positionY);
+    const weather = chunkWeather.get(chunkIndex.toString());
+    
+    // If chunk weather exists, use it. Otherwise, assume Clear (chunk hasn't been initialized yet)
+    // We don't fall back to global weather because chunk-based weather is the source of truth
+    return weather || null;
+  }, [localPlayer, chunkWeather, localPlayer?.positionX, localPlayer?.positionY]);
+
+  // Use chunk weather if available, otherwise assume Clear (chunk not initialized yet)
+  // Only fall back to global weather if chunk weather explicitly exists but is null/undefined
+  const displayWeather = currentChunkWeather?.currentWeather || { tag: 'Clear' };
+  const displayRainIntensity = currentChunkWeather?.rainIntensity ?? 0.0;
 
   // Helper function to get display name for time of day
   const getTimeOfDayDisplay = (timeOfDay: TimeOfDay) => {
@@ -63,6 +84,18 @@ const DayNightCycleTracker: React.FC<DayNightCycleTrackerProps> = ({ worldState 
       case 'HeavyRain': return 'Heavy Rain';
       case 'HeavyStorm': return 'Heavy Storm';
       default: return 'Unknown';
+    }
+  };
+
+  // Helper function to get weather emoji
+  const getWeatherEmoji = (weather: any) => {
+    switch (weather.tag) {
+      case 'Clear': return '☀️';
+      case 'LightRain': return '🌦️';
+      case 'ModerateRain': return '🌧️';
+      case 'HeavyRain': return '🌧️';
+      case 'HeavyStorm': return '⛈️';
+      default: return '🌍';
     }
   };
 
@@ -105,8 +138,8 @@ const DayNightCycleTracker: React.FC<DayNightCycleTrackerProps> = ({ worldState 
       case 'Dawn': return '🌅';
       case 'TwilightMorning': return '🌄';
       case 'Morning': return '☀️';
-      case 'Noon': return '🌞';
-      case 'Afternoon': return '🌤️';
+      case 'Noon': return '☀️'; // Use same sun emoji to avoid weather confusion
+      case 'Afternoon': return '☀️'; // Use same sun emoji to avoid weather confusion
       case 'Dusk': return '🌇';
       case 'TwilightEvening': return '🌆';
       case 'Night': return isFullMoon ? '🌕' : '🌙';
@@ -164,14 +197,15 @@ const DayNightCycleTracker: React.FC<DayNightCycleTrackerProps> = ({ worldState 
           justifyContent: 'center',
           fontSize: '16px',
           transition: 'all 0.3s ease',
-          filter: 'drop-shadow(0 0 8px rgba(0, 255, 255, 0.6))'
+          filter: 'drop-shadow(0 0 8px rgba(0, 255, 255, 0.6))',
+          transform: 'rotate(-15deg)' // Always diagonal
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.1) rotate(5deg)';
+          e.currentTarget.style.transform = 'scale(1.1) rotate(-10deg)';
           e.currentTarget.style.filter = 'drop-shadow(0 0 15px rgba(0, 255, 255, 0.9))';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
+          e.currentTarget.style.transform = 'scale(1) rotate(-15deg)';
           e.currentTarget.style.filter = 'drop-shadow(0 0 8px rgba(0, 255, 255, 0.6))';
         }}
       >
@@ -224,31 +258,108 @@ const DayNightCycleTracker: React.FC<DayNightCycleTrackerProps> = ({ worldState 
       <div style={{ marginBottom: '8px', position: 'relative', zIndex: 2 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '14px', fontWeight: 'bold' }}>
           <span style={{ textShadow: '0 0 10px rgba(0, 255, 255, 0.8)' }}>Day {worldState.cycleCount}</span>
-          <span
-            onClick={toggleMinimized}
-            style={{
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              opacity: 0.9,
-              fontSize: '16px',
-              filter: 'drop-shadow(0 0 8px rgba(0, 255, 255, 0.6))'
-            }}
-            onMouseEnter={(e) => { 
-              e.currentTarget.style.opacity = '1'; 
-              e.currentTarget.style.transform = 'scale(1.1)';
-              e.currentTarget.style.filter = 'drop-shadow(0 0 12px rgba(0, 255, 255, 0.9))';
-            }}
-            onMouseLeave={(e) => { 
-              e.currentTarget.style.opacity = '0.9'; 
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.filter = 'drop-shadow(0 0 8px rgba(0, 255, 255, 0.6))';
-            }}
-          >
-            {getSeasonEmoji(worldState.currentSeason)}
-            <span style={{ marginLeft: '4px' }}>
-              {getTimeOfDayEmoji(worldState.timeOfDay, worldState.isFullMoon)}
+          <div style={{ position: 'relative', display: 'flex', gap: '4px' }}>
+            <span
+              style={{
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                opacity: 0.9,
+                fontSize: '16px',
+                filter: 'drop-shadow(0 0 8px rgba(0, 255, 255, 0.6))',
+                position: 'relative'
+              }}
+              onMouseEnter={(e) => { 
+                e.currentTarget.style.opacity = '1'; 
+                e.currentTarget.style.transform = 'scale(1.1)';
+                e.currentTarget.style.filter = 'drop-shadow(0 0 12px rgba(0, 255, 255, 0.9))';
+                setHoveredElement('season');
+              }}
+              onMouseLeave={(e) => { 
+                e.currentTarget.style.opacity = '0.9'; 
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.filter = 'drop-shadow(0 0 8px rgba(0, 255, 255, 0.6))';
+                setHoveredElement(null);
+              }}
+            >
+              {getSeasonEmoji(worldState.currentSeason)}
+              {hoveredElement === 'season' && (
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  right: '100%',
+                  transform: 'translateY(-50%)',
+                  marginRight: '8px',
+                  padding: '6px 12px',
+                  background: 'linear-gradient(135deg, rgba(30, 15, 50, 0.98), rgba(20, 10, 40, 0.98))',
+                  border: `2px solid ${getSeasonColor(worldState.currentSeason)}`,
+                  borderRadius: '6px',
+                  boxShadow: `0 0 20px ${getSeasonColor(worldState.currentSeason)}80, inset 0 0 10px ${getSeasonColor(worldState.currentSeason)}40`,
+                  backdropFilter: 'blur(10px)',
+                  whiteSpace: 'nowrap',
+                  fontSize: '10px',
+                  fontFamily: UI_FONT_FAMILY,
+                  color: getSeasonColor(worldState.currentSeason),
+                  textShadow: `0 0 8px ${getSeasonColor(worldState.currentSeason)}`,
+                  zIndex: 100,
+                  pointerEvents: 'none',
+                  animation: 'tooltipSlideIn 0.2s ease-out'
+                }}>
+                  {getSeasonDisplay(worldState.currentSeason)}
+                </div>
+              )}
             </span>
-          </span>
+            <span
+              onClick={toggleMinimized}
+              style={{
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                opacity: 0.9,
+                fontSize: '16px',
+                filter: 'drop-shadow(0 0 8px rgba(0, 255, 255, 0.6))',
+                position: 'relative'
+              }}
+              onMouseEnter={(e) => { 
+                e.currentTarget.style.opacity = '1'; 
+                e.currentTarget.style.transform = 'scale(1.1)';
+                e.currentTarget.style.filter = 'drop-shadow(0 0 12px rgba(0, 255, 255, 0.9))';
+                setHoveredElement('timeOfDay');
+              }}
+              onMouseLeave={(e) => { 
+                e.currentTarget.style.opacity = '0.9'; 
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.filter = 'drop-shadow(0 0 8px rgba(0, 255, 255, 0.6))';
+                setHoveredElement(null);
+              }}
+            >
+              {getTimeOfDayEmoji(worldState.timeOfDay, worldState.isFullMoon)}
+              {hoveredElement === 'timeOfDay' && (
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  right: '100%',
+                  transform: 'translateY(-50%)',
+                  marginRight: '8px',
+                  padding: '6px 12px',
+                  background: 'linear-gradient(135deg, rgba(30, 15, 50, 0.98), rgba(20, 10, 40, 0.98))',
+                  border: `2px solid ${UI_BORDER_COLOR}`,
+                  borderRadius: '6px',
+                  boxShadow: `0 0 20px rgba(0, 170, 255, 0.8), inset 0 0 10px rgba(0, 170, 255, 0.4)`,
+                  backdropFilter: 'blur(10px)',
+                  whiteSpace: 'nowrap',
+                  fontSize: '10px',
+                  fontFamily: UI_FONT_FAMILY,
+                  color: '#00ffff',
+                  textShadow: '0 0 8px rgba(0, 255, 255, 0.8)',
+                  zIndex: 100,
+                  pointerEvents: 'none',
+                  animation: 'tooltipSlideIn 0.2s ease-out'
+                }}>
+                  {getTimeOfDayDisplay(worldState.timeOfDay)}
+                  {worldState.isFullMoon && (worldState.timeOfDay.tag === 'Night' || worldState.timeOfDay.tag === 'Midnight') && ' - Full Moon'}
+                </div>
+              )}
+            </span>
+          </div>
         </div>
         
         {/* Season and Year Information */}
@@ -268,13 +379,12 @@ const DayNightCycleTracker: React.FC<DayNightCycleTrackerProps> = ({ worldState 
         
         <div style={{ fontSize: '11px', opacity: 0.9, textShadow: '0 0 5px rgba(0, 255, 255, 0.3)' }}>
           <div>
-            <span>{getSeasonDisplay(worldState.currentSeason)}</span>
-            <span style={{ margin: '0 4px' }}>|</span>
-            <span>{getWeatherDisplay(worldState.currentWeather)}</span>
+            <span>{getWeatherEmoji(displayWeather)}</span>
+            <span style={{ margin: '0 4px' }}>{getWeatherDisplay(displayWeather)}</span>
           </div>
-          {worldState.rainIntensity > 0 && (
+          {displayRainIntensity > 0 && (
             <div style={{ marginTop: '2px', paddingLeft: '8px', color: '#00aaff' }}>
-              <span>Intensity: {Math.round(worldState.rainIntensity * 100)}%</span>
+              <span>Intensity: {Math.round(displayRainIntensity * 100)}%</span>
             </div>
           )}
         </div>
@@ -344,6 +454,16 @@ const DayNightCycleTracker: React.FC<DayNightCycleTrackerProps> = ({ worldState 
           }
           50% { 
             box-shadow: 0 0 18px rgba(255, 255, 255, 1), 0 0 30px rgba(0, 255, 255, 1), 0 0 45px rgba(0, 255, 255, 0.7);
+          }
+        }
+        @keyframes tooltipSlideIn {
+          0% { 
+            opacity: 0; 
+            transform: translateY(-50%) translateX(10px);
+          }
+          100% { 
+            opacity: 1; 
+            transform: translateY(-50%) translateX(0);
           }
         }
       `}</style>

@@ -28,44 +28,34 @@ import {
   type TableHandle as __TableHandle,
 } from "spacetimedb";
 
-export type ThunderEvent = {
-  id: bigint,
-  chunkIndex: number,
-  timestamp: __Timestamp,
-  intensity: number,
-};
-let _cached_ThunderEvent_type_value: __AlgebraicTypeType | null = null;
+export type StopHeavyStormRainSoundReducer = {};
+let _cached_StopHeavyStormRainSoundReducer_type_value: __AlgebraicTypeType | null = null;
 
 /**
  * An object for generated helper functions.
  */
-export const ThunderEvent = {
+export const StopHeavyStormRainSoundReducer = {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
   getTypeScriptAlgebraicType(): __AlgebraicTypeType {
-    if (_cached_ThunderEvent_type_value) return _cached_ThunderEvent_type_value;
-    _cached_ThunderEvent_type_value = __AlgebraicTypeValue.Product({ elements: [] });
-    _cached_ThunderEvent_type_value.value.elements.push(
-      { name: "id", algebraicType: __AlgebraicTypeValue.U64 },
-      { name: "chunkIndex", algebraicType: __AlgebraicTypeValue.U32 },
-      { name: "timestamp", algebraicType: __AlgebraicTypeValue.createTimestampType() },
-      { name: "intensity", algebraicType: __AlgebraicTypeValue.F32 },
+    if (_cached_StopHeavyStormRainSoundReducer_type_value) return _cached_StopHeavyStormRainSoundReducer_type_value;
+    _cached_StopHeavyStormRainSoundReducer_type_value = __AlgebraicTypeValue.Product({ elements: [] });
+    _cached_StopHeavyStormRainSoundReducer_type_value.value.elements.push(
     );
-    return _cached_ThunderEvent_type_value;
+    return _cached_StopHeavyStormRainSoundReducer_type_value;
   },
 
-  serialize(writer: __BinaryWriter, value: ThunderEvent): void {
-    __AlgebraicTypeValue.serializeValue(writer, ThunderEvent.getTypeScriptAlgebraicType(), value);
+  serialize(writer: __BinaryWriter, value: StopHeavyStormRainSoundReducer): void {
+    __AlgebraicTypeValue.serializeValue(writer, StopHeavyStormRainSoundReducer.getTypeScriptAlgebraicType(), value);
   },
 
-  deserialize(reader: __BinaryReader): ThunderEvent {
-    return __AlgebraicTypeValue.deserializeValue(reader, ThunderEvent.getTypeScriptAlgebraicType());
+  deserialize(reader: __BinaryReader): StopHeavyStormRainSoundReducer {
+    return __AlgebraicTypeValue.deserializeValue(reader, StopHeavyStormRainSoundReducer.getTypeScriptAlgebraicType());
   },
 
 }
 
-export default ThunderEvent;
-
+export default StopHeavyStormRainSoundReducer;
 

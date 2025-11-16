@@ -1,5 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { TimeOfDay, WeatherType } from '../generated'; // Import actual types
+import { calculateChunkIndex } from '../utils/chunkUtils'; // Import chunk calculation helper
+import { gameConfig } from '../config/gameConfig'; // Import game config for chunk dimensions
 
 /**
  * ⚠️ WARNING: This ambient sound system is NOW INTEGRATED into the game!
@@ -15,7 +17,9 @@ interface AmbientSoundProps {
     masterVolume?: number;
     environmentalVolume?: number;
     timeOfDay?: TimeOfDay; // Use actual server TimeOfDay type
-    weatherCondition?: WeatherType; // Use actual server WeatherType
+    weatherCondition?: WeatherType; // Use actual server WeatherType (deprecated - use chunkWeather instead)
+    chunkWeather?: Map<string, any>; // Chunk-based weather data
+    localPlayer?: any; // Player data for position
 }
 
 // Ambient sound definitions for Aleutian island atmosphere
@@ -24,7 +28,7 @@ const AMBIENT_SOUND_DEFINITIONS = {
     wind_light: { 
         type: 'continuous', 
         filename: 'ambient_wind_light.mp3', 
-        baseVolume: 0.15, // Reduced from 0.4 for ambient feel
+        baseVolume: 0.08, // Further reduced for subtle clear-day breeze
         isLooping: true,
         useSeamlessLooping: true,
         description: 'Gentle constant wind through grass and trees'
@@ -32,7 +36,7 @@ const AMBIENT_SOUND_DEFINITIONS = {
     wind_moderate: { 
         type: 'continuous', 
         filename: 'ambient_wind_moderate.mp3', 
-        baseVolume: 0.25, // Reduced from 0.6 for ambient feel
+        baseVolume: 0.18, // Reduced for light rain ambience
         isLooping: true,
         useSeamlessLooping: true,
         description: 'Moderate wind with occasional gusts'
@@ -40,7 +44,7 @@ const AMBIENT_SOUND_DEFINITIONS = {
     wind_strong: { 
         type: 'continuous', 
         filename: 'ambient_wind_strong.mp3', 
-        baseVolume: 0.35, // Reduced from 0.8 for ambient feel
+        baseVolume: 0.30, // Reduced for heavy storm ambience
         isLooping: true,
         useSeamlessLooping: true,
         description: 'Strong persistent wind for harsh weather'
@@ -882,7 +886,9 @@ export const useAmbientSounds = ({
     masterVolume = 1.0,
     environmentalVolume, // Remove default - use whatever is passed in (including 0)
     timeOfDay, // No default - will be passed from actual game data
-    weatherCondition, // No default - will be passed from actual game data
+    weatherCondition, // Deprecated - kept for backwards compatibility
+    chunkWeather,
+    localPlayer,
 }: AmbientSoundProps = {}) => {
     // Use a fallback only if environmentalVolume is completely undefined, but allow 0
     const effectiveEnvironmentalVolume = environmentalVolume !== undefined ? environmentalVolume : 0.7;
@@ -894,16 +900,46 @@ export const useAmbientSounds = ({
     // console.log(`🌊 [VOLUME DEBUG] useAmbientSounds called with environmentalVolume=${environmentalVolume}, effective=${effectiveEnvironmentalVolume}`);
 
     // Calculate which continuous sounds should be playing
+    // Helper to get wind intensity based on player's current chunk weather
+    // Wind matches the weather type exactly - same as rain sounds
+    const getCurrentWindIntensity = useCallback((): 'light' | 'moderate' | 'strong' => {
+        // If no chunk weather data, fall back to global weather
+        if (!chunkWeather || !localPlayer) {
+            console.log('[AmbientSounds] No chunk data, using global weather fallback:', weatherCondition?.tag);
+            if (weatherCondition?.tag === 'HeavyRain' || weatherCondition?.tag === 'HeavyStorm') {
+                return 'strong';
+            } else if (weatherCondition?.tag === 'LightRain' || weatherCondition?.tag === 'ModerateRain') {
+                return 'moderate';
+            }
+            return 'light';
+        }
+
+        // Calculate chunk index for player's position using the same helper as DayNightTracker
+        const playerChunkIndex = calculateChunkIndex(localPlayer.positionX, localPlayer.positionY);
+        const playerChunkData = chunkWeather.get(playerChunkIndex.toString());
+        const playerWeatherTag = playerChunkData?.currentWeather?.tag || 'Clear';
+        
+        // Wind matches weather type exactly
+        if (playerWeatherTag === 'HeavyStorm' || playerWeatherTag === 'HeavyRain') {
+            return 'strong';
+        } else if (playerWeatherTag === 'ModerateRain' || playerWeatherTag === 'LightRain') {
+            return 'moderate';
+        }
+        return 'light'; // Clear weather = gentle breeze
+    }, [chunkWeather, localPlayer, weatherCondition]);
+
     const getActiveContinuousSounds = useCallback((): AmbientSoundType[] => {
         const sounds: AmbientSoundType[] = [];
         
-        // Always have some wind based on weather
-        if (weatherCondition?.tag === 'HeavyRain' || weatherCondition?.tag === 'HeavyStorm') {
-            sounds.push('wind_strong'); // Heavy weather = strong wind
-        } else if (weatherCondition?.tag === 'LightRain' || weatherCondition?.tag === 'ModerateRain') {
-            sounds.push('wind_moderate'); // Light/moderate rain = moderate wind
+        // Wind matches player's current chunk weather (same as rain)
+        const windIntensity = getCurrentWindIntensity();
+        
+        if (windIntensity === 'strong') {
+            sounds.push('wind_strong');
+        } else if (windIntensity === 'moderate') {
+            sounds.push('wind_moderate');
         } else {
-            sounds.push('wind_light'); // Clear weather = light wind
+            sounds.push('wind_light');
         }
         
         // Ocean sounds (always present for island atmosphere)
@@ -913,7 +949,7 @@ export const useAmbientSounds = ({
         sounds.push('nature_general');
         
         return sounds;
-    }, [weatherCondition]);
+    }, [getCurrentWindIntensity]);
 
     // Start a seamless continuous ambient sound
     const startContinuousSound = useCallback(async (soundType: AmbientSoundType) => {
@@ -1171,19 +1207,35 @@ export const useAmbientSounds = ({
             const targetSounds = getActiveContinuousSounds();
             const currentSounds = Array.from(activeSeamlessLoopingSounds.keys());
 
-            // Stop sounds that should no longer be playing (with fade-out)
-            const stopPromises = currentSounds
-                .filter(soundType => !targetSounds.includes(soundType))
-                .map(soundType => stopContinuousSound(soundType));
+            // For wind sounds, do crossfade (start new before stopping old)
+            const soundsToStop = currentSounds.filter(soundType => !targetSounds.includes(soundType));
+            const soundsToStart = targetSounds.filter(soundType => !activeSeamlessLoopingSounds.has(soundType));
             
-            await Promise.all(stopPromises);
+            // Check if we're transitioning between wind types
+            const isWindTransition = soundsToStop.some(s => s.startsWith('wind_')) && 
+                                    soundsToStart.some(s => s.startsWith('wind_'));
+            
+            if (isWindTransition) {
+                // Start new wind sound immediately (with fade-in)
+                const startPromises = soundsToStart.map(soundType => startContinuousSound(soundType));
+                await Promise.all(startPromises);
+                
+                // Wait 1 second for crossfade, then stop old wind sound (with fade-out)
+                setTimeout(() => {
+                    soundsToStop.forEach(soundType => {
+                        if (soundType.startsWith('wind_')) {
+                            stopContinuousSound(soundType);
+                        }
+                    });
+                }, 1000);
+            } else {
+                // Normal transition: stop old sounds first, then start new ones
+                const stopPromises = soundsToStop.map(soundType => stopContinuousSound(soundType));
+                await Promise.all(stopPromises);
 
-            // Start sounds that should be playing (with fade-in)
-            const startPromises = targetSounds
-                .filter(soundType => !activeSeamlessLoopingSounds.has(soundType))
-                .map(soundType => startContinuousSound(soundType));
-            
-            await Promise.all(startPromises);
+                const startPromises = soundsToStart.map(soundType => startContinuousSound(soundType));
+                await Promise.all(startPromises);
+            }
 
             // Update references
             lastWeatherRef.current = weatherCondition;

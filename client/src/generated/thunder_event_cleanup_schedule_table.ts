@@ -27,36 +27,26 @@ import {
   type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
   type TableHandle as __TableHandle,
 } from "spacetimedb";
-import { WorldState } from "./world_state_type";
-import { WeatherType } from "./weather_type_type";
-// Mark import as potentially unused
-declare type __keep_WeatherType = WeatherType;
-import { Season } from "./season_type";
-// Mark import as potentially unused
-declare type __keep_Season = Season;
-import { TimeOfDay } from "./time_of_day_type";
-// Mark import as potentially unused
-declare type __keep_TimeOfDay = TimeOfDay;
-
+import { ThunderEventCleanupSchedule } from "./thunder_event_cleanup_schedule_type";
 import { type EventContext, type Reducer, RemoteReducers, RemoteTables } from ".";
 declare type __keep = [EventContext, Reducer, RemoteReducers, RemoteTables];
 
 /**
- * Table handle for the table `world_state`.
+ * Table handle for the table `thunder_event_cleanup_schedule`.
  *
- * Obtain a handle from the [`worldState`] property on [`RemoteTables`],
- * like `ctx.db.worldState`.
+ * Obtain a handle from the [`thunderEventCleanupSchedule`] property on [`RemoteTables`],
+ * like `ctx.db.thunderEventCleanupSchedule`.
  *
  * Users are encouraged not to explicitly reference this type,
  * but to directly chain method calls,
- * like `ctx.db.worldState.on_insert(...)`.
+ * like `ctx.db.thunderEventCleanupSchedule.on_insert(...)`.
  */
-export class WorldStateTableHandle<TableName extends string> implements __TableHandle<TableName> {
+export class ThunderEventCleanupScheduleTableHandle<TableName extends string> implements __TableHandle<TableName> {
   // phantom type to track the table name
   readonly tableName!: TableName;
-  tableCache: __TableCache<WorldState>;
+  tableCache: __TableCache<ThunderEventCleanupSchedule>;
 
-  constructor(tableCache: __TableCache<WorldState>) {
+  constructor(tableCache: __TableCache<ThunderEventCleanupSchedule>) {
     this.tableCache = tableCache;
   }
 
@@ -64,53 +54,53 @@ export class WorldStateTableHandle<TableName extends string> implements __TableH
     return this.tableCache.count();
   }
 
-  iter(): Iterable<WorldState> {
+  iter(): Iterable<ThunderEventCleanupSchedule> {
     return this.tableCache.iter();
   }
   /**
-   * Access to the `id` unique index on the table `world_state`,
+   * Access to the `scheduleId` unique index on the table `thunder_event_cleanup_schedule`,
    * which allows point queries on the field of the same name
-   * via the [`WorldStateIdUnique.find`] method.
+   * via the [`ThunderEventCleanupScheduleScheduleIdUnique.find`] method.
    *
    * Users are encouraged not to explicitly reference this type,
    * but to directly chain method calls,
-   * like `ctx.db.worldState.id().find(...)`.
+   * like `ctx.db.thunderEventCleanupSchedule.scheduleId().find(...)`.
    *
-   * Get a handle on the `id` unique index on the table `world_state`.
+   * Get a handle on the `scheduleId` unique index on the table `thunder_event_cleanup_schedule`.
    */
-  id = {
-    // Find the subscribed row whose `id` column value is equal to `col_val`,
+  scheduleId = {
+    // Find the subscribed row whose `scheduleId` column value is equal to `col_val`,
     // if such a row is present in the client cache.
-    find: (col_val: number): WorldState | undefined => {
+    find: (col_val: bigint): ThunderEventCleanupSchedule | undefined => {
       for (let row of this.tableCache.iter()) {
-        if (__deepEqual(row.id, col_val)) {
+        if (__deepEqual(row.scheduleId, col_val)) {
           return row;
         }
       }
     },
   };
 
-  onInsert = (cb: (ctx: EventContext, row: WorldState) => void) => {
+  onInsert = (cb: (ctx: EventContext, row: ThunderEventCleanupSchedule) => void) => {
     return this.tableCache.onInsert(cb);
   }
 
-  removeOnInsert = (cb: (ctx: EventContext, row: WorldState) => void) => {
+  removeOnInsert = (cb: (ctx: EventContext, row: ThunderEventCleanupSchedule) => void) => {
     return this.tableCache.removeOnInsert(cb);
   }
 
-  onDelete = (cb: (ctx: EventContext, row: WorldState) => void) => {
+  onDelete = (cb: (ctx: EventContext, row: ThunderEventCleanupSchedule) => void) => {
     return this.tableCache.onDelete(cb);
   }
 
-  removeOnDelete = (cb: (ctx: EventContext, row: WorldState) => void) => {
+  removeOnDelete = (cb: (ctx: EventContext, row: ThunderEventCleanupSchedule) => void) => {
     return this.tableCache.removeOnDelete(cb);
   }
 
   // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: WorldState, newRow: WorldState) => void) => {
+  onUpdate = (cb: (ctx: EventContext, oldRow: ThunderEventCleanupSchedule, newRow: ThunderEventCleanupSchedule) => void) => {
     return this.tableCache.onUpdate(cb);
   }
 
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: WorldState, newRow: WorldState) => void) => {
+  removeOnUpdate = (cb: (ctx: EventContext, onRow: ThunderEventCleanupSchedule, newRow: ThunderEventCleanupSchedule) => void) => {
     return this.tableCache.removeOnUpdate(cb);
   }}

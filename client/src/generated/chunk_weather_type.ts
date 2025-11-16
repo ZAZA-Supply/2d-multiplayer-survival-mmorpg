@@ -30,24 +30,10 @@ import {
 import { WeatherType } from "./weather_type_type";
 // Mark import as potentially unused
 declare type __keep_WeatherType = WeatherType;
-import { Season } from "./season_type";
-// Mark import as potentially unused
-declare type __keep_Season = Season;
-import { TimeOfDay } from "./time_of_day_type";
-// Mark import as potentially unused
-declare type __keep_TimeOfDay = TimeOfDay;
 
 
-export type WorldState = {
-  id: number,
-  cycleProgress: number,
-  timeOfDay: TimeOfDay,
-  cycleCount: number,
-  isFullMoon: boolean,
-  lastTick: __Timestamp,
-  currentSeason: Season,
-  dayOfYear: number,
-  year: number,
+export type ChunkWeather = {
+  chunkIndex: number,
   currentWeather: WeatherType,
   rainIntensity: number,
   weatherStartTime: __Timestamp | undefined,
@@ -55,30 +41,23 @@ export type WorldState = {
   lastRainEndTime: __Timestamp | undefined,
   lastThunderTime: __Timestamp | undefined,
   nextThunderTime: __Timestamp | undefined,
+  lastUpdate: __Timestamp,
 };
-let _cached_WorldState_type_value: __AlgebraicTypeType | null = null;
+let _cached_ChunkWeather_type_value: __AlgebraicTypeType | null = null;
 
 /**
  * An object for generated helper functions.
  */
-export const WorldState = {
+export const ChunkWeather = {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
   getTypeScriptAlgebraicType(): __AlgebraicTypeType {
-    if (_cached_WorldState_type_value) return _cached_WorldState_type_value;
-    _cached_WorldState_type_value = __AlgebraicTypeValue.Product({ elements: [] });
-    _cached_WorldState_type_value.value.elements.push(
-      { name: "id", algebraicType: __AlgebraicTypeValue.U32 },
-      { name: "cycleProgress", algebraicType: __AlgebraicTypeValue.F32 },
-      { name: "timeOfDay", algebraicType: TimeOfDay.getTypeScriptAlgebraicType() },
-      { name: "cycleCount", algebraicType: __AlgebraicTypeValue.U32 },
-      { name: "isFullMoon", algebraicType: __AlgebraicTypeValue.Bool },
-      { name: "lastTick", algebraicType: __AlgebraicTypeValue.createTimestampType() },
-      { name: "currentSeason", algebraicType: Season.getTypeScriptAlgebraicType() },
-      { name: "dayOfYear", algebraicType: __AlgebraicTypeValue.U32 },
-      { name: "year", algebraicType: __AlgebraicTypeValue.U32 },
+    if (_cached_ChunkWeather_type_value) return _cached_ChunkWeather_type_value;
+    _cached_ChunkWeather_type_value = __AlgebraicTypeValue.Product({ elements: [] });
+    _cached_ChunkWeather_type_value.value.elements.push(
+      { name: "chunkIndex", algebraicType: __AlgebraicTypeValue.U32 },
       { name: "currentWeather", algebraicType: WeatherType.getTypeScriptAlgebraicType() },
       { name: "rainIntensity", algebraicType: __AlgebraicTypeValue.F32 },
       { name: "weatherStartTime", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.createTimestampType()) },
@@ -86,20 +65,21 @@ export const WorldState = {
       { name: "lastRainEndTime", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.createTimestampType()) },
       { name: "lastThunderTime", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.createTimestampType()) },
       { name: "nextThunderTime", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.createTimestampType()) },
+      { name: "lastUpdate", algebraicType: __AlgebraicTypeValue.createTimestampType() },
     );
-    return _cached_WorldState_type_value;
+    return _cached_ChunkWeather_type_value;
   },
 
-  serialize(writer: __BinaryWriter, value: WorldState): void {
-    __AlgebraicTypeValue.serializeValue(writer, WorldState.getTypeScriptAlgebraicType(), value);
+  serialize(writer: __BinaryWriter, value: ChunkWeather): void {
+    __AlgebraicTypeValue.serializeValue(writer, ChunkWeather.getTypeScriptAlgebraicType(), value);
   },
 
-  deserialize(reader: __BinaryReader): WorldState {
-    return __AlgebraicTypeValue.deserializeValue(reader, WorldState.getTypeScriptAlgebraicType());
+  deserialize(reader: __BinaryReader): ChunkWeather {
+    return __AlgebraicTypeValue.deserializeValue(reader, ChunkWeather.getTypeScriptAlgebraicType());
   },
 
 }
 
-export default WorldState;
+export default ChunkWeather;
 
 

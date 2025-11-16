@@ -55,6 +55,8 @@ import { CleanupExpiredWaterPatches } from "./cleanup_expired_water_patches_redu
 export { CleanupExpiredWaterPatches };
 import { CleanupOldSoundEvents } from "./cleanup_old_sound_events_reducer.ts";
 export { CleanupOldSoundEvents };
+import { CleanupOldThunderEvents } from "./cleanup_old_thunder_events_reducer.ts";
+export { CleanupOldThunderEvents };
 import { ClearActiveItemReducer } from "./clear_active_item_reducer_reducer.ts";
 export { ClearActiveItemReducer };
 import { ConsumeFilledWaterContainer } from "./consume_filled_water_container_reducer.ts";
@@ -153,6 +155,8 @@ import { LoadRangedWeapon } from "./load_ranged_weapon_reducer.ts";
 export { LoadRangedWeapon };
 import { ManageSeasonalPlants } from "./manage_seasonal_plants_reducer.ts";
 export { ManageSeasonalPlants };
+import { ManualCleanupThunderEvents } from "./manual_cleanup_thunder_events_reducer.ts";
+export { ManualCleanupThunderEvents };
 import { MoveItemFromBox } from "./move_item_from_box_reducer.ts";
 export { MoveItemFromBox };
 import { MoveItemFromCampfireToPlayerSlot } from "./move_item_from_campfire_to_player_slot_reducer.ts";
@@ -403,6 +407,14 @@ import { StartCrafting } from "./start_crafting_reducer.ts";
 export { StartCrafting };
 import { StartCraftingMultiple } from "./start_crafting_multiple_reducer.ts";
 export { StartCraftingMultiple };
+import { StartHeavyStormRainSoundReducer } from "./start_heavy_storm_rain_sound_reducer_reducer.ts";
+export { StartHeavyStormRainSoundReducer };
+import { StartNormalRainSoundReducer } from "./start_normal_rain_sound_reducer_reducer.ts";
+export { StartNormalRainSoundReducer };
+import { StopHeavyStormRainSoundReducer } from "./stop_heavy_storm_rain_sound_reducer_reducer.ts";
+export { StopHeavyStormRainSoundReducer };
+import { StopNormalRainSoundReducer } from "./stop_normal_rain_sound_reducer_reducer.ts";
+export { StopNormalRainSoundReducer };
 import { ThrowItem } from "./throw_item_reducer.ts";
 export { ThrowItem };
 import { TickWorldState } from "./tick_world_state_reducer.ts";
@@ -463,6 +475,8 @@ import { CampfireTableHandle } from "./campfire_table.ts";
 export { CampfireTableHandle };
 import { CampfireProcessingScheduleTableHandle } from "./campfire_processing_schedule_table.ts";
 export { CampfireProcessingScheduleTableHandle };
+import { ChunkWeatherTableHandle } from "./chunk_weather_table.ts";
+export { ChunkWeatherTableHandle };
 import { ClientViewportTableHandle } from "./client_viewport_table.ts";
 export { ClientViewportTableHandle };
 import { CloudTableHandle } from "./cloud_table.ts";
@@ -595,6 +609,8 @@ import { StoneTableHandle } from "./stone_table.ts";
 export { StoneTableHandle };
 import { ThunderEventTableHandle } from "./thunder_event_table.ts";
 export { ThunderEventTableHandle };
+import { ThunderEventCleanupScheduleTableHandle } from "./thunder_event_cleanup_schedule_table.ts";
+export { ThunderEventCleanupScheduleTableHandle };
 import { TreeTableHandle } from "./tree_table.ts";
 export { TreeTableHandle };
 import { ViperSpittleTableHandle } from "./viper_spittle_table.ts";
@@ -651,6 +667,8 @@ import { Campfire } from "./campfire_type.ts";
 export { Campfire };
 import { CampfireProcessingSchedule } from "./campfire_processing_schedule_type.ts";
 export { CampfireProcessingSchedule };
+import { ChunkWeather } from "./chunk_weather_type.ts";
+export { ChunkWeather };
 import { ClientViewport } from "./client_viewport_type.ts";
 export { ClientViewport };
 import { Cloud } from "./cloud_type.ts";
@@ -837,6 +855,8 @@ import { TargetType } from "./target_type_type.ts";
 export { TargetType };
 import { ThunderEvent } from "./thunder_event_type.ts";
 export { ThunderEvent };
+import { ThunderEventCleanupSchedule } from "./thunder_event_cleanup_schedule_type.ts";
+export { ThunderEventCleanupSchedule };
 import { TileType } from "./tile_type_type.ts";
 export { TileType };
 import { TimeOfDay } from "./time_of_day_type.ts";
@@ -971,6 +991,15 @@ const REMOTE_MODULE = {
       primaryKeyInfo: {
         colName: "campfireId",
         colType: (CampfireProcessingSchedule.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
+      },
+    },
+    chunk_weather: {
+      tableName: "chunk_weather" as const,
+      rowType: ChunkWeather.getTypeScriptAlgebraicType(),
+      primaryKey: "chunkIndex",
+      primaryKeyInfo: {
+        colName: "chunkIndex",
+        colType: (ChunkWeather.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
       },
     },
     client_viewport: {
@@ -1567,6 +1596,15 @@ const REMOTE_MODULE = {
         colType: (ThunderEvent.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
       },
     },
+    thunder_event_cleanup_schedule: {
+      tableName: "thunder_event_cleanup_schedule" as const,
+      rowType: ThunderEventCleanupSchedule.getTypeScriptAlgebraicType(),
+      primaryKey: "scheduleId",
+      primaryKeyInfo: {
+        colName: "scheduleId",
+        colType: (ThunderEventCleanupSchedule.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
+      },
+    },
     tree: {
       tableName: "tree" as const,
       rowType: Tree.getTypeScriptAlgebraicType(),
@@ -1724,6 +1762,10 @@ const REMOTE_MODULE = {
     cleanup_old_sound_events: {
       reducerName: "cleanup_old_sound_events",
       argsType: CleanupOldSoundEvents.getTypeScriptAlgebraicType(),
+    },
+    cleanup_old_thunder_events: {
+      reducerName: "cleanup_old_thunder_events",
+      argsType: CleanupOldThunderEvents.getTypeScriptAlgebraicType(),
     },
     clear_active_item_reducer: {
       reducerName: "clear_active_item_reducer",
@@ -1920,6 +1962,10 @@ const REMOTE_MODULE = {
     manage_seasonal_plants: {
       reducerName: "manage_seasonal_plants",
       argsType: ManageSeasonalPlants.getTypeScriptAlgebraicType(),
+    },
+    manual_cleanup_thunder_events: {
+      reducerName: "manual_cleanup_thunder_events",
+      argsType: ManualCleanupThunderEvents.getTypeScriptAlgebraicType(),
     },
     move_item_from_box: {
       reducerName: "move_item_from_box",
@@ -2421,6 +2467,22 @@ const REMOTE_MODULE = {
       reducerName: "start_crafting_multiple",
       argsType: StartCraftingMultiple.getTypeScriptAlgebraicType(),
     },
+    start_heavy_storm_rain_sound_reducer: {
+      reducerName: "start_heavy_storm_rain_sound_reducer",
+      argsType: StartHeavyStormRainSoundReducer.getTypeScriptAlgebraicType(),
+    },
+    start_normal_rain_sound_reducer: {
+      reducerName: "start_normal_rain_sound_reducer",
+      argsType: StartNormalRainSoundReducer.getTypeScriptAlgebraicType(),
+    },
+    stop_heavy_storm_rain_sound_reducer: {
+      reducerName: "stop_heavy_storm_rain_sound_reducer",
+      argsType: StopHeavyStormRainSoundReducer.getTypeScriptAlgebraicType(),
+    },
+    stop_normal_rain_sound_reducer: {
+      reducerName: "stop_normal_rain_sound_reducer",
+      argsType: StopNormalRainSoundReducer.getTypeScriptAlgebraicType(),
+    },
     throw_item: {
       reducerName: "throw_item",
       argsType: ThrowItem.getTypeScriptAlgebraicType(),
@@ -2535,6 +2597,7 @@ export type Reducer = never
 | { name: "CleanupExpiredDodgeRolls", args: CleanupExpiredDodgeRolls }
 | { name: "CleanupExpiredWaterPatches", args: CleanupExpiredWaterPatches }
 | { name: "CleanupOldSoundEvents", args: CleanupOldSoundEvents }
+| { name: "CleanupOldThunderEvents", args: CleanupOldThunderEvents }
 | { name: "ClearActiveItemReducer", args: ClearActiveItemReducer }
 | { name: "ConsumeFilledWaterContainer", args: ConsumeFilledWaterContainer }
 | { name: "ConsumeItem", args: ConsumeItem }
@@ -2584,6 +2647,7 @@ export type Reducer = never
 | { name: "LightLantern", args: LightLantern }
 | { name: "LoadRangedWeapon", args: LoadRangedWeapon }
 | { name: "ManageSeasonalPlants", args: ManageSeasonalPlants }
+| { name: "ManualCleanupThunderEvents", args: ManualCleanupThunderEvents }
 | { name: "MoveItemFromBox", args: MoveItemFromBox }
 | { name: "MoveItemFromCampfireToPlayerSlot", args: MoveItemFromCampfireToPlayerSlot }
 | { name: "MoveItemFromCorpse", args: MoveItemFromCorpse }
@@ -2709,6 +2773,10 @@ export type Reducer = never
 | { name: "SplitStackWithinStash", args: SplitStackWithinStash }
 | { name: "StartCrafting", args: StartCrafting }
 | { name: "StartCraftingMultiple", args: StartCraftingMultiple }
+| { name: "StartHeavyStormRainSoundReducer", args: StartHeavyStormRainSoundReducer }
+| { name: "StartNormalRainSoundReducer", args: StartNormalRainSoundReducer }
+| { name: "StopHeavyStormRainSoundReducer", args: StopHeavyStormRainSoundReducer }
+| { name: "StopNormalRainSoundReducer", args: StopNormalRainSoundReducer }
 | { name: "ThrowItem", args: ThrowItem }
 | { name: "TickWorldState", args: TickWorldState }
 | { name: "ToggleCampfireBurning", args: ToggleCampfireBurning }
@@ -2906,6 +2974,22 @@ export class RemoteReducers {
 
   removeOnCleanupOldSoundEvents(callback: (ctx: ReducerEventContext, args: SoundEventCleanupSchedule) => void) {
     this.connection.offReducer("cleanup_old_sound_events", callback);
+  }
+
+  cleanupOldThunderEvents(args: ThunderEventCleanupSchedule) {
+    const __args = { args };
+    let __writer = new __BinaryWriter(1024);
+    CleanupOldThunderEvents.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("cleanup_old_thunder_events", __argsBuffer, this.setCallReducerFlags.cleanupOldThunderEventsFlags);
+  }
+
+  onCleanupOldThunderEvents(callback: (ctx: ReducerEventContext, args: ThunderEventCleanupSchedule) => void) {
+    this.connection.onReducer("cleanup_old_thunder_events", callback);
+  }
+
+  removeOnCleanupOldThunderEvents(callback: (ctx: ReducerEventContext, args: ThunderEventCleanupSchedule) => void) {
+    this.connection.offReducer("cleanup_old_thunder_events", callback);
   }
 
   clearActiveItemReducer(playerIdentity: __Identity) {
@@ -3638,6 +3722,18 @@ export class RemoteReducers {
 
   removeOnManageSeasonalPlants(callback: (ctx: ReducerEventContext, args: SeasonalPlantManagementSchedule) => void) {
     this.connection.offReducer("manage_seasonal_plants", callback);
+  }
+
+  manualCleanupThunderEvents() {
+    this.connection.callReducer("manual_cleanup_thunder_events", new Uint8Array(0), this.setCallReducerFlags.manualCleanupThunderEventsFlags);
+  }
+
+  onManualCleanupThunderEvents(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("manual_cleanup_thunder_events", callback);
+  }
+
+  removeOnManualCleanupThunderEvents(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("manual_cleanup_thunder_events", callback);
   }
 
   moveItemFromBox(boxId: number, sourceSlotIndex: number, targetSlotType: string, targetSlotIndex: number) {
@@ -5608,6 +5704,54 @@ export class RemoteReducers {
     this.connection.offReducer("start_crafting_multiple", callback);
   }
 
+  startHeavyStormRainSoundReducer() {
+    this.connection.callReducer("start_heavy_storm_rain_sound_reducer", new Uint8Array(0), this.setCallReducerFlags.startHeavyStormRainSoundReducerFlags);
+  }
+
+  onStartHeavyStormRainSoundReducer(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("start_heavy_storm_rain_sound_reducer", callback);
+  }
+
+  removeOnStartHeavyStormRainSoundReducer(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("start_heavy_storm_rain_sound_reducer", callback);
+  }
+
+  startNormalRainSoundReducer() {
+    this.connection.callReducer("start_normal_rain_sound_reducer", new Uint8Array(0), this.setCallReducerFlags.startNormalRainSoundReducerFlags);
+  }
+
+  onStartNormalRainSoundReducer(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("start_normal_rain_sound_reducer", callback);
+  }
+
+  removeOnStartNormalRainSoundReducer(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("start_normal_rain_sound_reducer", callback);
+  }
+
+  stopHeavyStormRainSoundReducer() {
+    this.connection.callReducer("stop_heavy_storm_rain_sound_reducer", new Uint8Array(0), this.setCallReducerFlags.stopHeavyStormRainSoundReducerFlags);
+  }
+
+  onStopHeavyStormRainSoundReducer(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("stop_heavy_storm_rain_sound_reducer", callback);
+  }
+
+  removeOnStopHeavyStormRainSoundReducer(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("stop_heavy_storm_rain_sound_reducer", callback);
+  }
+
+  stopNormalRainSoundReducer() {
+    this.connection.callReducer("stop_normal_rain_sound_reducer", new Uint8Array(0), this.setCallReducerFlags.stopNormalRainSoundReducerFlags);
+  }
+
+  onStopNormalRainSoundReducer(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("stop_normal_rain_sound_reducer", callback);
+  }
+
+  removeOnStopNormalRainSoundReducer(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("stop_normal_rain_sound_reducer", callback);
+  }
+
   throwItem(targetWorldX: number, targetWorldY: number) {
     const __args = { targetWorldX, targetWorldY };
     let __writer = new __BinaryWriter(1024);
@@ -5947,6 +6091,11 @@ export class SetReducerFlags {
     this.cleanupOldSoundEventsFlags = flags;
   }
 
+  cleanupOldThunderEventsFlags: __CallReducerFlags = 'FullUpdate';
+  cleanupOldThunderEvents(flags: __CallReducerFlags) {
+    this.cleanupOldThunderEventsFlags = flags;
+  }
+
   clearActiveItemReducerFlags: __CallReducerFlags = 'FullUpdate';
   clearActiveItemReducer(flags: __CallReducerFlags) {
     this.clearActiveItemReducerFlags = flags;
@@ -6180,6 +6329,11 @@ export class SetReducerFlags {
   manageSeasonalPlantsFlags: __CallReducerFlags = 'FullUpdate';
   manageSeasonalPlants(flags: __CallReducerFlags) {
     this.manageSeasonalPlantsFlags = flags;
+  }
+
+  manualCleanupThunderEventsFlags: __CallReducerFlags = 'FullUpdate';
+  manualCleanupThunderEvents(flags: __CallReducerFlags) {
+    this.manualCleanupThunderEventsFlags = flags;
   }
 
   moveItemFromBoxFlags: __CallReducerFlags = 'FullUpdate';
@@ -6807,6 +6961,26 @@ export class SetReducerFlags {
     this.startCraftingMultipleFlags = flags;
   }
 
+  startHeavyStormRainSoundReducerFlags: __CallReducerFlags = 'FullUpdate';
+  startHeavyStormRainSoundReducer(flags: __CallReducerFlags) {
+    this.startHeavyStormRainSoundReducerFlags = flags;
+  }
+
+  startNormalRainSoundReducerFlags: __CallReducerFlags = 'FullUpdate';
+  startNormalRainSoundReducer(flags: __CallReducerFlags) {
+    this.startNormalRainSoundReducerFlags = flags;
+  }
+
+  stopHeavyStormRainSoundReducerFlags: __CallReducerFlags = 'FullUpdate';
+  stopHeavyStormRainSoundReducer(flags: __CallReducerFlags) {
+    this.stopHeavyStormRainSoundReducerFlags = flags;
+  }
+
+  stopNormalRainSoundReducerFlags: __CallReducerFlags = 'FullUpdate';
+  stopNormalRainSoundReducer(flags: __CallReducerFlags) {
+    this.stopNormalRainSoundReducerFlags = flags;
+  }
+
   throwItemFlags: __CallReducerFlags = 'FullUpdate';
   throwItem(flags: __CallReducerFlags) {
     this.throwItemFlags = flags;
@@ -6955,6 +7129,11 @@ export class RemoteTables {
   get campfireProcessingSchedule(): CampfireProcessingScheduleTableHandle<'campfire_processing_schedule'> {
     // clientCache is a private property
     return new CampfireProcessingScheduleTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<CampfireProcessingSchedule>(REMOTE_MODULE.tables.campfire_processing_schedule));
+  }
+
+  get chunkWeather(): ChunkWeatherTableHandle<'chunk_weather'> {
+    // clientCache is a private property
+    return new ChunkWeatherTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<ChunkWeather>(REMOTE_MODULE.tables.chunk_weather));
   }
 
   get clientViewport(): ClientViewportTableHandle<'client_viewport'> {
@@ -7285,6 +7464,11 @@ export class RemoteTables {
   get thunderEvent(): ThunderEventTableHandle<'thunder_event'> {
     // clientCache is a private property
     return new ThunderEventTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<ThunderEvent>(REMOTE_MODULE.tables.thunder_event));
+  }
+
+  get thunderEventCleanupSchedule(): ThunderEventCleanupScheduleTableHandle<'thunder_event_cleanup_schedule'> {
+    // clientCache is a private property
+    return new ThunderEventCleanupScheduleTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<ThunderEventCleanupSchedule>(REMOTE_MODULE.tables.thunder_event_cleanup_schedule));
   }
 
   get tree(): TreeTableHandle<'tree'> {

@@ -221,6 +221,9 @@ interface GameScreenProps {
     
     // ADD: Local facing direction for instant visual feedback (client-authoritative)
     facingDirection?: string;
+    
+    // Chunk-based weather
+    chunkWeather: Map<string, any>;
 }
 
 const GameScreen: React.FC<GameScreenProps> = (props) => {
@@ -314,6 +317,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
         isMusicPanelVisible,
         setIsMusicPanelVisible,
         movementDirection,
+        chunkWeather,
     } = props;
 
     const gameCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -941,6 +945,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 movementDirection={movementDirection}
                 playerDodgeRollStates={props.playerDodgeRollStates}
                 treeShadowsEnabled={treeShadowsEnabled}
+                chunkWeather={chunkWeather}
             />
             
             {/* Use our camera offsets for SpeechBubbleManager */}
@@ -991,7 +996,11 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 worldState={worldState}
                 isGameMenuOpen={currentMenu !== null}
             />
-            <DayNightCycleTracker worldState={worldState} />
+            <DayNightCycleTracker 
+                worldState={worldState} 
+                chunkWeather={chunkWeather}
+                localPlayer={localPlayer}
+            />
             <MusicControlPanel 
                 musicSystem={musicSystem}
                 musicVolume={musicVolume}

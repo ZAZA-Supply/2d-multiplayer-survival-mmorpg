@@ -28,44 +28,40 @@ import {
   type TableHandle as __TableHandle,
 } from "spacetimedb";
 
-export type ThunderEvent = {
-  id: bigint,
-  chunkIndex: number,
-  timestamp: __Timestamp,
-  intensity: number,
+export type ThunderEventCleanupSchedule = {
+  scheduleId: bigint,
+  scheduledAt: { tag: "Interval", value: __TimeDuration } | { tag: "Time", value: __Timestamp },
 };
-let _cached_ThunderEvent_type_value: __AlgebraicTypeType | null = null;
+let _cached_ThunderEventCleanupSchedule_type_value: __AlgebraicTypeType | null = null;
 
 /**
  * An object for generated helper functions.
  */
-export const ThunderEvent = {
+export const ThunderEventCleanupSchedule = {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
   getTypeScriptAlgebraicType(): __AlgebraicTypeType {
-    if (_cached_ThunderEvent_type_value) return _cached_ThunderEvent_type_value;
-    _cached_ThunderEvent_type_value = __AlgebraicTypeValue.Product({ elements: [] });
-    _cached_ThunderEvent_type_value.value.elements.push(
-      { name: "id", algebraicType: __AlgebraicTypeValue.U64 },
-      { name: "chunkIndex", algebraicType: __AlgebraicTypeValue.U32 },
-      { name: "timestamp", algebraicType: __AlgebraicTypeValue.createTimestampType() },
-      { name: "intensity", algebraicType: __AlgebraicTypeValue.F32 },
+    if (_cached_ThunderEventCleanupSchedule_type_value) return _cached_ThunderEventCleanupSchedule_type_value;
+    _cached_ThunderEventCleanupSchedule_type_value = __AlgebraicTypeValue.Product({ elements: [] });
+    _cached_ThunderEventCleanupSchedule_type_value.value.elements.push(
+      { name: "scheduleId", algebraicType: __AlgebraicTypeValue.U64 },
+      { name: "scheduledAt", algebraicType: __AlgebraicTypeValue.createScheduleAtType() },
     );
-    return _cached_ThunderEvent_type_value;
+    return _cached_ThunderEventCleanupSchedule_type_value;
   },
 
-  serialize(writer: __BinaryWriter, value: ThunderEvent): void {
-    __AlgebraicTypeValue.serializeValue(writer, ThunderEvent.getTypeScriptAlgebraicType(), value);
+  serialize(writer: __BinaryWriter, value: ThunderEventCleanupSchedule): void {
+    __AlgebraicTypeValue.serializeValue(writer, ThunderEventCleanupSchedule.getTypeScriptAlgebraicType(), value);
   },
 
-  deserialize(reader: __BinaryReader): ThunderEvent {
-    return __AlgebraicTypeValue.deserializeValue(reader, ThunderEvent.getTypeScriptAlgebraicType());
+  deserialize(reader: __BinaryReader): ThunderEventCleanupSchedule {
+    return __AlgebraicTypeValue.deserializeValue(reader, ThunderEventCleanupSchedule.getTypeScriptAlgebraicType());
   },
 
 }
 
-export default ThunderEvent;
+export default ThunderEventCleanupSchedule;
 
 

@@ -208,6 +208,109 @@ export default {
     
     <p>So fur armor pieces provide two benefits: warmth bonus (which slows warmth drain) and cold resistance (which reduces health damage when warmth gets low). Even if you don't have full immunity, partial cold resistance still helps by reducing the health damage you take. This makes individual pieces valuable even before you complete a set.</p>
     
+    <h2>Understanding Warmth vs Cold Protection</h2>
+    
+    <p>One of the most common questions we get is: "What's the difference between warmth and cold protection?" It's a crucial distinction that affects how you survive in the tundra, so let me break it down clearly.</p>
+    
+    <h3>The Two-Layer Cold System</h3>
+    
+    <p>Our cold survival system works in two stages:</p>
+    
+    <ol>
+      <li><strong>Warmth Drain</strong> - Your warmth stat constantly drains over time, especially in cold biomes</li>
+      <li><strong>Cold Damage</strong> - When your warmth gets too low, you start taking health damage</li>
+    </ol>
+    
+    <p>Armor affects <em>both</em> of these stages, but in different ways:</p>
+    
+    <h3>Warmth Bonus: Slowing the Drain</h3>
+    
+    <p>When armor provides a <strong>warmth bonus</strong>, it's adding warmth points per second to your character. This doesn't prevent warmth drain - it just slows it down by counteracting some of the drain rate.</p>
+    
+    <p>Think of it like this:</p>
+    
+    <ul>
+      <li>Base warmth drain in cold biome: -2 warmth/second</li>
+      <li>Cloth armor warmth bonus: +0.5 warmth/second per piece</li>
+      <li>With 5 pieces of cloth: -2 + 2.5 = +0.5 warmth/second (net gain!)</li>
+    </ul>
+    
+    <p><strong>All armor types</strong> provide some warmth bonus - even cloth and leather. This means any armor helps you stay warm longer. The difference is in the magnitude:</p>
+    
+    <ul>
+      <li><strong>Cloth/Leather/Bone/Wood/Scale</strong> - Small warmth bonuses (helps a bit)</li>
+      <li><strong>Fox Fur/Wolf Fur</strong> - Large warmth bonuses (significantly slows drain)</li>
+    </ul>
+    
+    <h3>Cold Resistance: Reducing the Damage</h3>
+    
+    <p>When armor provides <strong>cold resistance</strong>, it's reducing the health damage you take when your warmth gets low. This is a <em>separate</em> calculation that happens after warmth has already dropped.</p>
+    
+    <p>Here's how it works:</p>
+    
+    <ul>
+      <li>Your warmth drops below the threshold (usually around 20%)</li>
+      <li>The game calculates cold damage based on how low your warmth is</li>
+      <li>Cold resistance reduces that damage by a percentage</li>
+    </ul>
+    
+    <p>Example scenario:</p>
+    
+    <ul>
+      <li>Your warmth is at 10% (very cold)</li>
+      <li>Base cold damage: 5 health/second</li>
+      <li>You're wearing 3 pieces of fox fur (60% cold resistance)</li>
+      <li>Actual damage taken: 5 × (1 - 0.60) = 2 health/second</li>
+    </ul>
+    
+    <p><strong>Only fur armor</strong> provides cold resistance - fox fur and wolf fur both give 20% cold resistance per piece. Other armor types (cloth, leather, bone, wood, scale) do NOT provide cold resistance, only warmth bonuses.</p>
+    
+    <h3>Why Both Matter</h3>
+    
+    <p>This two-layer system creates interesting strategic choices:</p>
+    
+    <ul>
+      <li><strong>Warmth Bonus</strong> - Prevents the problem (keeps warmth high longer)</li>
+      <li><strong>Cold Resistance</strong> - Mitigates the consequence (reduces damage when warmth is low)</li>
+    </ul>
+    
+    <p>In practice, this means:</p>
+    
+    <ul>
+      <li><strong>Any armor</strong> helps with cold survival by slowing warmth drain</li>
+      <li><strong>Fur armor</strong> is specialized for cold - it both slows drain AND reduces damage</li>
+      <li><strong>Mix and match</strong> strategies work - you can wear some fur pieces for cold resistance while keeping other armor for different bonuses</li>
+    </ul>
+    
+    <h3>Practical Examples</h3>
+    
+    <p><strong>Scenario 1: Cloth Armor in Cold Biome</strong></p>
+    <ul>
+      <li>Warmth bonus: Moderate (slows drain)</li>
+      <li>Cold resistance: 0% (no damage reduction)</li>
+      <li>Result: You stay warm longer, but once warmth drops, you take full cold damage</li>
+    </ul>
+    
+    <p><strong>Scenario 2: Fox Fur Armor in Cold Biome</strong></p>
+    <ul>
+      <li>Warmth bonus: High (significantly slows drain)</li>
+      <li>Cold resistance: 100% with full set (no damage)</li>
+      <li>Result: You stay warm much longer, and even if warmth drops, you take no cold damage</li>
+    </ul>
+    
+    <p><strong>Scenario 3: Mixed Build (3 Fox Fur + 2 Scale)</strong></p>
+    <ul>
+      <li>Warmth bonus: Moderate-high (decent drain reduction)</li>
+      <li>Cold resistance: 60% (significant damage reduction)</li>
+      <li>Result: Good cold survival while maintaining scale armor's other benefits (slash resistance, wetness immunity)</li>
+    </ul>
+    
+    <h3>The Bottom Line</h3>
+    
+    <p>When players say "I'm wearing armor but still taking cold damage," it's usually because they're wearing armor with warmth bonuses but no cold resistance. The armor IS helping - it's keeping their warmth higher for longer. But once warmth drops below the threshold, they need cold resistance to reduce the damage.</p>
+    
+    <p>This is why fur armor is so valuable in the tundra - it's the only armor that provides both layers of protection. But even without fur armor, any armor helps with cold survival by slowing warmth drain. You just need to be more careful about staying near heat sources and monitoring your warmth stat.</p>
+    
     <h2>The Crafting Economy</h2>
     
     <p>We've balanced the crafting costs to make armor feel achievable without being trivial:</p>

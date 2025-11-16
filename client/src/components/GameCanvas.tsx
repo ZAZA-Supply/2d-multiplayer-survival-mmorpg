@@ -62,7 +62,8 @@ import { useResourceSparkleParticles } from '../hooks/useResourceSparkleParticle
 import { useCloudInterpolation, InterpolatedCloudData } from '../hooks/useCloudInterpolation';
 import { useGrassInterpolation, InterpolatedGrassData } from '../hooks/useGrassInterpolation';
 import { useArrowBreakEffects } from '../hooks/useArrowBreakEffects';
-import { useThunderEffects } from '../hooks/useThunderEffects';
+// Thunder effects removed - system disabled for now
+import { useChunkBasedRainSounds } from '../hooks/useChunkBasedRainSounds';
 import { useFireArrowParticles } from '../hooks/useFireArrowParticles';
 import { useWorldTileCache } from '../hooks/useWorldTileCache';
 import { useAmbientSounds } from '../hooks/useAmbientSounds';
@@ -96,6 +97,8 @@ import { renderShelter } from '../utils/renderers/shelterRenderingUtils';
 import { setShelterClippingData } from '../utils/renderers/shadowUtils';
 import { renderRain } from '../utils/renderers/rainRenderingUtils';
 import { renderCombinedHealthOverlays } from '../utils/renderers/healthOverlayUtils';
+import { renderWeatherOverlay } from '../utils/renderers/weatherOverlayUtils';
+import { calculateChunkIndex } from '../utils/chunkUtils';
 import { renderWaterOverlay } from '../utils/renderers/waterOverlayUtils';
 import { renderPlayer, isPlayerHovered, getSpriteCoordinates } from '../utils/renderers/playerRenderingUtils';
 import { renderSeaStackSingle, renderSeaStackShadowOnly, renderSeaStackBottomOnly, renderSeaStackWaterEffectsOnly, renderSeaStackWaterLineOnly } from '../utils/renderers/seaStackRenderingUtils';
@@ -198,6 +201,8 @@ interface GameCanvasProps {
   localFacingDirection?: string;
   // NEW: Visual cortex module setting for tree shadows
   treeShadowsEnabled?: boolean;
+  // Chunk-based weather data
+  chunkWeather: Map<string, any>;
 }
 
 /**
@@ -270,6 +275,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   playerDodgeRollStates,
   localFacingDirection, // ADD: Destructure local facing direction for client-authoritative direction changes
   treeShadowsEnabled, // NEW: Destructure treeShadowsEnabled for visual cortex module setting
+  chunkWeather, // Chunk-based weather data
 }) => {
   // console.log('[GameCanvas IS RUNNING] showInventory:', showInventory);
 
@@ -1180,11 +1186,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   });
 
   // 🌊 AMBIENT SOUND SYSTEM - Seamless atmospheric audio for the Aleutian island
+  // Wind sounds use regional weather (checks nearby chunks for stability)
   const ambientSoundSystem = useAmbientSounds({
     masterVolume: 1.0, // Master volume (could be made configurable later)
     environmentalVolume: environmentalVolume ?? 0.7, // Use environmental volume from settings or default
     timeOfDay: worldState?.timeOfDay, // Pass actual server time of day
-    weatherCondition: worldState?.currentWeather, // Pass actual server weather condition
+    weatherCondition: worldState?.currentWeather, // Fallback for global weather (deprecated)
+    chunkWeather, // Chunk-based weather for regional wind calculation
+    localPlayer, // Player position for determining nearby chunks
   });
 
   // 🧪 DEBUG: Expose ambient sound test function to window for debugging
@@ -1244,8 +1253,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     }
   }, [connection, camera.x, camera.y, currentCanvasWidth, currentCanvasHeight]);
 
-  // Hook for thunder effects
-  useThunderEffects({ connection });
+  // Thunder effects removed - system disabled for now
+  // TODO: Re-enable thunder system after debugging
+
+  // Hook for chunk-based rain sounds (manages rain sounds based on player's chunk weather)
+  useChunkBasedRainSounds({ connection, localPlayer, chunkWeather });
 
   // Helper function to convert shelter data for shadow clipping
   const shelterClippingData = useMemo(() => {
@@ -2071,7 +2083,25 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
     // --- Render Rain Before Color Overlay ---
     // Rain should be rendered before the day/night overlay so it doesn't show above the darkness at night
-    const rainIntensity = worldState?.rainIntensity ?? 0.0;
+    // Calculate rain intensity from chunk-based weather system
+    let rainIntensity = 0.0;
+    if (localPlayer && chunkWeather) {
+      const playerX = predictedPosition?.x ?? localPlayer.positionX;
+      const playerY = predictedPosition?.y ?? localPlayer.positionY;
+      const currentChunkIndex = calculateChunkIndex(playerX, playerY);
+      const chunkWeatherData = chunkWeather.get(currentChunkIndex.toString());
+      
+      if (chunkWeatherData && chunkWeatherData.currentWeather?.tag !== 'Clear') {
+        // Use rain intensity from chunk weather (0.0 to 1.0)
+        rainIntensity = chunkWeatherData.rainIntensity ?? 0.0;
+      }
+    }
+    
+    // Fallback to global weather if chunk weather not available (backward compatibility)
+    if (rainIntensity === 0.0 && worldState?.rainIntensity) {
+      rainIntensity = worldState.rainIntensity;
+    }
+    
     if (rainIntensity > 0) {
       renderRain(
         ctx,
@@ -2084,6 +2114,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       );
     }
     // --- End Rain Rendering ---
+
+        // --- Render Weather Atmosphere Overlay ---
+        // Darkens and desaturates the scene based on storm intensity
+        // Renders BEFORE day/night overlay so both effects layer naturally
+        // Smoothly fades in/out when moving between chunks with different weather
+        renderWeatherOverlay(
+          ctx,
+          currentCanvasWidth,
+          currentCanvasHeight,
+          rainIntensity, // Target intensity (will smoothly transition)
+          worldState?.cycleProgress ?? 0.5, // Time of day progress
+          Date.now() // Current time for transition timing
+        );
+        // --- End Weather Atmosphere Overlay ---
 
     // --- Post-Processing (Day/Night, Indicators, Lights, Minimap) ---
     // Day/Night mask overlay
@@ -2358,6 +2402,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     shelterImageRef.current,
     minimapCache,
     visibleHarvestableResourcesMap,
+    chunkWeather, // Chunk-based weather data
+    predictedPosition, // Player predicted position for chunk calculation
      // Viewport-culled resource maps for sparkles
   ]);
 

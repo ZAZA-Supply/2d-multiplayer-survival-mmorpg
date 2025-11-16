@@ -55,6 +55,7 @@ pub enum SoundType {
     ItemThrown,                // item_thrown.mp3 (1 variation - when a weapon/item is thrown)
     ErrorResources,           // error_resources.mp3 (1 variation - when player doesn't have enough resources)
     DoneCooking,              // done_cooking.mp3 (1 variation - when items finish cooking in campfire)
+    // Thunder removed - system disabled for now
     // Add more as needed - extensible system
 }
 
@@ -953,3 +954,41 @@ pub fn stop_lantern_sound(ctx: &ReducerContext, lantern_id: u64) {
     }
 }
 
+// --- Client-Callable Rain Sound Reducers ---
+
+/// Client-callable reducer to start heavy storm rain sound
+#[spacetimedb::reducer]
+pub fn start_heavy_storm_rain_sound_reducer(ctx: &ReducerContext) -> Result<(), String> {
+    log::info!("🌧️ Client {} requesting heavy storm rain sound", ctx.sender);
+    start_heavy_storm_rain_sound(ctx)
+}
+
+/// Client-callable reducer to stop heavy storm rain sound
+#[spacetimedb::reducer]
+pub fn stop_heavy_storm_rain_sound_reducer(ctx: &ReducerContext) -> Result<(), String> {
+    log::info!("🌧️ Client {} stopping heavy storm rain sound", ctx.sender);
+    stop_heavy_storm_rain_sound(ctx);
+    Ok(())
+}
+
+/// Client-callable reducer to start normal rain sound
+#[spacetimedb::reducer]
+pub fn start_normal_rain_sound_reducer(ctx: &ReducerContext) -> Result<(), String> {
+    log::info!("🌦️ Client {} requesting normal rain sound", ctx.sender);
+    start_normal_rain_sound(ctx)
+}
+
+/// Client-callable reducer to stop normal rain sound
+#[spacetimedb::reducer]
+pub fn stop_normal_rain_sound_reducer(ctx: &ReducerContext) -> Result<(), String> {
+    log::info!("🌦️ Client {} stopping normal rain sound", ctx.sender);
+    stop_normal_rain_sound(ctx);
+    Ok(())
+}
+
+// ============================================================================
+// THUNDER/LIGHTNING SYSTEM - DISABLED FOR NOW
+// ============================================================================
+// TODO: Re-enable thunder system after debugging
+// The thunder sound schedule table, reducers, and functions have been removed
+// to prevent spam issues. Will be reintroduced later with proper fixes.

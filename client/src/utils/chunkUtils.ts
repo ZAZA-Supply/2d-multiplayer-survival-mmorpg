@@ -76,4 +76,27 @@ export const getChunkIndicesForViewportWithBuffer = (viewport: Viewport | null, 
     }
 
     return indices;
+};
+
+/**
+ * Calculates the chunk index for a given world position.
+ * Matches the server's calculate_chunk_index function exactly.
+ * 
+ * @param posX X position in pixels
+ * @param posY Y position in pixels
+ * @returns The 1D chunk index (row-major ordering)
+ */
+export const calculateChunkIndex = (posX: number, posY: number): number => {
+    const { chunkSizeTiles, worldWidthChunks, worldHeightChunks, tileSize } = gameConfig;
+    
+    // Convert position to tile coordinates (matching server logic)
+    const tileX = Math.floor(posX / tileSize);
+    const tileY = Math.floor(posY / tileSize);
+    
+    // Calculate chunk coordinates (which chunk the tile is in)
+    const chunkX = Math.min(Math.floor(tileX / chunkSizeTiles), worldWidthChunks - 1);
+    const chunkY = Math.min(Math.floor(tileY / chunkSizeTiles), worldHeightChunks - 1);
+    
+    // Calculate 1D chunk index (row-major ordering)
+    return chunkY * worldWidthChunks + chunkX;
 }; 

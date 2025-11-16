@@ -1,4 +1,4 @@
-use spacetimedb::{ReducerContext, Table, Timestamp};
+use spacetimedb::{ReducerContext, Table, Timestamp, TimeDuration, ScheduleAt};
 use log;
 use std::f32::consts::PI;
 use rand::Rng;
@@ -9,11 +9,15 @@ use crate::items::inventory_item as InventoryItemTableTrait;
 use crate::items::InventoryItem;
 use crate::shelter::shelter as ShelterTableTrait;
 use crate::tree::tree as TreeTableTrait;
+use crate::player; // ADDED: Import player module for chunk weather system
 use crate::world_state::world_state as WorldStateTableTrait;
 use crate::world_state::thunder_event as ThunderEventTableTrait;
+use crate::world_state::thunder_event_cleanup_schedule as ThunderEventCleanupScheduleTableTrait;
 use crate::world_state::seasonal_plant_management_schedule as SeasonalPlantManagementScheduleTableTrait;
+use crate::world_state::chunk_weather as ChunkWeatherTableTrait;
 use crate::harvestable_resource::harvestable_resource as HarvestableResourceTableTrait;
 use crate::sound_events;
+use crate::environment::{calculate_chunk_index, WORLD_WIDTH_CHUNKS, WORLD_HEIGHT_CHUNKS};
 
 // Define fuel consumption rate (items per second)
 const FUEL_ITEM_CONSUME_PER_SECOND: f32 = 0.2; // e.g., 1 wood every 5 seconds
@@ -49,11 +53,22 @@ pub(crate) const WARMTH_DRAIN_RAIN_HEAVY: f32 = 3.0;      // Heavy rain adds 3.0
 pub(crate) const WARMTH_DRAIN_RAIN_STORM: f32 = 4.0;      // Heavy storm adds 4.0 per second
 
 // --- Weather Constants ---
+// Aleutian islands are rainy but not constantly stormy - aim for ~40% rain coverage at any time
 const MIN_RAIN_DURATION_SECONDS: f32 = 300.0; // 5 minutes
 const MAX_RAIN_DURATION_SECONDS: f32 = 900.0; // 15 minutes
-const RAIN_PROBABILITY_BASE: f32 = 0.6; // 60% base chance per day (increased from 15%)
-const RAIN_PROBABILITY_SEASONAL_MODIFIER: f32 = 0.2; // Additional variability (increased from 0.1)
-const MIN_TIME_BETWEEN_RAIN_CYCLES: f32 = 600.0; // 10 minutes minimum between rain events (reduced from 30 minutes)
+const RAIN_PROBABILITY_BASE: f32 = 0.25; // 25% base chance per day (reduced from 60% - was too aggressive)
+const RAIN_PROBABILITY_SEASONAL_MODIFIER: f32 = 0.15; // Additional variability
+const MIN_TIME_BETWEEN_RAIN_CYCLES: f32 = 900.0; // 15 minutes minimum between rain events (increased from 10 - give more clear time)
+
+// Weather variation constants
+// These values are tuned to create realistic weather fronts with good regional variation:
+// - More chunks updated per tick = faster weather changes across the map
+// - Longer propagation distance = weather fronts can spread further (more realistic)
+// - Distance decay = nearby chunks more likely to share weather, distant chunks less likely
+// - Lower base propagation = weather doesn't spread too uniformly, preserving regional differences
+const CHUNKS_PER_UPDATE: usize = 50; // Increased from 20 - process more chunks per tick for faster variation
+const WEATHER_PROPAGATION_DISTANCE: u32 = 2; // Increased from 1 - weather can spread to chunks 2 away (more realistic fronts)
+const WEATHER_PROPAGATION_DECAY: f32 = 0.5; // Each distance step reduces propagation chance by 50% (distance 1 = 100%, distance 2 = 50%)
 
 #[derive(Clone, Debug, PartialEq, spacetimedb::SpacetimeType)]
 pub enum WeatherType {
@@ -91,8 +106,63 @@ pub struct ThunderEvent {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub chunk_index: u32, // Which chunk this thunder occurred in
     pub timestamp: Timestamp,
     pub intensity: f32, // 0.5 to 1.0 for flash intensity
+}
+
+/// Schedule table for cleaning up old thunder events
+#[spacetimedb::table(name = thunder_event_cleanup_schedule, scheduled(cleanup_old_thunder_events))]
+#[derive(Clone, Debug)]
+pub struct ThunderEventCleanupSchedule {
+    #[primary_key]
+    #[auto_inc]
+    pub schedule_id: u64,
+    pub scheduled_at: ScheduleAt,
+}
+
+/// Clean up thunder events older than 3 seconds to prevent table bloat and infinite repeats
+#[spacetimedb::reducer]
+pub fn cleanup_old_thunder_events(ctx: &ReducerContext, _args: ThunderEventCleanupSchedule) -> Result<(), String> {
+    // Security check - only allow scheduler to run this
+    if ctx.sender != ctx.identity() {
+        return Err("Thunder event cleanup can only be run by scheduler".to_string());
+    }
+
+    let cutoff_time = ctx.timestamp - TimeDuration::from_micros(3_000_000); // 3 seconds ago
+    
+    let thunder_events_table = ctx.db.thunder_event();
+    let old_events: Vec<u64> = thunder_events_table.iter()
+        .filter(|event| event.timestamp < cutoff_time)
+        .map(|event| event.id)
+        .collect();
+
+    let removed_count = old_events.len();
+    for event_id in old_events {
+        thunder_events_table.id().delete(event_id);
+    }
+
+    if removed_count > 0 {
+        log::info!("🗑️ Cleaned up {} old thunder events", removed_count);
+    }
+
+    Ok(())
+}
+
+/// Manual cleanup reducer that can be called by clients to clear all thunder events
+/// This is a temporary fix until the scheduled cleanup is working properly
+#[spacetimedb::reducer]
+pub fn manual_cleanup_thunder_events(ctx: &ReducerContext) -> Result<(), String> {
+    let thunder_events_table = ctx.db.thunder_event();
+    let all_events: Vec<u64> = thunder_events_table.iter().map(|event| event.id).collect();
+    let cleanup_count = all_events.len();
+    
+    for event_id in all_events {
+        thunder_events_table.id().delete(event_id);
+    }
+    
+    log::info!("🗑️ Manual cleanup: Removed {} thunder events", cleanup_count);
+    Ok(())
 }
 
 #[spacetimedb::table(name = world_state, public)]
@@ -133,6 +203,23 @@ pub struct SeasonalPlantManagementSchedule {
     pub spawn_batch_size: u32,     // How many plants to spawn per batch
 }
 
+// --- Chunk-Based Weather System ---
+#[spacetimedb::table(name = chunk_weather, public)]
+#[derive(Clone, Debug)]
+pub struct ChunkWeather {
+    #[primary_key]
+    pub chunk_index: u32, // Chunk index (row-major ordering)
+    pub current_weather: WeatherType,
+    pub rain_intensity: f32, // 0.0 to 1.0, for client-side rendering intensity
+    pub weather_start_time: Option<Timestamp>, // When current weather started
+    pub weather_duration: Option<f32>, // How long current weather should last (seconds)
+    pub last_rain_end_time: Option<Timestamp>, // When rain last ended (for spacing)
+    // Thunder/Lightning fields (per chunk)
+    pub last_thunder_time: Option<Timestamp>, // When thunder last occurred
+    pub next_thunder_time: Option<Timestamp>, // When next thunder should occur
+    pub last_update: Timestamp, // Last time this chunk's weather was updated
+}
+
 // Reducer to initialize the world state if it doesn't exist
 #[spacetimedb::reducer]
 pub fn seed_world_state(ctx: &ReducerContext) -> Result<(), String> {
@@ -157,10 +244,215 @@ pub fn seed_world_state(ctx: &ReducerContext) -> Result<(), String> {
             last_thunder_time: None,
             next_thunder_time: None,
         })?;
+        
+        // Initialize thunder event cleanup system (runs every 5 seconds)
+        let cleanup_interval = TimeDuration::from_micros(5_000_000); // 5 seconds
+        let cleanup_schedule = ThunderEventCleanupSchedule {
+            schedule_id: 0,
+            scheduled_at: cleanup_interval.into(), // Periodic cleanup
+        };
+        match ctx.db.thunder_event_cleanup_schedule().try_insert(cleanup_schedule) {
+            Ok(_) => log::info!("⚡ Thunder event cleanup system initialized"),
+            Err(e) => log::error!("Failed to initialize thunder cleanup system: {:?}", e),
+        }
+        
     } else {
         log::debug!("WorldState already seeded.");
     }
+    
+    // IMMEDIATE CLEANUP: Clear any existing thunder events on startup (runs every time, not just first seed)
+    // This fixes the issue of accumulated events from before the cleanup system existed
+    let thunder_events_table = ctx.db.thunder_event();
+    let all_events: Vec<u64> = thunder_events_table.iter().map(|event| event.id).collect();
+    let cleanup_count = all_events.len();
+    for event_id in all_events {
+        thunder_events_table.id().delete(event_id);
+    }
+    if cleanup_count > 0 {
+        log::info!("🗑️ Cleaned up {} accumulated thunder events on startup", cleanup_count);
+    }
+    
     Ok(())
+}
+
+// --- Chunk Weather Helper Functions ---
+
+/// Gets or creates weather data for a specific chunk
+fn get_or_create_chunk_weather(ctx: &ReducerContext, chunk_index: u32) -> ChunkWeather {
+    let chunk_weather_table = ctx.db.chunk_weather();
+    
+    if let Some(weather) = chunk_weather_table.chunk_index().find(&chunk_index) {
+        return weather.clone();
+    }
+    
+    // Create new chunk weather with default Clear weather
+    let new_weather = ChunkWeather {
+        chunk_index,
+        current_weather: WeatherType::Clear,
+        rain_intensity: 0.0,
+        weather_start_time: None,
+        weather_duration: None,
+        last_rain_end_time: None,
+        last_thunder_time: None,
+        next_thunder_time: None,
+        last_update: ctx.timestamp,
+    };
+    
+    match chunk_weather_table.try_insert(new_weather.clone()) {
+        Ok(_) => new_weather,
+        Err(_) => {
+            // If insert failed, try to get it again (race condition)
+            chunk_weather_table.chunk_index().find(&chunk_index)
+                .map(|w| w.clone())
+                .unwrap_or(new_weather)
+        }
+    }
+}
+
+/// Gets nearby chunk indices for weather propagation (including diagonals)
+/// Returns chunks within propagation_distance with their distance from source
+/// Returns Vec<(chunk_index, distance)> where distance is 1 for immediate neighbors, 2 for next ring, etc.
+fn get_nearby_chunk_indices(chunk_index: u32, propagation_distance: u32) -> Vec<(u32, u32)> {
+    // Convert 1D chunk index to 2D coordinates
+    let chunk_x = (chunk_index % WORLD_WIDTH_CHUNKS) as i32;
+    let chunk_y = (chunk_index / WORLD_WIDTH_CHUNKS) as i32;
+    
+    let mut nearby_chunks = Vec::new();
+    let max_distance = propagation_distance as i32;
+    
+    // Check all chunks within propagation distance (including diagonals)
+    for dy in -max_distance..=max_distance {
+        for dx in -max_distance..=max_distance {
+            if dx == 0 && dy == 0 {
+                continue; // Skip the center chunk itself
+            }
+            
+            // Calculate Chebyshev distance (max of dx and dy) for diagonal movement
+            let distance = dx.abs().max(dy.abs()) as u32;
+            
+            let check_x = chunk_x + dx;
+            let check_y = chunk_y + dy;
+            
+            // Bounds check
+            if check_x >= 0 && check_x < WORLD_WIDTH_CHUNKS as i32 &&
+               check_y >= 0 && check_y < WORLD_HEIGHT_CHUNKS as i32 {
+                let nearby_index = (check_y as u32) * WORLD_WIDTH_CHUNKS + (check_x as u32);
+                nearby_chunks.push((nearby_index, distance));
+            }
+        }
+    }
+    
+    nearby_chunks
+}
+
+/// Propagates weather from one chunk to nearby chunks (weather fronts)
+/// Stronger weather has higher propagation chance
+fn propagate_weather_to_nearby_chunks(
+    ctx: &ReducerContext,
+    source_chunk_index: u32,
+    source_weather: &WeatherType,
+    mut rng: &mut impl Rng,
+) -> Result<(), String> {
+    // Base propagation probability based on weather intensity
+    // Lower values = weather fronts spread slower = more regional variation = more clear areas
+    let base_propagation_chance = match source_weather {
+        WeatherType::Clear => 0.0,          // Clear weather doesn't propagate
+        WeatherType::LightRain => 0.05,     // 5% - spreads slowly, creates patchy rain
+        WeatherType::ModerateRain => 0.10,  // 10% - moderate spread
+        WeatherType::HeavyRain => 0.18,     // 18% - spreads more but not overwhelming
+        WeatherType::HeavyStorm => 0.30,    // 30% - storms spread noticeably but are rare
+    };
+    
+    if base_propagation_chance == 0.0 {
+        return Ok(());
+    }
+    
+    // Get nearby chunks up to WEATHER_PROPAGATION_DISTANCE away
+    let nearby_chunks = get_nearby_chunk_indices(source_chunk_index, WEATHER_PROPAGATION_DISTANCE);
+    
+    for (nearby_index, distance) in nearby_chunks {
+        // Apply distance decay: each step reduces chance by WEATHER_PROPAGATION_DECAY
+        let distance_multiplier = WEATHER_PROPAGATION_DECAY.powi(distance as i32 - 1);
+        let propagation_chance = base_propagation_chance * distance_multiplier;
+        
+        // Check if we should propagate to this chunk
+        if rng.gen::<f32>() < propagation_chance {
+            let mut nearby_weather = get_or_create_chunk_weather(ctx, nearby_index);
+            
+            // Only propagate if the nearby chunk has Clear weather or weaker weather
+            let should_propagate = match (&nearby_weather.current_weather, source_weather) {
+                (WeatherType::Clear, _) => true, // Always propagate to clear chunks
+                (WeatherType::LightRain, WeatherType::ModerateRain | WeatherType::HeavyRain | WeatherType::HeavyStorm) => true,
+                (WeatherType::ModerateRain, WeatherType::HeavyRain | WeatherType::HeavyStorm) => true,
+                (WeatherType::HeavyRain, WeatherType::HeavyStorm) => true,
+                _ => false, // Don't overwrite stronger weather
+            };
+            
+            if should_propagate {
+                // Propagate weather (but slightly weaker)
+                let propagated_weather = match source_weather {
+                    WeatherType::HeavyStorm => {
+                        // 80% chance to stay HeavyStorm, 20% to become HeavyRain
+                        if rng.gen::<f32>() < 0.8 {
+                            WeatherType::HeavyStorm
+                        } else {
+                            WeatherType::HeavyRain
+                        }
+                    }
+                    WeatherType::HeavyRain => {
+                        // 70% chance to stay HeavyRain, 30% to become ModerateRain
+                        if rng.gen::<f32>() < 0.7 {
+                            WeatherType::HeavyRain
+                        } else {
+                            WeatherType::ModerateRain
+                        }
+                    }
+                    WeatherType::ModerateRain => {
+                        // 60% chance to stay ModerateRain, 40% to become LightRain
+                        if rng.gen::<f32>() < 0.6 {
+                            WeatherType::ModerateRain
+                        } else {
+                            WeatherType::LightRain
+                        }
+                    }
+                    _ => source_weather.clone(), // LightRain propagates as-is
+                };
+                
+                nearby_weather.current_weather = propagated_weather.clone();
+                nearby_weather.rain_intensity = match propagated_weather {
+                    WeatherType::Clear => 0.0,
+                    WeatherType::LightRain => rng.gen_range(0.2..=0.4),
+                    WeatherType::ModerateRain => rng.gen_range(0.5..=0.7),
+                    WeatherType::HeavyRain => rng.gen_range(0.8..=1.0),
+                    WeatherType::HeavyStorm => 1.0,
+                };
+                nearby_weather.weather_start_time = Some(ctx.timestamp);
+                nearby_weather.weather_duration = Some(rng.gen_range(MIN_RAIN_DURATION_SECONDS..=MAX_RAIN_DURATION_SECONDS));
+                nearby_weather.last_update = ctx.timestamp;
+                
+                // Thunder/lightning disabled for now
+                // TODO: Re-enable thunder system after debugging
+                
+                ctx.db.chunk_weather().chunk_index().update(nearby_weather);
+                
+                log::debug!("Weather propagated from chunk {} to chunk {}: {:?}", 
+                           source_chunk_index, nearby_index, propagated_weather);
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+/// Gets weather for a specific chunk (public API)
+pub fn get_weather_for_chunk(ctx: &ReducerContext, chunk_index: u32) -> ChunkWeather {
+    get_or_create_chunk_weather(ctx, chunk_index)
+}
+
+/// Gets weather for a position (convenience function)
+pub fn get_weather_for_position(ctx: &ReducerContext, pos_x: f32, pos_y: f32) -> ChunkWeather {
+    let chunk_index = calculate_chunk_index(pos_x, pos_y);
+    get_weather_for_chunk(ctx, chunk_index)
 }
 
 // Debug reducer to manually set weather (only for testing)
@@ -217,14 +509,8 @@ pub fn debug_set_weather(ctx: &ReducerContext, weather_type_str: String) -> Resu
     }
     
     // Handle HeavyStorm-specific setup (thunder scheduling)
-    if weather_type == WeatherType::HeavyStorm {
-        // Schedule first thunder for Heavy Storm
-        let mut updated_world_state = world_state.clone();
-        let first_thunder_delay = rng.gen_range(5.0..=15.0); // 5-15 seconds
-        updated_world_state.next_thunder_time = Some(now + spacetimedb::TimeDuration::from_micros((first_thunder_delay * 1_000_000.0) as i64));
-        ctx.db.world_state().id().update(updated_world_state);
-        log::info!("Heavy Storm started with thunder scheduled in {:.1} seconds", first_thunder_delay);
-    }
+    // Thunder/lightning disabled for now
+    // TODO: Re-enable thunder system after debugging
     
     // 🌧️ Start continuous rain sounds based on weather type
     if matches!(weather_type, WeatherType::HeavyRain | WeatherType::HeavyStorm) {
@@ -239,6 +525,33 @@ pub fn debug_set_weather(ctx: &ReducerContext, weather_type_str: String) -> Resu
         } else {
             log::info!("🌦️ Started normal rain sound for debug weather change: {:?}", weather_type);
         }
+    }
+    
+    // Also update chunk weather for the caller's current chunk (if they're a player)
+    // This ensures the debug weather shows up in the chunk-based system
+    if let Some(player) = ctx.db.player().identity().find(&ctx.sender) {
+        let chunk_index = calculate_chunk_index(player.position_x, player.position_y);
+        let mut chunk_weather = get_or_create_chunk_weather(ctx, chunk_index);
+        
+        chunk_weather.current_weather = weather_type.clone();
+        chunk_weather.rain_intensity = match weather_type {
+            WeatherType::Clear => 0.0,
+            WeatherType::LightRain => 0.3,
+            WeatherType::ModerateRain => 0.6,
+            WeatherType::HeavyRain => 0.9,
+            WeatherType::HeavyStorm => 1.0,
+        };
+        chunk_weather.weather_start_time = Some(now);
+        chunk_weather.weather_duration = Some(600.0); // 10 minutes
+        chunk_weather.last_update = now;
+        
+        // Thunder/lightning disabled for now
+        // TODO: Re-enable thunder system after debugging
+        chunk_weather.next_thunder_time = None;
+        chunk_weather.last_thunder_time = None;
+        
+        ctx.db.chunk_weather().chunk_index().update(chunk_weather);
+        log::info!("Debug: Chunk {} weather set to {:?} (player position: {:.1}, {:.1})", chunk_index, weather_type, player.position_x, player.position_y);
     }
     
     log::info!("Debug: Weather manually set to {:?}", weather_type);
@@ -382,8 +695,8 @@ pub fn tick_world_state(ctx: &ReducerContext, _timestamp: Timestamp) -> Result<(
         // Pass a clone to update
         ctx.db.world_state().id().update(world_state.clone());
         
-        // Update weather after updating time
-        update_weather(ctx, &mut world_state, elapsed_seconds)?;
+        // Update chunk-based weather after updating time
+        update_chunk_weather_system(ctx, &world_state, elapsed_seconds)?;
         
         // log::debug!("World tick: Progress {:.2}, Time: {:?}, Cycle: {}, Full Moon: {}, Season: {:?} (Day {} of Year {}), Weather: {:?}", 
         //            new_progress, world_state.time_of_day, new_cycle_count, new_is_full_moon, 
@@ -405,15 +718,132 @@ fn calculate_season(day_of_year: u32) -> Season {
     }
 }
 
-/// Updates weather patterns based on realistic probability and timing
-fn update_weather(ctx: &ReducerContext, world_state: &mut WorldState, elapsed_seconds: f32) -> Result<(), String> {
+/// Updates chunk-based weather system - processes weather for all chunks
+/// Only processes a subset of chunks per tick for performance (staggered updates)
+fn update_chunk_weather_system(ctx: &ReducerContext, world_state: &WorldState, elapsed_seconds: f32) -> Result<(), String> {
     let now = ctx.timestamp;
     let mut rng = ctx.rng();
     
-    match world_state.current_weather {
+    // Process a random subset of chunks each tick (for performance)
+    // This creates natural variation while keeping updates manageable
+    
+    let chunk_weather_table = ctx.db.chunk_weather();
+    let all_chunk_weather: Vec<ChunkWeather> = chunk_weather_table.iter().collect();
+    
+    // If no chunks have weather yet, initialize weather for multiple random chunks to seed the system
+    // This creates multiple weather fronts across the map for more variation
+    if all_chunk_weather.is_empty() {
+        // Initialize weather for multiple random chunks scattered across the map
+        // Use ~1% of total chunks to seed weather fronts (but cap at reasonable number)
+        let total_chunks = WORLD_WIDTH_CHUNKS * WORLD_HEIGHT_CHUNKS;
+        let chunks_to_init = (total_chunks / 100).max(20).min(100); // 1% of chunks, min 20, max 100
+        
+        for _ in 0..chunks_to_init {
+            let chunk_x = rng.gen_range(0..WORLD_WIDTH_CHUNKS);
+            let chunk_y = rng.gen_range(0..WORLD_HEIGHT_CHUNKS);
+            let chunk_index = chunk_y * WORLD_WIDTH_CHUNKS + chunk_x;
+            let mut chunk_weather = get_or_create_chunk_weather(ctx, chunk_index);
+            
+            // Start with rain in some chunks (20% chance) to create immediate variation
+            // This gives ~20% rain coverage at game start, which will naturally evolve
+            if rng.gen::<f32>() < 0.2 {
+                let rain_type = match rng.gen::<f32>() {
+                    x if x < 0.60 => WeatherType::LightRain,      // 60% of rain is light
+                    x if x < 0.85 => WeatherType::ModerateRain,   // 25% moderate
+                    x if x < 0.98 => WeatherType::HeavyRain,      // 13% heavy
+                    _ => WeatherType::HeavyStorm,                 // 2% storm
+                };
+                
+                chunk_weather.current_weather = rain_type.clone();
+                chunk_weather.rain_intensity = match rain_type {
+                    WeatherType::LightRain => rng.gen_range(0.2..=0.4),
+                    WeatherType::ModerateRain => rng.gen_range(0.5..=0.7),
+                    WeatherType::HeavyRain => rng.gen_range(0.8..=1.0),
+                    WeatherType::HeavyStorm => 1.0,
+                    _ => 0.0,
+                };
+                chunk_weather.weather_start_time = Some(now);
+                chunk_weather.weather_duration = Some(rng.gen_range(MIN_RAIN_DURATION_SECONDS..=MAX_RAIN_DURATION_SECONDS));
+                chunk_weather.last_update = now;
+                
+                ctx.db.chunk_weather().chunk_index().update(chunk_weather);
+            }
+        }
+        
+        log::info!("Initialized weather system with {} seed chunks", chunks_to_init);
+    }
+    
+    // Ensure chunks with players in them are initialized (so players always see weather)
+    let mut player_chunks_set = std::collections::HashSet::new();
+    for player in ctx.db.player().iter() {
+        let chunk_index = calculate_chunk_index(player.position_x, player.position_y);
+        player_chunks_set.insert(chunk_index);
+        
+        // Initialize chunk weather if it doesn't exist yet
+        if chunk_weather_table.chunk_index().find(&chunk_index).is_none() {
+            get_or_create_chunk_weather(ctx, chunk_index);
+        }
+    }
+    
+    // Refresh all_chunk_weather after initializing player chunks
+    let all_chunk_weather: Vec<ChunkWeather> = chunk_weather_table.iter().collect();
+    
+    // Select chunks to update this tick (random sampling)
+    // Prioritize chunks with players in them, then randomly sample others
+    let mut chunks_to_update: Vec<u32> = Vec::new();
+    
+    // First, add player chunks (up to half of CHUNKS_PER_UPDATE)
+    let player_chunks_vec: Vec<u32> = player_chunks_set.into_iter().collect();
+    let player_chunks_to_update = player_chunks_vec.len().min(CHUNKS_PER_UPDATE / 2);
+    chunks_to_update.extend(player_chunks_vec.into_iter().take(player_chunks_to_update));
+    
+    // Then add random chunks to fill the rest
+    if all_chunk_weather.len() <= CHUNKS_PER_UPDATE - chunks_to_update.len() {
+        // Add all remaining chunks
+        let existing_indices: Vec<u32> = all_chunk_weather.iter()
+            .map(|cw| cw.chunk_index)
+            .filter(|idx| !chunks_to_update.contains(idx))
+            .collect();
+        chunks_to_update.extend(existing_indices);
+    } else {
+        // Randomly sample remaining chunks
+        use rand::seq::SliceRandom;
+        let mut indices: Vec<u32> = all_chunk_weather.iter()
+            .map(|cw| cw.chunk_index)
+            .filter(|idx| !chunks_to_update.contains(idx))
+            .collect();
+        indices.shuffle(&mut rng);
+        let remaining_slots = CHUNKS_PER_UPDATE - chunks_to_update.len();
+        chunks_to_update.extend(indices.into_iter().take(remaining_slots));
+    }
+    
+    // Update each selected chunk
+    for chunk_index in chunks_to_update {
+        if let Some(mut chunk_weather) = chunk_weather_table.chunk_index().find(&chunk_index) {
+            update_single_chunk_weather(ctx, &mut chunk_weather, world_state, elapsed_seconds, &mut rng)?;
+            
+            // Propagate weather to nearby chunks
+            propagate_weather_to_nearby_chunks(ctx, chunk_index, &chunk_weather.current_weather, &mut rng)?;
+        }
+    }
+    
+    Ok(())
+}
+
+/// Updates weather for a single chunk
+fn update_single_chunk_weather(
+    ctx: &ReducerContext,
+    chunk_weather: &mut ChunkWeather,
+    world_state: &WorldState,
+    elapsed_seconds: f32,
+    rng: &mut impl Rng,
+) -> Result<(), String> {
+    let now = ctx.timestamp;
+    
+    match chunk_weather.current_weather {
         WeatherType::Clear => {
             // Check if we should start rain
-            let should_check_rain = if let Some(last_rain_end) = world_state.last_rain_end_time {
+            let should_check_rain = if let Some(last_rain_end) = chunk_weather.last_rain_end_time {
                 let time_since_last_rain = (now.to_micros_since_unix_epoch() - last_rain_end.to_micros_since_unix_epoch()) as f32 / 1_000_000.0;
                 time_since_last_rain >= MIN_TIME_BETWEEN_RAIN_CYCLES
             } else {
@@ -435,12 +865,12 @@ fn update_weather(ctx: &ReducerContext, world_state: &mut WorldState, elapsed_se
                 let rain_probability = RAIN_PROBABILITY_BASE * time_modifier * seasonal_modifier * elapsed_seconds / FULL_CYCLE_DURATION_SECONDS;
                 
                 if rng.gen::<f32>() < rain_probability {
-                    // Start rain!
+                    // Start rain! Distribution favors lighter rain (realistic for Aleutian islands)
                     let rain_type = match rng.gen::<f32>() {
-                        x if x < 0.4 => WeatherType::LightRain,
-                        x if x < 0.7 => WeatherType::ModerateRain,
-                        x if x < 0.95 => WeatherType::HeavyRain,
-                        _ => WeatherType::HeavyStorm, // 5% chance for heavy storm
+                        x if x < 0.50 => WeatherType::LightRain,      // 50% - most common
+                        x if x < 0.80 => WeatherType::ModerateRain,   // 30% - fairly common
+                        x if x < 0.97 => WeatherType::HeavyRain,      // 17% - occasional
+                        _ => WeatherType::HeavyStorm,                 // 3% - rare and dramatic
                     };
                     
                     let rain_duration = rng.gen_range(MIN_RAIN_DURATION_SECONDS..=MAX_RAIN_DURATION_SECONDS);
@@ -452,123 +882,113 @@ fn update_weather(ctx: &ReducerContext, world_state: &mut WorldState, elapsed_se
                         _ => 0.0,
                     };
                     
-                    world_state.current_weather = rain_type.clone();
-                    world_state.rain_intensity = rain_intensity;
-                    world_state.weather_start_time = Some(now);
-                    world_state.weather_duration = Some(rain_duration);
+                    chunk_weather.current_weather = rain_type.clone();
+                    chunk_weather.rain_intensity = rain_intensity;
+                    chunk_weather.weather_start_time = Some(now);
+                    chunk_weather.weather_duration = Some(rain_duration);
+                    chunk_weather.last_update = now;
                     
-                    // Schedule first thunder for Heavy Storm
-                    if rain_type == WeatherType::HeavyStorm {
-                        let first_thunder_delay = rng.gen_range(5.0..=15.0); // 5-15 seconds (reduced from 10-30)
-                        world_state.next_thunder_time = Some(now + spacetimedb::TimeDuration::from_micros((first_thunder_delay * 1_000_000.0) as i64));
-                        log::info!("Heavy Storm started with thunder scheduled in {:.1} seconds", first_thunder_delay);
-                    }
+                    // Thunder/lightning disabled for now
+                    // TODO: Re-enable thunder system after debugging
                     
-                    // 🌧️ Start continuous rain sounds based on rain type
+                    // Extinguish unprotected campfires in this chunk during heavy rain/storms
                     if matches!(rain_type, WeatherType::HeavyRain | WeatherType::HeavyStorm) {
-                        if let Err(e) = sound_events::start_heavy_storm_rain_sound(ctx) {
-                            log::error!("Failed to start heavy rain sound: {}", e);
-                        } else {
-                            log::info!("🌧️ Started heavy rain sound for {:?}", rain_type);
-                        }
-                    } else if matches!(rain_type, WeatherType::LightRain | WeatherType::ModerateRain) {
-                        if let Err(e) = sound_events::start_normal_rain_sound(ctx) {
-                            log::error!("Failed to start normal rain sound: {}", e);
-                        } else {
-                            log::info!("🌦️ Started normal rain sound for {:?}", rain_type);
-                        }
+                        extinguish_campfires_in_chunk(ctx, chunk_weather.chunk_index, &rain_type)?;
                     }
                     
-                    log::info!("Rain started: {:?} with intensity {:.2} for {:.1} seconds", 
-                              world_state.current_weather, rain_intensity, rain_duration);
-                    
-                    // Extinguish unprotected campfires only during heavy rain/storms
-                    if matches!(rain_type, WeatherType::HeavyRain | WeatherType::HeavyStorm) {
-                        extinguish_unprotected_campfires(ctx, &rain_type)?;
-                    }
-                    
-                    // Start rain collection for all rain collectors
-                    if let Err(e) = crate::rain_collector::update_rain_collectors(ctx, &rain_type, elapsed_seconds) {
-                        log::error!("Failed to update rain collectors: {}", e);
-                    }
+                    // Update the chunk weather
+                    ctx.db.chunk_weather().chunk_index().update(chunk_weather.clone());
                 }
             }
         },
         WeatherType::LightRain | WeatherType::ModerateRain | WeatherType::HeavyRain | WeatherType::HeavyStorm => {
             // Check if rain should end
-            if let (Some(start_time), Some(duration)) = (world_state.weather_start_time, world_state.weather_duration) {
+            if let (Some(start_time), Some(duration)) = (chunk_weather.weather_start_time, chunk_weather.weather_duration) {
                 let rain_elapsed = (now.to_micros_since_unix_epoch() - start_time.to_micros_since_unix_epoch()) as f32 / 1_000_000.0;
                 
                 if rain_elapsed >= duration {
-                    // 🌧️ Stop rain sounds based on current weather type (check before changing weather)
-                    if matches!(world_state.current_weather, WeatherType::HeavyRain | WeatherType::HeavyStorm) {
-                        sound_events::stop_heavy_storm_rain_sound(ctx);
-                    } else if matches!(world_state.current_weather, WeatherType::LightRain | WeatherType::ModerateRain) {
-                        sound_events::stop_normal_rain_sound(ctx);
-                    }
-                    
                     // End rain
-                    world_state.current_weather = WeatherType::Clear;
-                    world_state.rain_intensity = 0.0;
-                    world_state.weather_start_time = None;
-                    world_state.weather_duration = None;
-                    world_state.last_rain_end_time = Some(now);
-                    // Clear thunder scheduling
-                    world_state.last_thunder_time = None;
-                    world_state.next_thunder_time = None;
+                    chunk_weather.current_weather = WeatherType::Clear;
+                    chunk_weather.rain_intensity = 0.0;
+                    chunk_weather.weather_start_time = None;
+                    chunk_weather.weather_duration = None;
+                    chunk_weather.last_rain_end_time = Some(now);
+                    chunk_weather.last_thunder_time = None;
+                    chunk_weather.next_thunder_time = None;
+                    chunk_weather.last_update = now;
                     
-                    log::info!("Rain ended after {:.1} seconds", rain_elapsed);
+                    ctx.db.chunk_weather().chunk_index().update(chunk_weather.clone());
                 } else {
-                    // Process thunder for Heavy Storm
-                    if world_state.current_weather == WeatherType::HeavyStorm {
-                        if let Some(next_thunder) = world_state.next_thunder_time {
-                            if now.to_micros_since_unix_epoch() >= next_thunder.to_micros_since_unix_epoch() {
-                                // Thunder occurs! Schedule next one
-                                world_state.last_thunder_time = Some(now);
-                                let next_thunder_delay = rng.gen_range(8.0..=25.0); // 8-25 seconds between thunder (reduced from 15-60)
-                                world_state.next_thunder_time = Some(now + spacetimedb::TimeDuration::from_micros((next_thunder_delay * 1_000_000.0) as i64));
-                                
-                                // Create thunder event for client (visual flash only)
-                                let thunder_intensity = rng.gen_range(0.5..=1.0);
-                                let thunder_event = ThunderEvent {
-                                    id: 0, // Auto-incremented
-                                    intensity: thunder_intensity,
-                                    timestamp: now,
-                                };
-                                
-                                if let Err(e) = ctx.db.thunder_event().try_insert(thunder_event) {
-                                    log::error!("Failed to create thunder event: {}", e);
-                                } else {
-                                    log::info!("⚡ THUNDER! Intensity {:.2}, Next thunder in {:.1} seconds", thunder_intensity, next_thunder_delay);
-                                }
-                                
-                                // Lightning sound removed - too aggressive for gameplay
-                            }
-                        }
-                    }
-                    
-                    // Continue rain collection for all rain collectors
-                    if let Err(e) = crate::rain_collector::update_rain_collectors(ctx, &world_state.current_weather, elapsed_seconds) {
-                        log::error!("Failed to update rain collectors during rain: {}", e);
-                    }
+                    // Thunder/lightning disabled for now
+                    // TODO: Re-enable thunder system after debugging
                     
                     // Optionally vary intensity slightly during rain
                     let intensity_variation = (rain_elapsed * 0.1).sin() * 0.1;
-                    let base_intensity = match world_state.current_weather {
+                    let base_intensity = match chunk_weather.current_weather {
                         WeatherType::LightRain => 0.3,
                         WeatherType::ModerateRain => 0.6,
                         WeatherType::HeavyRain => 0.9,
-                        WeatherType::HeavyStorm => 1.0, // Maximum intensity
+                        WeatherType::HeavyStorm => 1.0,
                         _ => 0.0,
                     };
-                    world_state.rain_intensity = (base_intensity + intensity_variation).max(0.1).min(1.0);
+                    chunk_weather.rain_intensity = (base_intensity + intensity_variation).max(0.1).min(1.0);
+                    chunk_weather.last_update = now;
+                    
+                    ctx.db.chunk_weather().chunk_index().update(chunk_weather.clone());
                 }
             }
         },
     }
     
-    // Update the world state with new weather
-    ctx.db.world_state().id().update(world_state.clone());
+    Ok(())
+}
+
+/// Extinguishes campfires in a specific chunk during heavy weather
+fn extinguish_campfires_in_chunk(ctx: &ReducerContext, chunk_index: u32, weather_type: &WeatherType) -> Result<(), String> {
+    let mut extinguished_count = 0;
+    
+    // Get chunk bounds
+    let chunk_x = (chunk_index % WORLD_WIDTH_CHUNKS) as i32;
+    let chunk_y = (chunk_index / WORLD_WIDTH_CHUNKS) as i32;
+    let chunk_min_x = (chunk_x as f32) * crate::environment::CHUNK_SIZE_PX;
+    let chunk_max_x = ((chunk_x + 1) as f32) * crate::environment::CHUNK_SIZE_PX;
+    let chunk_min_y = (chunk_y as f32) * crate::environment::CHUNK_SIZE_PX;
+    let chunk_max_y = ((chunk_y + 1) as f32) * crate::environment::CHUNK_SIZE_PX;
+    
+    for mut campfire in ctx.db.campfire().iter() {
+        if !campfire.is_burning || campfire.is_destroyed {
+            continue;
+        }
+        
+        // Check if campfire is in this chunk
+        if campfire.pos_x < chunk_min_x || campfire.pos_x >= chunk_max_x ||
+           campfire.pos_y < chunk_min_y || campfire.pos_y >= chunk_max_y {
+            continue;
+        }
+        
+        // Check if campfire is protected
+        let is_shelter_protected = is_campfire_inside_shelter(ctx, &campfire);
+        let is_tree_protected = is_campfire_near_tree(ctx, &campfire);
+        let is_protected = is_shelter_protected || is_tree_protected;
+        
+        if !is_protected {
+            // Extinguish the campfire
+            campfire.is_burning = false;
+            campfire.current_fuel_def_id = None;
+            campfire.remaining_fuel_burn_time_secs = None;
+            
+            crate::sound_events::stop_campfire_sound(ctx, campfire.id as u64);
+            ctx.db.campfire().id().update(campfire.clone());
+            ctx.db.campfire_processing_schedule().campfire_id().delete(campfire.id as u64);
+            
+            extinguished_count += 1;
+        }
+    }
+    
+    if extinguished_count > 0 {
+        log::debug!("{:?} extinguished {} unprotected campfires in chunk {}", weather_type, extinguished_count, chunk_index);
+    }
+    
     Ok(())
 }
 
@@ -586,24 +1006,19 @@ pub fn get_light_intensity(progress: f32) -> f32 {
     intensity.max(0.0).min(1.0) // Clamp just in case
 }
 
-/// Gets the current rain warmth drain modifier based on weather type and player position
+/// Gets the current rain warmth drain modifier based on chunk weather and player position
 /// This should be ADDED to the base warmth drain (stacks with time-of-day multipliers)
 /// Returns 0.0 if player is protected by tree cover (within 100px of any tree)
 pub fn get_rain_warmth_drain_modifier(ctx: &ReducerContext, player_x: f32, player_y: f32) -> f32 {
     use crate::player;
-    let world_state = match ctx.db.world_state().iter().next() {
-        Some(state) => state,
-        None => {
-            log::warn!("No WorldState found for rain warmth drain calculation");
-            return 0.0; // No world state, no rain effect
-        }
-    };
     
-    log::info!("Current weather: {:?}, rain intensity: {:.2}", world_state.current_weather, world_state.rain_intensity);
+    // Get weather for the player's current chunk
+    let chunk_weather = get_weather_for_position(ctx, player_x, player_y);
+    
+    log::debug!("Chunk {} weather: {:?}, rain intensity: {:.2}", chunk_weather.chunk_index, chunk_weather.current_weather, chunk_weather.rain_intensity);
     
     // If it's clear weather, no rain effect
-    if world_state.current_weather == WeatherType::Clear {
-        log::info!("Clear weather, no rain warmth drain");
+    if chunk_weather.current_weather == WeatherType::Clear {
         return 0.0;
     }
     
@@ -619,18 +1034,14 @@ pub fn get_rain_warmth_drain_modifier(ctx: &ReducerContext, player_x: f32, playe
     
     if let Some(player_id) = player_id_opt {
         let has_tree_cover = crate::active_effects::player_has_tree_cover_effect(ctx, player_id);
-        log::info!("Player at ({:.1}, {:.1}) has tree cover effect: {}", player_x, player_y, has_tree_cover);
         
         if has_tree_cover {
-            log::info!("Player protected by tree cover, no rain warmth drain");
             return 0.0; // Protected by tree cover, no rain warmth drain
         }
-    } else {
-        log::warn!("Could not find player at position ({:.1}, {:.1}) for tree cover check", player_x, player_y);
     }
     
-    // Apply rain warmth drain based on weather intensity
-    let drain_amount = match world_state.current_weather {
+    // Apply rain warmth drain based on chunk weather intensity
+    let drain_amount = match chunk_weather.current_weather {
         WeatherType::Clear => 0.0,
         WeatherType::LightRain => WARMTH_DRAIN_RAIN_LIGHT,
         WeatherType::ModerateRain => WARMTH_DRAIN_RAIN_MODERATE,
@@ -638,12 +1049,15 @@ pub fn get_rain_warmth_drain_modifier(ctx: &ReducerContext, player_x: f32, playe
         WeatherType::HeavyStorm => WARMTH_DRAIN_RAIN_STORM,
     };
     
-    log::info!("Rain warmth drain calculated: {:.2} for weather {:?}", drain_amount, world_state.current_weather);
     drain_amount
 }
 
 /// Extinguishes all campfires that are not protected by shelters or trees during heavy rain/storms
+/// NOTE: This function is now deprecated in favor of chunk-based extinguishing
+/// Kept for backward compatibility with debug_set_weather
 fn extinguish_unprotected_campfires(ctx: &ReducerContext, weather_type: &WeatherType) -> Result<(), String> {
+    // For global weather changes (debug), extinguish campfires in all chunks with heavy weather
+    // In practice, chunk-based weather handles this automatically
     let mut extinguished_count = 0;
     
     for mut campfire in ctx.db.campfire().iter() {
@@ -651,7 +1065,15 @@ fn extinguish_unprotected_campfires(ctx: &ReducerContext, weather_type: &Weather
             continue;
         }
         
-        // Check if campfire is protected by being inside a shelter or near a tree
+        // Get weather for this campfire's chunk
+        let chunk_weather = get_weather_for_position(ctx, campfire.pos_x, campfire.pos_y);
+        
+        // Only extinguish if this chunk has heavy weather
+        if !matches!(chunk_weather.current_weather, WeatherType::HeavyRain | WeatherType::HeavyStorm) {
+            continue;
+        }
+        
+        // Check if campfire is protected
         let is_shelter_protected = is_campfire_inside_shelter(ctx, &campfire);
         let is_tree_protected = is_campfire_near_tree(ctx, &campfire);
         let is_protected = is_shelter_protected || is_tree_protected;
@@ -662,34 +1084,16 @@ fn extinguish_unprotected_campfires(ctx: &ReducerContext, weather_type: &Weather
             campfire.current_fuel_def_id = None;
             campfire.remaining_fuel_burn_time_secs = None;
             
-            // 🔊 Stop campfire looping sound when extinguished by rain
             crate::sound_events::stop_campfire_sound(ctx, campfire.id as u64);
-            
-            // Update the campfire in the database
             ctx.db.campfire().id().update(campfire.clone());
-            
-            // Cancel any scheduled processing for this campfire
             ctx.db.campfire_processing_schedule().campfire_id().delete(campfire.id as u64);
             
             extinguished_count += 1;
-            log::info!("{:?} extinguished unprotected campfire {} at ({:.1}, {:.1})", 
-                      weather_type, campfire.id, campfire.pos_x, campfire.pos_y);
-        } else {
-            if is_shelter_protected {
-                log::debug!("Campfire {} is protected from {:?} by shelter", campfire.id, weather_type);
-            }
-            if is_tree_protected {
-                log::debug!("Campfire {} is protected from {:?} by nearby tree", campfire.id, weather_type);
-            }
         }
     }
     
     if extinguished_count > 0 {
         log::info!("{:?} extinguished {} unprotected campfires", weather_type, extinguished_count);
-    } else {
-        log::info!("{:?} started, but all {} campfires are either protected or already out", 
-                  weather_type, 
-                  ctx.db.campfire().iter().filter(|c| c.is_burning && !c.is_destroyed).count());
     }
     
     Ok(())

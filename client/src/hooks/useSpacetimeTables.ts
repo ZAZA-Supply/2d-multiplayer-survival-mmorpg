@@ -138,6 +138,7 @@ export interface SpacetimeTableStates {
     seaStacks: Map<string, SpacetimeDB.SeaStack>; // ADDED sea stacks
     foundationCells: Map<string, SpacetimeDB.FoundationCell>; // ADDED: Building foundations
     wallCells: Map<string, SpacetimeDB.WallCell>; // ADDED: Building walls
+    chunkWeather: Map<string, any>; // ADDED: Chunk-based weather (types will be generated after server build)
 }   
 
 // Define the props the hook accepts
@@ -205,6 +206,7 @@ export const useSpacetimeTables = ({
     const [seaStacks, setSeaStacks] = useState<Map<string, SpacetimeDB.SeaStack>>(() => new Map()); // ADDED sea stacks
     const [foundationCells, setFoundationCells] = useState<Map<string, SpacetimeDB.FoundationCell>>(() => new Map()); // ADDED: Building foundations
     const [wallCells, setWallCells] = useState<Map<string, SpacetimeDB.WallCell>>(() => new Map()); // ADDED: Building walls
+    const [chunkWeather, setChunkWeather] = useState<Map<string, any>>(() => new Map()); // ADDED: Chunk-based weather
 
 
 
@@ -1239,6 +1241,17 @@ export const useSpacetimeTables = ({
                 setWallCells(prev => { const newMap = new Map(prev); newMap.delete(wall.id.toString()); return newMap; });
             };
 
+            // --- Chunk Weather handlers - NON-SPATIAL (subscribe to all chunks) ---
+            const handleChunkWeatherInsert = (ctx: any, weather: any) => {
+                setChunkWeather(prev => new Map(prev).set(weather.chunkIndex.toString(), weather));
+            };
+            const handleChunkWeatherUpdate = (ctx: any, oldWeather: any, newWeather: any) => {
+                setChunkWeather(prev => new Map(prev).set(newWeather.chunkIndex.toString(), newWeather));
+            };
+            const handleChunkWeatherDelete = (ctx: any, weather: any) => {
+                setChunkWeather(prev => { const newMap = new Map(prev); newMap.delete(weather.chunkIndex.toString()); return newMap; });
+            };
+
             // --- Register Callbacks ---
             connection.db.player.onInsert(handlePlayerInsert); connection.db.player.onUpdate(handlePlayerUpdate); connection.db.player.onDelete(handlePlayerDelete);
             connection.db.tree.onInsert(handleTreeInsert); connection.db.tree.onUpdate(handleTreeUpdate); connection.db.tree.onDelete(handleTreeDelete);
@@ -1388,6 +1401,11 @@ export const useSpacetimeTables = ({
             connection.db.wallCell.onUpdate(handleWallCellUpdate);
             connection.db.wallCell.onDelete(handleWallCellDelete);
 
+            // Register ChunkWeather callbacks - NON-SPATIAL
+            connection.db.chunkWeather.onInsert(handleChunkWeatherInsert);
+            connection.db.chunkWeather.onUpdate(handleChunkWeatherUpdate);
+            connection.db.chunkWeather.onDelete(handleChunkWeatherDelete);
+
 
 
             isSubscribingRef.current = true;
@@ -1493,6 +1511,10 @@ export const useSpacetimeTables = ({
                   connection.subscriptionBuilder()
                      .onError((err) => console.error("[WILD_ANIMAL Sub Error]:", err))
                      .subscribe('SELECT * FROM wild_animal'),
+                  // ADDED ChunkWeather subscription - NON-SPATIAL (subscribe to all chunks for weather)
+                  connection.subscriptionBuilder()
+                     .onError((err) => console.error("[CHUNK_WEATHER Sub Error]:", err))
+                     .subscribe('SELECT * FROM chunk_weather'),
             ];
             // console.log("[useSpacetimeTables] currentInitialSubs content:", currentInitialSubs); // ADDED LOG
             nonSpatialHandlesRef.current = currentInitialSubs;
@@ -1731,6 +1753,7 @@ export const useSpacetimeTables = ({
                  setViperSpittles(new Map());
                  setAnimalCorpses(new Map());
                  setSeaStacks(new Map());
+                 setChunkWeather(new Map());
              }
         };
 
@@ -1788,5 +1811,6 @@ export const useSpacetimeTables = ({
         foundationCells, // ADDED: Building foundations
         wallCells, // ADDED: Building walls
         runeStones, // ADDED: Rune stones
+        chunkWeather, // ADDED: Chunk-based weather
     };
 }; 

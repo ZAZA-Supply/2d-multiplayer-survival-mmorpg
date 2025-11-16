@@ -341,10 +341,79 @@ const InventoryUI: React.FC<InventoryUIProps> = ({
                 stats.push({ label: 'Bleed', value: `${def.bleedDamagePerTick}/tick for ${def.bleedDurationSeconds}s` });
             }
 
-            // Armor Stats
+            // Armor Stats - New System
+            if (def.armorResistances) {
+                const resistances = def.armorResistances;
+                
+                // Show melee resistance (most common)
+                if (resistances.meleeResistance !== undefined && resistances.meleeResistance !== 0) {
+                    stats.push({ 
+                        label: 'Melee Defense', 
+                        value: formatStatDisplay(resistances.meleeResistance * 100, true),
+                        color: resistances.meleeResistance > 0 ? '#d4af37' : '#d9534f'
+                    });
+                }
+                
+                // Show projectile resistance
+                if (resistances.projectileResistance !== undefined && resistances.projectileResistance !== 0) {
+                    stats.push({ 
+                        label: 'Projectile Defense', 
+                        value: formatStatDisplay(resistances.projectileResistance * 100, true),
+                        color: resistances.projectileResistance > 0 ? '#d4af37' : '#d9534f'
+                    });
+                }
+                
+                // Show slash resistance
+                if (resistances.slashResistance !== undefined && resistances.slashResistance !== 0) {
+                    stats.push({ 
+                        label: 'Slash Defense', 
+                        value: formatStatDisplay(resistances.slashResistance * 100, true),
+                        color: resistances.slashResistance > 0 ? '#d4af37' : '#d9534f'
+                    });
+                }
+                
+                // Show pierce resistance
+                if (resistances.pierceResistance !== undefined && resistances.pierceResistance !== 0) {
+                    stats.push({ 
+                        label: 'Pierce Defense', 
+                        value: formatStatDisplay(resistances.pierceResistance * 100, true),
+                        color: resistances.pierceResistance > 0 ? '#d4af37' : '#d9534f'
+                    });
+                }
+                
+                // Show blunt resistance
+                if (resistances.bluntResistance !== undefined && resistances.bluntResistance !== 0) {
+                    stats.push({ 
+                        label: 'Blunt Defense', 
+                        value: formatStatDisplay(resistances.bluntResistance * 100, true),
+                        color: resistances.bluntResistance > 0 ? '#d4af37' : '#d9534f'
+                    });
+                }
+                
+                // Show fire resistance (can be negative for vulnerability)
+                if (resistances.fireResistance !== undefined && resistances.fireResistance !== 0) {
+                    stats.push({ 
+                        label: 'Fire Resistance', 
+                        value: formatStatDisplay(resistances.fireResistance * 100, true),
+                        color: resistances.fireResistance > 0 ? '#ff6b35' : '#d9534f'
+                    });
+                }
+                
+                // Show cold resistance
+                if (resistances.coldResistance !== undefined && resistances.coldResistance !== 0) {
+                    stats.push({ 
+                        label: 'Cold Resistance', 
+                        value: formatStatDisplay(resistances.coldResistance * 100, true),
+                        color: resistances.coldResistance > 0 ? '#5bc0de' : '#d9534f'
+                    });
+                }
+            }
+            
+            // Legacy armor stat (fallback for old items)
             if (def.damageResistance !== undefined && def.damageResistance > 0) {
                 stats.push({ label: 'Defense', value: formatStatDisplay(def.damageResistance * 100, true) });
             }
+            
             if (def.warmthBonus !== undefined && def.warmthBonus !== 0) {
                 stats.push({ label: 'Warmth', value: formatStatDisplay(def.warmthBonus), color: def.warmthBonus > 0 ? '#f0ad4e' : '#5bc0de' });
             }
@@ -588,10 +657,79 @@ const InventoryUI: React.FC<InventoryUIProps> = ({
                 stats.push({ label: 'Bleed', value: `${def.bleedDamagePerTick}/tick for ${def.bleedDurationSeconds}s` });
             }
 
-            // Armor Stats
+            // Armor Stats - New System
+            if (def.armorResistances) {
+                const resistances = def.armorResistances;
+                
+                // Show melee resistance (most common)
+                if (resistances.meleeResistance !== undefined && resistances.meleeResistance !== 0) {
+                    stats.push({ 
+                        label: 'Melee Defense', 
+                        value: formatStatDisplay(resistances.meleeResistance * 100, true),
+                        color: resistances.meleeResistance > 0 ? '#d4af37' : '#d9534f'
+                    });
+                }
+                
+                // Show projectile resistance
+                if (resistances.projectileResistance !== undefined && resistances.projectileResistance !== 0) {
+                    stats.push({ 
+                        label: 'Projectile Defense', 
+                        value: formatStatDisplay(resistances.projectileResistance * 100, true),
+                        color: resistances.projectileResistance > 0 ? '#d4af37' : '#d9534f'
+                    });
+                }
+                
+                // Show slash resistance
+                if (resistances.slashResistance !== undefined && resistances.slashResistance !== 0) {
+                    stats.push({ 
+                        label: 'Slash Defense', 
+                        value: formatStatDisplay(resistances.slashResistance * 100, true),
+                        color: resistances.slashResistance > 0 ? '#d4af37' : '#d9534f'
+                    });
+                }
+                
+                // Show pierce resistance
+                if (resistances.pierceResistance !== undefined && resistances.pierceResistance !== 0) {
+                    stats.push({ 
+                        label: 'Pierce Defense', 
+                        value: formatStatDisplay(resistances.pierceResistance * 100, true),
+                        color: resistances.pierceResistance > 0 ? '#d4af37' : '#d9534f'
+                    });
+                }
+                
+                // Show blunt resistance
+                if (resistances.bluntResistance !== undefined && resistances.bluntResistance !== 0) {
+                    stats.push({ 
+                        label: 'Blunt Defense', 
+                        value: formatStatDisplay(resistances.bluntResistance * 100, true),
+                        color: resistances.bluntResistance > 0 ? '#d4af37' : '#d9534f'
+                    });
+                }
+                
+                // Show fire resistance (can be negative for vulnerability)
+                if (resistances.fireResistance !== undefined && resistances.fireResistance !== 0) {
+                    stats.push({ 
+                        label: 'Fire Resistance', 
+                        value: formatStatDisplay(resistances.fireResistance * 100, true),
+                        color: resistances.fireResistance > 0 ? '#ff6b35' : '#d9534f'
+                    });
+                }
+                
+                // Show cold resistance
+                if (resistances.coldResistance !== undefined && resistances.coldResistance !== 0) {
+                    stats.push({ 
+                        label: 'Cold Resistance', 
+                        value: formatStatDisplay(resistances.coldResistance * 100, true),
+                        color: resistances.coldResistance > 0 ? '#5bc0de' : '#d9534f'
+                    });
+                }
+            }
+            
+            // Legacy armor stat (fallback for old items)
             if (def.damageResistance !== undefined && def.damageResistance > 0) {
                 stats.push({ label: 'Defense', value: formatStatDisplay(def.damageResistance * 100, true) });
             }
+            
             if (def.warmthBonus !== undefined && def.warmthBonus !== 0) {
                 stats.push({ label: 'Warmth', value: formatStatDisplay(def.warmthBonus), color: def.warmthBonus > 0 ? '#f0ad4e' : '#5bc0de' });
             }

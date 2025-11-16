@@ -248,6 +248,7 @@ use crate::furnace::furnace as FurnaceTableTrait;
 use crate::lantern::lantern as LanternTableTrait;
 use crate::harvestable_resource::harvestable_resource as HarvestableResourceTableTrait;
 use crate::world_state::world_state as WorldStateTableTrait;
+use crate::world_state::thunder_event_cleanup_schedule as ThunderEventCleanupScheduleTableTrait; // <<< ADDED: Import ThunderEventCleanupSchedule table trait
 use crate::items::inventory_item as InventoryItemTableTrait;
 use crate::items::item_definition as ItemDefinitionTableTrait;
 use crate::active_equipment::active_equipment as ActiveEquipmentTableTrait;
@@ -268,6 +269,7 @@ use crate::drinking::player_drinking_cooldown as PlayerDrinkingCooldownTableTrai
 use crate::planted_seeds::planted_seed as PlantedSeedTableTrait; // <<< ADDED: Import PlantedSeed table trait
 use crate::sound_events::sound_event as SoundEventTableTrait; // <<< ADDED: Import SoundEvent table trait
 use crate::sound_events::sound_event_cleanup_schedule as SoundEventCleanupScheduleTableTrait; // <<< ADDED: Import SoundEventCleanupSchedule table trait
+// Thunder sound schedule removed - system disabled for now
 use crate::rain_collector::rain_collector as RainCollectorTableTrait; // <<< ADDED: Import RainCollector table trait
 use crate::water_patch::water_patch as WaterPatchTableTrait; // <<< ADDED: Import WaterPatch table trait
 use crate::wild_animal_npc::wild_animal as WildAnimalTableTrait; // <<< ADDED: Import WildAnimal table trait

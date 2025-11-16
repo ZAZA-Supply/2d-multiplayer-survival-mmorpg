@@ -213,6 +213,7 @@ function AppContent() {
       foundationCells, // ADDED: Building foundations
       wallCells, // ADDED: Building walls
       playerDodgeRollStates,
+      chunkWeather, // ADDED: Chunk-based weather
     } = useSpacetimeTables({ 
         connection, 
         cancelPlacement: placementActions.cancelPlacement,
@@ -917,6 +918,7 @@ function AppContent() {
                             playerDodgeRollStates={playerDodgeRollStates}
                             movementDirection={inputState.direction}
                             facingDirection={facingDirection} // ADD: Pass local facing direction for instant visual feedback
+                            chunkWeather={chunkWeather} // ADDED: Chunk-based weather
                         />
                     );
                 })()

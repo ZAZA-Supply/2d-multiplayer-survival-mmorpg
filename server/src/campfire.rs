@@ -457,8 +457,8 @@ pub fn toggle_campfire_burning(ctx: &ReducerContext, campfire_id: u32) -> Result
             return Err("Cannot light campfire, requires fuel.".to_string());
         }
         
-        // Check if it's raining heavily and campfire is not protected by shelter or tree cover
-        if is_heavy_raining(ctx) && !is_campfire_protected_from_rain(ctx, &campfire) {
+        // Check if it's raining heavily in this campfire's chunk and campfire is not protected
+        if is_campfire_in_heavy_rain(ctx, &campfire) && !is_campfire_protected_from_rain(ctx, &campfire) {
             return Err("Cannot light campfire in heavy rain unless it's inside a shelter or near a tree.".to_string());
         }
         
@@ -1447,6 +1447,9 @@ impl crate::cooking::CookableAppliance for Campfire {
 /// Checks if it's currently raining heavily enough to prevent campfire lighting
 /// Only heavy rain/storms prevent lighting, light/moderate rain should allow lighting
 fn is_heavy_raining(ctx: &ReducerContext) -> bool {
+    // DEPRECATED: This function now always returns false because we use chunk-based weather
+    // The check is now done per-campfire in is_campfire_in_heavy_rain()
+    // Kept for backward compatibility but should not be used for new code
     if let Some(world_state) = ctx.db.world_state().iter().next() {
         if world_state.rain_intensity <= 0.0 {
             return false;
@@ -1464,6 +1467,13 @@ fn is_heavy_raining(ctx: &ReducerContext) -> bool {
     } else {
         false
     }
+}
+
+/// Checks if it's raining heavily (HeavyRain or HeavyStorm) at a specific campfire's location
+/// Uses chunk-based weather system
+fn is_campfire_in_heavy_rain(ctx: &ReducerContext, campfire: &Campfire) -> bool {
+    let chunk_weather = crate::world_state::get_weather_for_position(ctx, campfire.pos_x, campfire.pos_y);
+    matches!(chunk_weather.current_weather, WeatherType::HeavyRain | WeatherType::HeavyStorm)
 }
 
 /// Checks if a campfire is protected from rain by being inside a shelter, building, or near a tree

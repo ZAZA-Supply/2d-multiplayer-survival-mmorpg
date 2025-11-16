@@ -1,19 +1,52 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { handleServerThunderEvent } from '../utils/renderers/rainRenderingUtils';
+import { calculateChunkIndex } from '../utils/chunkUtils';
 
 interface UseThunderEffectsProps {
   connection: any | null;
+  localPlayer: any | undefined;
 }
 
-export function useThunderEffects({ connection }: UseThunderEffectsProps) {
+export function useThunderEffects({ connection, localPlayer }: UseThunderEffectsProps) {
+  // Track processed thunder event IDs to prevent duplicate processing
+  const processedThunderIds = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (!connection) return;
 
     // Listen for thunder events from the server
     const handleThunderEvent = (ctx: any, thunderEvent: any) => {
-      console.log(`[Thunder] Received thunder event with intensity ${thunderEvent.intensity}`);
+      // Check if we've already processed this thunder event
+      const thunderId = thunderEvent.id?.toString();
+      if (!thunderId || processedThunderIds.current.has(thunderId)) {
+        return; // Skip already processed events
+      }
+
+      // Only trigger thunder flash if it's in the player's current chunk
+      if (!localPlayer) {
+        return;
+      }
+
+      const playerChunkIndex = calculateChunkIndex(localPlayer.positionX, localPlayer.positionY);
       
-      // Use the safe server thunder event handler
+      if (thunderEvent.chunkIndex !== playerChunkIndex) {
+        return; // Silently ignore thunder in other chunks
+      }
+
+      // Mark this thunder event as processed
+      processedThunderIds.current.add(thunderId);
+      
+      // Clean up old processed IDs (keep only last 100 to prevent memory leak)
+      if (processedThunderIds.current.size > 100) {
+        const idsArray = Array.from(processedThunderIds.current);
+        processedThunderIds.current = new Set(idsArray.slice(-50)); // Keep only last 50
+      }
+
+      console.log(`[Thunder] ⚡ Lightning flash in chunk ${playerChunkIndex}! Intensity: ${thunderEvent.intensity}`);
+      
+      // REALISTIC PHYSICS: Lightning flash happens instantly (visual effect)
+      // Thunder sound is delayed by 0.5-2.5 seconds on the server to simulate distance
+      // (Light travels ~instantly, but sound travels ~343 m/s)
       handleServerThunderEvent(thunderEvent);
     };
 
@@ -30,18 +63,14 @@ export function useThunderEffects({ connection }: UseThunderEffectsProps) {
       console.error('[Thunder] Failed to subscribe to thunder events:', error);
     }
 
-    // REMOVED: Manual test function for safety - prevents players from triggering epileptic seizures
-    // No debug commands that could be used to spam thunder flashes
-
     // Cleanup function
     return () => {
       try {
-        // Note: SpacetimeDB client doesn't have a direct unsubscribe method
-        // The subscription will be cleaned up when the connection is closed
         console.log('[Thunder] Thunder effects hook cleanup');
+        processedThunderIds.current.clear(); // Clear processed IDs on unmount
       } catch (error) {
         console.error('[Thunder] Error during thunder effects cleanup:', error);
       }
     };
-  }, [connection]);
+  }, [connection, localPlayer]);
 } 
