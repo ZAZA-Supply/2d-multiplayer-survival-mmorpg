@@ -15,6 +15,7 @@ export type SlotType =
     | 'homestead_hearth'
     | 'broth_pot'
     | 'broth_pot_water_container'
+    | 'broth_pot_output'
     | 'split'
     // Add more types as needed (e.g., 'furnace_input', 'furnace_fuel', 'crafting_output')
 
