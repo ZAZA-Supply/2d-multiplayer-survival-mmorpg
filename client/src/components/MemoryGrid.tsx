@@ -553,17 +553,6 @@ const MemoryGrid: React.FC<MemoryGridProps> = ({
                     {displayNode.name}
                   </div>
                   
-                  {faction && (
-                    <div style={{ 
-                      color: faction.color, 
-                      fontSize: '10px', 
-                      marginBottom: '4px',
-                      fontStyle: 'italic'
-                    }}>
-                      {faction.name} - {faction.description}
-                    </div>
-                  )}
-                  
                   <div style={{ marginBottom: '8px', lineHeight: '1.4' }}>
                     {displayNode.description}
                   </div>
