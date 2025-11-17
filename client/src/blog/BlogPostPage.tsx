@@ -54,11 +54,14 @@ function BlogPostPage() {
   } = post;
 
   // Set SEO metadata for this blog post
+  // Use coverImage if available, otherwise fallback to default OG image
+  const ogImageUrl = coverImage || '/images/blog/og-default.jpg';
+  
   useSEO({
     title: `${title} | Broth & Bullets Blog`,
     description: subtitle,
-    ogImage: coverImage,
-    twitterImage: coverImage,
+    ogImage: ogImageUrl,
+    twitterImage: ogImageUrl,
     type: 'article'
   });
 

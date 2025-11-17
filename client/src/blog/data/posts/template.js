@@ -31,6 +31,8 @@ export default {
   excerpt: "A brief excerpt summarizing your post. Keep it under 200 characters for best results.",
   
   // Cover image path (relative to public folder)
+  // IMPORTANT: This is also used for social media OG cards (1200x630px recommended)
+  // If not provided, will fallback to /images/blog/og-default.jpg
   coverImage: "/images/blog/your-cover-image.jpg",
   
   // Post content in HTML format
