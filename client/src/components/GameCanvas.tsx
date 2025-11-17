@@ -2564,6 +2564,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     const validSleepingBags = sleepingBags instanceof Map ? sleepingBags : new Map();
     const validCampfires = campfires instanceof Map ? campfires : new Map();
 
+    // Read grid coordinates preference from localStorage
+    const savedGridPref = localStorage.getItem('minimap_show_grid_coordinates');
+    const showGridCoordinates = savedGridPref !== null ? savedGridPref === 'true' : true;
+
     drawMinimapOntoCanvas({
       ctx,
       players: validPlayers,
@@ -2590,6 +2594,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       pinMarkerImage: pinMarkerImg,
       campfireWarmthImage: campfireWarmthImg,
       torchOnImage: torchOnImg,
+      // Add grid coordinates visibility preference
+      showGridCoordinates,
     });
   }, [
     isMinimapOpen,
@@ -2832,6 +2838,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           currentTime={Date.now()}
           clouds={clouds}
           worldState={worldState}
+          chunkWeather={chunkWeather}
           waterPatches={waterPatches}
           campfires={campfires}
           lanterns={lanterns}

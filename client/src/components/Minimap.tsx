@@ -27,22 +27,25 @@ const MINIMAP_GLOW_COLOR = '#00d4ff'; // Cyan glow effect
 const PLAYER_DOT_SIZE = 3;
 const LOCAL_PLAYER_DOT_COLOR = '#FFFF00';
 // Player icon constants - Updated for directional triangular icons
-const PLAYER_ICON_SIZE = 12; // Much larger than tree/stone icons (which are 4px)
-const PLAYER_ICON_OUTLINE_COLOR = '#333333'; // Dark grey outline for visibility
-const PLAYER_ICON_OUTLINE_WIDTH = 2; // Thicker outline for better visibility
-const REMOTE_PLAYER_DOT_COLOR = '#00AAFF'; // Light blue for other players
-// Add colors for trees and rocks - UPDATED to be much darker and more visible
-const TREE_DOT_COLOR = '#37ff7a'; // Bright emerald green with excellent visibility
-const ROCK_DOT_COLOR = '#bbbbff'; // Light slate blue for rocks
-const BARREL_DOT_COLOR = '#ff4444'; // Bright red for barrels - high visibility
+// PvP THREAT INDICATORS - Players are PRIMARY focus
+const PLAYER_ICON_SIZE = 14; // LARGER than resources - players are the main threat
+const PLAYER_ICON_OUTLINE_COLOR = '#000000'; // Pure black outline for maximum contrast
+const PLAYER_ICON_OUTLINE_WIDTH = 2.5; // Thick outline for instant recognition
+const REMOTE_PLAYER_DOT_COLOR = '#FF3366'; // BRIGHT PINK/RED - ENEMY THREAT COLOR
+const REMOTE_PLAYER_GLOW = '0 0 10px #FF3366'; // Pulsing glow for threats
+// Resource colors - TACTICAL VISIBILITY (cover, landmarks, loot)
+// PvP Note: Resources are CRITICAL for tactical awareness - they're cover, ambush points, and landmarks
+const TREE_DOT_COLOR = 'rgba(55, 255, 122, 0.6)'; // Medium-bright green - COVER and CONCEALMENT
+const ROCK_DOT_COLOR = 'rgba(187, 187, 255, 0.6)'; // Medium-bright blue - HARD COVER landmarks
+const BARREL_DOT_COLOR = 'rgba(255, 187, 68, 0.75)'; // Bright yellow-orange - LOOT and OBJECTIVES
 // Rune stone colors - matching their rune types
 const RUNE_STONE_GREEN_COLOR = '#9dff00'; // Bright cyberpunk yellow-green for agrarian rune stones
 const RUNE_STONE_RED_COLOR = '#ff4400'; // Vibrant orange-red for production rune stones
 const RUNE_STONE_BLUE_COLOR = '#8b5cf6'; // Bright blue-purple cyberpunk violet for memory shard rune stones
 const RUNE_STONE_ICON_SIZE = 12; // Twice as large for better visibility on minimap
 
-const RESOURCE_ICON_OUTLINE_COLOR = '#000000'; // Black outline for resource icons
-const RESOURCE_ICON_OUTLINE_WIDTH = 1; // 1-pixel outline width
+const RESOURCE_ICON_OUTLINE_COLOR = 'rgba(0, 0, 0, 0.8)'; // Strong black outline for clarity
+const RESOURCE_ICON_OUTLINE_WIDTH = 1.5; // Thicker outline for tactical visibility
 const CAMPFIRE_DOT_COLOR = '#FF6600'; // Bright orange for campfires and lit players
 const CAMPFIRE_GLOW_COLOR = '#FF8800'; // Orange glow effect
 const CAMPFIRE_ICON_SIZE = 8; // Larger size for better visibility
@@ -52,7 +55,7 @@ const WATER_TILE_COLOR = '#1E90FF'; // Bright blue for water features
 const BEACH_TILE_COLOR = '#F4A460'; // Sandy beach color
 const DIRT_ROAD_COLOR = '#8B7355'; // Brown for dirt roads
 const DIRT_COLOR = '#8B4513'; // Slightly lighter brown for regular dirt
-const ENTITY_DOT_SIZE = 2; // Slightly smaller dot size for world objects
+const ENTITY_DOT_SIZE = 3; // Larger dot size for tactical visibility (was 2)
 const LIT_ENTITY_DOT_SIZE = 4; // Larger size for lit campfires and players with torches
 const OWNED_BAG_DOT_SIZE = 24; // Make owned bags larger
 const REGULAR_BAG_ICON_SIZE = 24; // Increased size considerably
@@ -69,10 +72,14 @@ const PIN_BORDER_COLOR = '#000000'; // Black border
 const PIN_SIZE = 24; // Standard size
 const PIN_BORDER_WIDTH = 1; // Thin border width
 
-// Grid Constants - Divisions will be calculated dynamically
-const GRID_LINE_COLOR = 'rgba(200, 200, 200, 0.3)';
-const GRID_TEXT_COLOR = 'rgba(255, 255, 255, 0.5)';
-const GRID_TEXT_FONT = '10px Arial';
+// Grid Constants - Cyberpunk SOVA style with enhanced readability
+const GRID_LINE_COLOR = 'rgba(0, 212, 255, 0.15)'; // Subtle cyan grid
+const GRID_LINE_HIGHLIGHT_COLOR = 'rgba(0, 212, 255, 0.4)'; // Brighter cyan for major grid lines
+const GRID_TEXT_COLOR = 'rgba(0, 255, 255, 1.0)'; // FULL BRIGHTNESS cyan for instant readability
+const GRID_TEXT_FONT = 'bold 13px "Courier New", monospace'; // LARGER and BOLD for combat readability
+const GRID_TEXT_SHADOW = '0 0 8px rgba(0, 255, 255, 1.0), 0 0 3px #000000'; // Stronger glow + black outline
+const GRID_TEXT_BG_COLOR = 'rgba(0, 0, 0, 0.85)'; // Darker background for better contrast
+const GRID_TEXT_BG_PADDING = 3; // More padding for readability
 
 // Death Marker Constants (New)
 const DEATH_MARKER_ICON_SIZE = 24;
@@ -201,26 +208,105 @@ interface MinimapProps {
   campfireWarmthImage?: HTMLImageElement | null; // Warmth image for campfires
   torchOnImage?: HTMLImageElement | null; // Torch image for torch-lit players
   // Tab functionality now handled by React components
+  showGridCoordinates?: boolean; // Whether to show grid coordinate labels (A1, B2, etc.)
 }
 
-// Helper function to map color values to terrain colors (UPDATED with Rust-style colors)
+// Cyberpunk SOVA-style terrain color mapping with neon accents
 function getTerrainColor(colorValue: number): [number, number, number] {
   switch (colorValue) {
-    case 0:   // Sea - Darker, more realistic ocean blue
-      return [19, 69, 139]; // Dark blue
-    case 64:  // Beach - More muted sandy color
-      return [194, 154, 108]; // Muted sand brown
-    case 96:  // Sand - Slightly different from beach
-      return [180, 142, 101]; // Darker sand
-    case 128: // Grass - More realistic forest green  
-      return [76, 110, 72]; // Muted forest green
-    case 192: // Dirt - Realistic brown dirt
-      return [101, 67, 33]; // Dark brown dirt
-    case 224: // DirtRoad - Even darker brown for roads
-      return [71, 47, 24]; // Very dark brown roads
-    default:  // Fallback for unknown values
-      return [76, 110, 72]; // Default to grass green
+    case 0:   // Sea - Deep cyberpunk blue with slight purple tint
+      return [10, 25, 47]; // Very dark blue-black
+    case 64:  // Beach - Desaturated with slight cyan tint
+      return [45, 52, 54]; // Dark grey-blue
+    case 96:  // Sand - Darker, more muted
+      return [40, 44, 46]; // Dark grey
+    case 128: // Grass - Dark with slight green tint
+      return [25, 35, 30]; // Very dark green-grey
+    case 192: // Dirt - Very dark brown-grey
+      return [30, 28, 26]; // Almost black brown
+    case 224: // DirtRoad - Darkest terrain
+      return [20, 20, 22]; // Near black
+    default:  // Fallback
+      return [25, 35, 30]; // Dark green-grey
   }
+}
+
+// Cyberpunk edge detection for SOVA-style outlines
+function applyEdgeDetection(
+  imageData: ImageData,
+  width: number,
+  height: number
+): ImageData {
+  const output = new ImageData(width, height);
+  const data = imageData.data;
+  const outData = output.data;
+  
+  // Sobel edge detection kernel
+  const sobelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+  const sobelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+  
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      let gx = 0, gy = 0;
+      
+      // Apply Sobel operator
+      for (let ky = -1; ky <= 1; ky++) {
+        for (let kx = -1; kx <= 1; kx++) {
+          const idx = ((y + ky) * width + (x + kx)) * 4;
+          const kernelIdx = (ky + 1) * 3 + (kx + 1);
+          const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+          
+          gx += brightness * sobelX[kernelIdx];
+          gy += brightness * sobelY[kernelIdx];
+        }
+      }
+      
+      const magnitude = Math.sqrt(gx * gx + gy * gy);
+      const edgeStrength = Math.min(255, magnitude);
+      
+      const idx = (y * width + x) * 4;
+      
+      // Copy original color
+      outData[idx] = data[idx];
+      outData[idx + 1] = data[idx + 1];
+      outData[idx + 2] = data[idx + 2];
+      outData[idx + 3] = 255;
+      
+      // Add cyan edge highlight for strong edges
+      if (edgeStrength > 30) {
+        const edgeFactor = edgeStrength / 255;
+        outData[idx] = Math.min(255, outData[idx] + 0 * edgeFactor * 100); // R
+        outData[idx + 1] = Math.min(255, outData[idx + 1] + 212 * edgeFactor * 0.5); // G (cyan)
+        outData[idx + 2] = Math.min(255, outData[idx + 2] + 255 * edgeFactor * 0.5); // B (cyan)
+      }
+    }
+  }
+  
+  return output;
+}
+
+// Apply cyberpunk scan line effect
+function applyScanLines(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+) {
+  ctx.save();
+  ctx.globalAlpha = 0.05;
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 1;
+  
+  // Horizontal scan lines
+  for (let i = 0; i < height; i += 3) {
+    ctx.beginPath();
+    ctx.moveTo(x, y + i);
+    ctx.lineTo(x + width, y + i);
+    ctx.stroke();
+  }
+  
+  ctx.restore();
 }
 
 /**
@@ -260,6 +346,8 @@ export function drawMinimapOntoCanvas({
   // Destructure campfire and torch image props
   campfireWarmthImage = null, // Default to null
   torchOnImage = null, // Default to null
+  // Destructure grid coordinates visibility prop
+  showGridCoordinates = true, // Default to true (show by default)
 }: MinimapProps) {
   const minimapWidth = MINIMAP_WIDTH;
   const minimapHeight = MINIMAP_HEIGHT;
@@ -387,7 +475,7 @@ export function drawMinimapOntoCanvas({
   ctx.fillStyle = MINIMAP_WORLD_BG_COLOR; 
   ctx.fillRect(worldRectScreenX, worldRectScreenY, worldRectScreenWidth, worldRectScreenHeight);
 
-  // --- Draw Cached Minimap Background ---
+  // --- Draw Cached Minimap Background with Cyberpunk Effects ---
   if (minimapCache && minimapCache.data && minimapCache.data.length > 0) {
     // console.log(`[Minimap] Using cached minimap data: ${minimapCache.width}x${minimapCache.height}, ${minimapCache.data.length} bytes`);
     
@@ -400,12 +488,12 @@ export function drawMinimapOntoCanvas({
     if (tempCtx) {
       const imageData = tempCtx.createImageData(minimapCache.width, minimapCache.height);
       
-      // Convert color values to RGBA pixels
+      // Convert color values to RGBA pixels with cyberpunk colors
       for (let i = 0; i < minimapCache.data.length; i++) {
         const colorValue = minimapCache.data[i];
         const pixelIndex = i * 4;
         
-        // Map color values to terrain colors
+        // Map color values to dark cyberpunk terrain colors
         const [r, g, b] = getTerrainColor(colorValue);
         imageData.data[pixelIndex] = r;     // Red
         imageData.data[pixelIndex + 1] = g; // Green  
@@ -413,7 +501,9 @@ export function drawMinimapOntoCanvas({
         imageData.data[pixelIndex + 3] = 255; // Alpha (fully opaque)
       }
       
-      tempCtx.putImageData(imageData, 0, 0);
+      // Apply edge detection for SOVA-style outlines
+      const processedImageData = applyEdgeDetection(imageData, minimapCache.width, minimapCache.height);
+      tempCtx.putImageData(processedImageData, 0, 0);
       
       // Calculate the world bounds within the minimap
       // The cached minimap represents the entire game world
@@ -434,16 +524,45 @@ export function drawMinimapOntoCanvas({
         worldRectScreenWidth,
         worldRectScreenHeight
       );
+      
+      // Apply scan line overlay for cyberpunk effect
+      applyScanLines(ctx, worldRectScreenX, worldRectScreenY, worldRectScreenWidth, worldRectScreenHeight);
+      
+      // Add subtle animated radar sweep effect
+      const time = Date.now() / 3000; // Slow rotation
+      const sweepAngle = (time % (Math.PI * 2));
+      const centerX = worldRectScreenX + worldRectScreenWidth / 2;
+      const centerY = worldRectScreenY + worldRectScreenHeight / 2;
+      const sweepRadius = Math.max(worldRectScreenWidth, worldRectScreenHeight);
+      
+      ctx.save();
+      ctx.globalAlpha = 0.08;
+      const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, sweepRadius);
+      gradient.addColorStop(0, 'rgba(0, 212, 255, 0.3)');
+      gradient.addColorStop(0.5, 'rgba(0, 212, 255, 0.1)');
+      gradient.addColorStop(1, 'rgba(0, 212, 255, 0)');
+      
+      ctx.translate(centerX, centerY);
+      ctx.rotate(sweepAngle);
+      ctx.translate(-centerX, -centerY);
+      
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.arc(centerX, centerY, sweepRadius, -Math.PI / 6, Math.PI / 6);
+      ctx.closePath();
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      ctx.restore();
     }
   } else {
     // Debug: Show what we actually have
     // console.log(`[Minimap] No cached minimap data available. minimapCache:`, minimapCache);
     
     // Show a message that minimap cache is not ready
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.font = '12px Arial';
+    ctx.fillStyle = 'rgba(0, 212, 255, 0.8)';
+    ctx.font = '14px "Courier New", monospace';
     ctx.textAlign = 'center';
-    // ctx.fillText('Generating minimap...', minimapX + minimapWidth/2, minimapY + minimapHeight/2);
+    // ctx.fillText('INITIALIZING TACTICAL MAP...', minimapX + minimapWidth/2, minimapY + minimapHeight/2);
   }
 
   // --- Calculate Grid Divisions Dynamically (Based on current view) ---
@@ -456,69 +575,56 @@ export function drawMinimapOntoCanvas({
   const startGridYWorld = Math.floor(viewMinYWorld / gridCellSizeWorld) * gridCellSizeWorld;
   const endGridYWorld = Math.ceil((viewMinYWorld + viewHeightWorld) / gridCellSizeWorld) * gridCellSizeWorld;
 
-  // --- Draw Grid (MOVED AFTER TERRAIN) ---
-  ctx.strokeStyle = GRID_LINE_COLOR;
-  ctx.lineWidth = 0.5;
+  // --- Draw Grid (CYBERPUNK SOVA STYLE) ---
   ctx.fillStyle = GRID_TEXT_COLOR;
   ctx.font = GRID_TEXT_FONT;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
+  ctx.shadowColor = GRID_TEXT_SHADOW;
+  ctx.shadowBlur = 4;
 
-  // Draw Vertical Lines & Labels
+  // Draw Vertical Lines with alternating emphasis
+  let gridLineIndex = 0;
   for (let worldX = startGridXWorld; worldX <= endGridXWorld; worldX += gridCellSizeWorld) {
     const screenCoords = worldToMinimap(worldX, viewMinYWorld);
     if (screenCoords) {
       const screenX = screenCoords.x;
+      const isMajorLine = gridLineIndex % 5 === 0; // Every 5th line is major
+      
+      ctx.strokeStyle = isMajorLine ? GRID_LINE_HIGHLIGHT_COLOR : GRID_LINE_COLOR;
+      ctx.lineWidth = isMajorLine ? 1 : 0.5;
+      
       ctx.beginPath();
       ctx.moveTo(screenX, minimapY);
       ctx.lineTo(screenX, minimapY + minimapHeight);
       ctx.stroke();
-      // Optionally add world coordinate labels when zoomed
-      // if (zoomLevel > 1.5) {
-      //  ctx.fillText(Math.round(worldX).toString(), screenX + 2, minimapY + 2);
-      // }
     }
+    gridLineIndex++;
   }
 
-  // Draw Horizontal Lines & Labels
+  // Draw Horizontal Lines with alternating emphasis
+  gridLineIndex = 0;
   for (let worldY = startGridYWorld; worldY <= endGridYWorld; worldY += gridCellSizeWorld) {
     const screenCoords = worldToMinimap(viewMinXWorld, worldY);
     if (screenCoords) {
       const screenY = screenCoords.y;
+      const isMajorLine = gridLineIndex % 5 === 0; // Every 5th line is major
+      
+      ctx.strokeStyle = isMajorLine ? GRID_LINE_HIGHLIGHT_COLOR : GRID_LINE_COLOR;
+      ctx.lineWidth = isMajorLine ? 1 : 0.5;
+      
       ctx.beginPath();
       ctx.moveTo(minimapX, screenY);
       ctx.lineTo(minimapX + minimapWidth, screenY);
       ctx.stroke();
-      // Optionally add world coordinate labels when zoomed
-      // if (zoomLevel > 1.5) {
-      //   ctx.fillText(Math.round(worldY).toString(), minimapX + 2, screenY + 2);
-      // }
     }
+    gridLineIndex++;
   }
-
-  // Draw Cell Labels (A1, B2 etc.) based on world grid cells visible
-  const labelGridDivisionsX = Math.max(1, Math.round(worldPixelWidth / gridCellSizeWorld));
-  const labelGridDivisionsY = Math.max(1, Math.round(worldPixelHeight / gridCellSizeWorld));
-
-  for (let row = 0; row < labelGridDivisionsY; row++) {
-    for (let col = 0; col < labelGridDivisionsX; col++) {
-      // Calculate world coordinates of the top-left corner of this grid cell
-      const cellWorldX = col * gridCellSizeWorld;
-      const cellWorldY = row * gridCellSizeWorld;
-      // Convert world corner to screen coordinates
-      const screenCoords = worldToMinimap(cellWorldX, cellWorldY);
-      if (screenCoords) {
-          // Check if the label position is actually within the minimap bounds
-          if (screenCoords.x + 2 < minimapX + minimapWidth && screenCoords.y + 12 < minimapY + minimapHeight) {
-              const colLabel = String.fromCharCode(65 + col); // A, B, C...
-              const rowLabel = (row + 1).toString(); // 1, 2, 3...
-              const label = colLabel + rowLabel;
-              ctx.fillText(label, screenCoords.x + 2, screenCoords.y + 2); // Draw label at scaled position
-          }
-      }
-    }
-  }
-  // --- End Grid Drawing ---
+  
+  // Reset shadow for subsequent drawing
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent';
+  // --- End Grid Lines (Labels drawn LAST for visibility) ---
 
   // --- Draw Death Marker ---
   // console.log('[Minimap] Checking for death marker. Marker data:', localPlayerDeathMarker, 'Image loaded:', deathMarkerImage && deathMarkerImage.complete && deathMarkerImage.naturalHeight !== 0, 'Image Element:', deathMarkerImage);
@@ -566,20 +672,26 @@ export function drawMinimapOntoCanvas({
     }
   }
 
-  // --- Draw Trees ---
+  // --- Draw Trees (TACTICAL COVER INDICATORS) ---
+  // PvP Tactical Note: Trees = SOFT COVER and CONCEALMENT zones
+  // Critical for predicting enemy movement and ambush points
   trees.forEach(tree => {
     // Only show trees that aren't destroyed or respawning
     if (tree.health <= 0 || tree.respawnAt !== undefined) return;
     
     const screenCoords = worldToMinimap(tree.posX, tree.posY);
     if (screenCoords) {
-      const iconSize = ENTITY_DOT_SIZE * 2; // Make trees slightly larger for visibility
+      const iconSize = ENTITY_DOT_SIZE * 2.5; // Larger for better tactical awareness
       const halfSize = iconSize / 2;
       const x = screenCoords.x;
       const y = screenCoords.y;
       
       // Draw triangular tree icon (▲)
       ctx.save();
+      
+      // Add subtle green glow for visibility
+      ctx.shadowColor = 'rgba(55, 255, 122, 0.4)';
+      ctx.shadowBlur = 4;
       
       // Draw black outline first
       ctx.strokeStyle = RESOURCE_ICON_OUTLINE_COLOR;
@@ -599,20 +711,26 @@ export function drawMinimapOntoCanvas({
     }
   });
 
-  // --- Draw Stones ---
+  // --- Draw Stones (HARD COVER LANDMARKS) ---
+  // PvP Tactical Note: Stones = HARD COVER and MAJOR LANDMARKS
+  // "Enemy behind the rock cluster at C7" - critical callout points
   stones.forEach(stone => { // Use stones prop (type SpacetimeDBStone)
     // Only show stones that aren't destroyed or respawning
     if (stone.health <= 0 || stone.respawnAt !== undefined) return;
     
     const screenCoords = worldToMinimap(stone.posX, stone.posY);
     if (screenCoords) {
-      const iconSize = ENTITY_DOT_SIZE * 2; // Make stones slightly larger for visibility
+      const iconSize = ENTITY_DOT_SIZE * 2.5; // Larger for landmark visibility
       const halfSize = iconSize / 2;
       const x = screenCoords.x;
       const y = screenCoords.y;
       
       // Draw square stone icon (■)
       ctx.save();
+      
+      // Add subtle blue glow for visibility
+      ctx.shadowColor = 'rgba(187, 187, 255, 0.4)';
+      ctx.shadowBlur = 4;
       
       // Draw black outline first
       ctx.strokeStyle = RESOURCE_ICON_OUTLINE_COLOR;
@@ -680,20 +798,26 @@ export function drawMinimapOntoCanvas({
     }
   });
 
-  // --- Draw Barrels ---
+  // --- Draw Barrels (LOOT OBJECTIVES) ---
+  // PvP Tactical Note: Barrels = LOOT CONTAINERS and OBJECTIVES
+  // High-value targets that attract player activity - expect combat nearby
   barrels.forEach(barrel => {
     // Only show barrels that aren't destroyed (health > 0)
     if (barrel.health <= 0) return;
     
     const screenCoords = worldToMinimap(barrel.posX, barrel.posY);
     if (screenCoords) {
-      const iconSize = ENTITY_DOT_SIZE * 2; // Make barrels slightly larger for visibility
+      const iconSize = ENTITY_DOT_SIZE * 2.5; // Larger for objective visibility
       const radius = iconSize / 2;
       const x = screenCoords.x;
       const y = screenCoords.y;
       
       // Draw circular barrel icon (●)
       ctx.save();
+      
+      // Add bright yellow-orange glow for LOOT visibility
+      ctx.shadowColor = 'rgba(255, 187, 68, 0.6)';
+      ctx.shadowBlur = 5;
       
       // Draw black outline first
       ctx.strokeStyle = RESOURCE_ICON_OUTLINE_COLOR;
@@ -702,7 +826,7 @@ export function drawMinimapOntoCanvas({
       ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.stroke();
       
-      // Fill with barrel color
+      // Fill with barrel color (bright yellow-orange)
       ctx.fillStyle = BARREL_DOT_COLOR;
       ctx.fill();
       
@@ -781,15 +905,16 @@ export function drawMinimapOntoCanvas({
     });
   }
 
-  // --- Draw Remote Players ---
-  // Remote players are only visible if they have torch lit AND it's night time
+  // --- Draw Remote Players (THREAT INDICATORS) ---
+  // PvP Tactical Note: Remote players are THE PRIMARY THREAT - always visible with high contrast
+  // Night visibility: Only show if torch is lit (tactical advantage for stealth)
   if (showNightLights) {
     players.forEach((player, playerId) => {
       if (localPlayerId && playerId === localPlayerId) {
         return; // Skip local player, handled separately
       }
       
-      // Only show remote players if they have torch lit
+      // Only show remote players if they have torch lit (night stealth mechanic)
       if (player.isTorchLit) {
         const screenCoords = worldToMinimap(player.positionX, player.positionY);
         if (screenCoords) {
@@ -798,6 +923,10 @@ export function drawMinimapOntoCanvas({
           const size = PLAYER_ICON_SIZE * 1.5; // Larger for torch-lit players
           
           ctx.save();
+          
+          // Add THREAT GLOW for enemy players at night
+          ctx.shadowColor = '#FF6600'; // Orange glow for torch-lit threats
+          ctx.shadowBlur = 12;
           
           // Use torch image if available, otherwise fallback to drawn player icon
           if (torchOnImage && torchOnImage.complete && torchOnImage.naturalHeight !== 0) {
@@ -821,19 +950,61 @@ export function drawMinimapOntoCanvas({
               default: rotation = 0; break;                // Default to right
             }
             
-            // Draw torch-lit players with larger, orange icons for visibility
+            // Draw torch-lit players with THREAT COLOR
             drawPlayerIcon(
               ctx, 
               x, 
               y, 
               rotation, 
-              CAMPFIRE_DOT_COLOR, 
+              REMOTE_PLAYER_DOT_COLOR, // Use threat color
               size
             );
           }
           
           ctx.restore();
         }
+      }
+    });
+  } else {
+    // DAYTIME: All players visible (no stealth advantage)
+    players.forEach((player, playerId) => {
+      if (localPlayerId && playerId === localPlayerId) {
+        return; // Skip local player, handled separately
+      }
+      
+      const screenCoords = worldToMinimap(player.positionX, player.positionY);
+      if (screenCoords) {
+        const x = screenCoords.x;
+        const y = screenCoords.y;
+        
+        ctx.save();
+        
+        // Add PULSING THREAT GLOW for enemy players
+        const pulseIntensity = 0.5 + Math.sin(Date.now() / 500) * 0.5; // Pulse between 0.5-1.0
+        ctx.shadowColor = REMOTE_PLAYER_DOT_COLOR;
+        ctx.shadowBlur = 10 + pulseIntensity * 5; // Pulsing glow
+        
+        // Convert player direction to rotation angle (radians)
+        let rotation = 0;
+        switch (player.direction) {
+          case 'right': rotation = 0; break;
+          case 'down': rotation = Math.PI / 2; break;
+          case 'left': rotation = Math.PI; break;
+          case 'up': rotation = -Math.PI / 2; break;
+          default: rotation = 0; break;
+        }
+        
+        // Draw enemy player with BRIGHT THREAT COLOR
+        drawPlayerIcon(
+          ctx, 
+          x, 
+          y, 
+          rotation, 
+          REMOTE_PLAYER_DOT_COLOR, // Bright pink/red threat indicator
+          PLAYER_ICON_SIZE
+        );
+        
+        ctx.restore();
       }
     });
   }
@@ -1064,6 +1235,131 @@ export function drawMinimapOntoCanvas({
       }
   }
 
+  // --- Draw Grid Cell Labels LAST (A1, B2 etc.) - ALWAYS ON TOP ---
+  // PvP Critical: Coordinates must NEVER be obscured - they're essential for callouts
+  // Only render if showGridCoordinates is true
+  if (showGridCoordinates) {
+    const labelGridDivisionsX = Math.max(1, Math.round(worldPixelWidth / gridCellSizeWorld));
+    const labelGridDivisionsY = Math.max(1, Math.round(worldPixelHeight / gridCellSizeWorld));
+
+    ctx.font = GRID_TEXT_FONT; // Use the bold, larger font
+    
+    for (let row = 0; row < labelGridDivisionsY; row++) {
+    for (let col = 0; col < labelGridDivisionsX; col++) {
+      // Calculate world coordinates of the top-left corner of this grid cell
+      const cellWorldX = col * gridCellSizeWorld;
+      const cellWorldY = row * gridCellSizeWorld;
+      // Convert world corner to screen coordinates
+      const screenCoords = worldToMinimap(cellWorldX, cellWorldY);
+      if (screenCoords) {
+          // Check if the label position is actually within the minimap bounds
+          if (screenCoords.x + 2 < minimapX + minimapWidth && screenCoords.y + 15 < minimapY + minimapHeight) {
+              const colLabel = String.fromCharCode(65 + col); // A, B, C...
+              const rowLabel = (row + 1).toString(); // 1, 2, 3...
+              const label = colLabel + rowLabel;
+              
+              ctx.save(); // Save state for each label
+              
+              // Measure text for background box
+              const textMetrics = ctx.measureText(label);
+              const textHeight = 13; // Approximate height for 13px font
+              
+              // Draw DARKER background box with MORE padding for combat readability
+              ctx.shadowBlur = 0; // No shadow on background
+              ctx.fillStyle = GRID_TEXT_BG_COLOR;
+              ctx.fillRect(
+                screenCoords.x + 2 - GRID_TEXT_BG_PADDING,
+                screenCoords.y + 2 - GRID_TEXT_BG_PADDING,
+                textMetrics.width + GRID_TEXT_BG_PADDING * 2,
+                textHeight + GRID_TEXT_BG_PADDING * 2
+              );
+              
+              // Draw border around background for extra definition
+              ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
+              ctx.lineWidth = 1;
+              ctx.strokeRect(
+                screenCoords.x + 2 - GRID_TEXT_BG_PADDING,
+                screenCoords.y + 2 - GRID_TEXT_BG_PADDING,
+                textMetrics.width + GRID_TEXT_BG_PADDING * 2,
+                textHeight + GRID_TEXT_BG_PADDING * 2
+              );
+              
+              // Draw text with STRONG glow and black outline
+              ctx.shadowBlur = 8;
+              ctx.shadowColor = 'rgba(0, 255, 255, 1.0)';
+              
+              // Draw black outline for text (stroke text multiple times)
+              ctx.strokeStyle = '#000000';
+              ctx.lineWidth = 3;
+              ctx.strokeText(label, screenCoords.x + 2, screenCoords.y + 2);
+              
+              // Draw bright cyan text
+              ctx.fillStyle = GRID_TEXT_COLOR;
+              ctx.fillText(label, screenCoords.x + 2, screenCoords.y + 2);
+              
+              ctx.restore(); // Restore state after each label
+          }
+      }
+    }
+    }
+  }
+  // --- End Grid Labels (Now conditionally visible based on preference) ---
+
+  // --- Draw Cyberpunk Corner HUD Elements ---
+  ctx.save();
+  
+  // Top-left tactical display corner
+  const cornerSize = 30;
+  const cornerOffset = 8;
+  
+  // Top-left corner bracket
+  ctx.strokeStyle = 'rgba(0, 212, 255, 0.8)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(minimapX + cornerOffset + cornerSize, minimapY + cornerOffset);
+  ctx.lineTo(minimapX + cornerOffset, minimapY + cornerOffset);
+  ctx.lineTo(minimapX + cornerOffset, minimapY + cornerOffset + cornerSize);
+  ctx.stroke();
+  
+  // Top-right corner bracket
+  ctx.beginPath();
+  ctx.moveTo(minimapX + minimapWidth - cornerOffset - cornerSize, minimapY + cornerOffset);
+  ctx.lineTo(minimapX + minimapWidth - cornerOffset, minimapY + cornerOffset);
+  ctx.lineTo(minimapX + minimapWidth - cornerOffset, minimapY + cornerOffset + cornerSize);
+  ctx.stroke();
+  
+  // Bottom-left corner bracket
+  ctx.beginPath();
+  ctx.moveTo(minimapX + cornerOffset, minimapY + minimapHeight - cornerOffset - cornerSize);
+  ctx.lineTo(minimapX + cornerOffset, minimapY + minimapHeight - cornerOffset);
+  ctx.lineTo(minimapX + cornerOffset + cornerSize, minimapY + minimapHeight - cornerOffset);
+  ctx.stroke();
+  
+  // Bottom-right corner bracket
+  ctx.beginPath();
+  ctx.moveTo(minimapX + minimapWidth - cornerOffset, minimapY + minimapHeight - cornerOffset - cornerSize);
+  ctx.lineTo(minimapX + minimapWidth - cornerOffset, minimapY + minimapHeight - cornerOffset);
+  ctx.lineTo(minimapX + minimapWidth - cornerOffset - cornerSize, minimapY + minimapHeight - cornerOffset);
+  ctx.stroke();
+  
+  // Add small corner dots for extra tactical feel
+  const dotRadius = 2;
+  ctx.fillStyle = '#00d4ff';
+  ctx.beginPath();
+  ctx.arc(minimapX + cornerOffset, minimapY + cornerOffset, dotRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(minimapX + minimapWidth - cornerOffset, minimapY + cornerOffset, dotRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(minimapX + cornerOffset, minimapY + minimapHeight - cornerOffset, dotRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(minimapX + minimapWidth - cornerOffset, minimapY + minimapHeight - cornerOffset, dotRadius, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.restore();
+  
   // X button now handled by React components, not canvas drawing
   ctx.restore(); // Restore context after drawing all elements
 

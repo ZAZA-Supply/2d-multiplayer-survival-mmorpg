@@ -25,6 +25,18 @@ const InterfaceContainer: React.FC<InterfaceContainerProps> = ({
   const [currentView, setCurrentView] = useState<'minimap' | 'encyclopedia' | 'memory-grid'>('minimap');
   const [isMinimapLoading, setIsMinimapLoading] = useState(false);
   
+  // Grid coordinates visibility preference (stored in localStorage)
+  const [showGridCoordinates, setShowGridCoordinates] = useState<boolean>(() => {
+    const saved = localStorage.getItem('minimap_show_grid_coordinates');
+    return saved !== null ? saved === 'true' : true; // Default to true (show by default)
+  });
+  
+  // Save preference to localStorage when it changes
+  const handleToggleGridCoordinates = useCallback((checked: boolean) => {
+    setShowGridCoordinates(checked);
+    localStorage.setItem('minimap_show_grid_coordinates', checked.toString());
+  }, []);
+  
   // Get SpacetimeDB connection
   const connection = useGameConnection();
   
@@ -434,6 +446,51 @@ const InterfaceContainer: React.FC<InterfaceContainerProps> = ({
         return (
           <div style={{ ...contentContainerStyle, position: 'relative' }}>
             {children}
+            {/* Grid Coordinates Toggle Checkbox */}
+            <label
+              style={{
+                position: 'absolute',
+                top: '8px',
+                right: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                cursor: 'pointer',
+                zIndex: 1002,
+                fontSize: '11px',
+                fontFamily: '"Courier New", monospace',
+                color: '#00d4ff',
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                border: '1px solid rgba(0, 212, 255, 0.3)',
+                userSelect: 'none',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+                e.currentTarget.style.borderColor = 'rgba(0, 212, 255, 0.6)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                e.currentTarget.style.borderColor = 'rgba(0, 212, 255, 0.3)';
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={showGridCoordinates}
+                onChange={(e) => handleToggleGridCoordinates(e.target.checked)}
+                style={{
+                  cursor: 'pointer',
+                  width: '14px',
+                  height: '14px',
+                  accentColor: '#00d4ff',
+                }}
+              />
+              <span style={{ textShadow: '0 0 4px rgba(0, 212, 255, 0.8)' }}>
+                Show Grid
+              </span>
+            </label>
             {/* Show loading overlay on top of minimap content */}
             {isMinimapLoading && <LoadingOverlay />}
           </div>

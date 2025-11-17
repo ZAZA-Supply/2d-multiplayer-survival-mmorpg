@@ -199,6 +199,10 @@ const DeathScreen: React.FC<DeathScreenProps> = ({
         viewCenterOffset
     );
 
+    // Read grid coordinates preference from localStorage
+    const savedGridPref = localStorage.getItem('minimap_show_grid_coordinates');
+    const showGridCoordinates = savedGridPref !== null ? savedGridPref === 'true' : true;
+
     // Draw the minimap using the imported function
     drawMinimapOntoCanvas({
       ctx,
@@ -229,6 +233,8 @@ const DeathScreen: React.FC<DeathScreenProps> = ({
       pinMarkerImage,
       campfireWarmthImage,
       torchOnImage,
+      // Add grid coordinates visibility preference
+      showGridCoordinates,
     });
 
     // Draw hover effect (simple circle) - This is illustrative

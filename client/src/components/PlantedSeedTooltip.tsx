@@ -1,6 +1,7 @@
-import React from 'react';
-import { PlantedSeed, Cloud, WorldState, WaterPatch, Campfire, Lantern, Furnace, Tree, RuneStone } from '../generated';
+import React, { useMemo } from 'react';
+import { PlantedSeed, Cloud, WorldState, WaterPatch, Campfire, Lantern, Furnace, Tree, RuneStone, ChunkWeather } from '../generated';
 import styles from './PlantedSeedTooltip.module.css';
+import { calculateChunkIndex } from '../utils/chunkUtils';
 
 interface PlantedSeedTooltipProps {
   seed: PlantedSeed;
@@ -10,6 +11,7 @@ interface PlantedSeedTooltipProps {
   // Environmental data for growth modifiers
   clouds: Map<string, Cloud>;
   worldState: WorldState | null;
+  chunkWeather: Map<string, ChunkWeather>; // Added for chunk-specific weather
   waterPatches: Map<string, WaterPatch>;
   campfires: Map<string, Campfire>;
   lanterns: Map<string, Lantern>;
@@ -25,6 +27,7 @@ const PlantedSeedTooltip: React.FC<PlantedSeedTooltipProps> = ({
   currentTime,
   clouds,
   worldState,
+  chunkWeather,
   waterPatches,
   campfires,
   lanterns,
@@ -35,6 +38,12 @@ const PlantedSeedTooltip: React.FC<PlantedSeedTooltipProps> = ({
   if (!visible || !seed) {
     return null;
   }
+  
+  // Get chunk-specific weather for this seed's location
+  const seedChunkWeather = useMemo(() => {
+    const chunkIndex = calculateChunkIndex(seed.posX, seed.posY);
+    return chunkWeather.get(chunkIndex.toString()) || null;
+  }, [seed.posX, seed.posY, chunkWeather]);
 
   // Calculate growth percentage
   const growthPercent = Math.round(seed.growthProgress * 100);
@@ -245,7 +254,9 @@ const PlantedSeedTooltip: React.FC<PlantedSeedTooltipProps> = ({
   const nearTree = isNearTree();
   const nearGreenRuneStone = isNearGreenRuneStone();
   const lightEffects = calculateLightEffects();
-  const currentWeather = worldState?.currentWeather.tag || 'Clear';
+  
+  // Use chunk-specific weather if available, otherwise fall back to global weather
+  const currentWeather = seedChunkWeather?.currentWeather?.tag || worldState?.currentWeather.tag || 'Clear';
   const currentTimeOfDay = worldState?.timeOfDay.tag || 'Noon';
   const isMushroomPlant = isMushroom();
   
@@ -354,7 +365,7 @@ const PlantedSeedTooltip: React.FC<PlantedSeedTooltipProps> = ({
               {currentWeather === 'LightRain' && '🌧️ Light Rain +30%'}
               {currentWeather === 'ModerateRain' && '🌧️ Moderate Rain +60%'}
               {currentWeather === 'HeavyRain' && '⛈️ Heavy Rain +40%'}
-              {currentWeather === 'HeavyStorm' && '⛈️ Storm -20%'}
+              {currentWeather === 'HeavyStorm' && '⛈️ Heavy Storm -20%'}
               {currentWeather === 'Clear' && '☀️ Clear'}
             </span>
           </div>

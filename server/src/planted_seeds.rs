@@ -363,26 +363,26 @@ fn get_shelter_penalty_multiplier(ctx: &ReducerContext, plant_x: f32, plant_y: f
 }
 
 /// Calculate the effective growth rate for current conditions
-fn calculate_growth_rate_multiplier(ctx: &ReducerContext) -> (f32, crate::world_state::Season) {
-    // Get current world state
+/// Returns (base_multiplier, current_season, time_of_day)
+fn calculate_growth_rate_multiplier(ctx: &ReducerContext) -> (f32, crate::world_state::Season, crate::world_state::TimeOfDay) {
+    // Get current world state for time of day and season
     let world_state = match ctx.db.world_state().iter().next() {
         Some(state) => state,
         None => {
             log::warn!("No WorldState found for growth calculation, using default multiplier");
-            return (0.5, crate::world_state::Season::Spring); // Default moderate growth if no world state
+            return (0.5, crate::world_state::Season::Spring, crate::world_state::TimeOfDay::Noon);
         }
     };
     
     let time_multiplier = get_time_of_day_growth_multiplier(&world_state.time_of_day);
-    let weather_multiplier = get_weather_growth_multiplier(&world_state.current_weather, world_state.rain_intensity);
     
-    let total_multiplier = time_multiplier * weather_multiplier;
+    // NOTE: Weather multiplier is now calculated per-plant based on chunk weather
+    // This function only returns the time-of-day multiplier as the base
     
-    log::debug!("Growth multiplier: time={:.2} * weather={:.2} = {:.2} (time={:?}, weather={:?})", 
-               time_multiplier, weather_multiplier, total_multiplier, 
-               world_state.time_of_day, world_state.current_weather);
+    log::debug!("Base growth multiplier (time only): {:.2} (time={:?})", 
+               time_multiplier, world_state.time_of_day);
     
-    (total_multiplier, world_state.current_season)
+    (time_multiplier, world_state.current_season, world_state.time_of_day)
 }
 
 // --- Initialization ---
@@ -723,7 +723,7 @@ pub fn check_plant_growth(ctx: &ReducerContext, _args: PlantedSeedGrowthSchedule
     }
     
     let current_time = ctx.timestamp;
-    let (base_growth_multiplier, current_season) = calculate_growth_rate_multiplier(ctx);
+    let (base_time_multiplier, current_season, current_time_of_day) = calculate_growth_rate_multiplier(ctx);
     let mut plants_updated = 0;
     let mut plants_matured = 0;
     let mut plants_dormant = 0;
@@ -758,6 +758,13 @@ pub fn check_plant_growth(ctx: &ReducerContext, _args: PlantedSeedGrowthSchedule
                        plant_id, plant_type, current_season, plant_pos_x, plant_pos_y, plant_progress * 100.0);
             continue;
         }
+        
+        // Get chunk-specific weather for this plant's location
+        let chunk_weather = crate::world_state::get_weather_for_position(ctx, plant.pos_x, plant.pos_y);
+        let weather_multiplier = get_weather_growth_multiplier(&chunk_weather.current_weather, chunk_weather.rain_intensity);
+        
+        // Calculate base growth multiplier (time * weather)
+        let base_growth_multiplier = base_time_multiplier * weather_multiplier;
         
         // Calculate cloud cover effect for this specific plant
         // For mushrooms, clouds help growth, so we'll handle it differently
@@ -796,12 +803,7 @@ pub fn check_plant_growth(ctx: &ReducerContext, _args: PlantedSeedGrowthSchedule
         let water_multiplier = crate::water_patch::get_water_patch_growth_multiplier(ctx, plant.pos_x, plant.pos_y);
         
         // Calculate mushroom-specific bonus (tree cover and night time only - cloud is handled above)
-        let world_state = ctx.db.world_state().iter().next();
-        let mushroom_bonus = if let Some(ref ws) = world_state {
-            get_mushroom_bonus_multiplier(ctx, plant.pos_x, plant.pos_y, &plant.plant_type, &ws.time_of_day)
-        } else {
-            1.0
-        };
+        let mushroom_bonus = get_mushroom_bonus_multiplier(ctx, plant.pos_x, plant.pos_y, &plant.plant_type, &current_time_of_day);
         
         // Calculate green rune stone bonus (agrarian effect)
         let green_rune_multiplier = crate::rune_stone::get_green_rune_growth_multiplier(ctx, plant.pos_x, plant.pos_y, &plant.plant_type);
@@ -860,16 +862,16 @@ pub fn check_plant_growth(ctx: &ReducerContext, _args: PlantedSeedGrowthSchedule
             plants_updated += 1;
             
             if growth_increment > 0.0 {
-                log::debug!("Plant {} ({}) grew from {:.1}% to {:.1}% (base: {:.2}x, cloud: {:.2}x, light: {:.2}x, crowding: {:.2}x, shelter: {:.2}x, water: {:.2}x, mushroom: {:.2}x, total: {:.2}x)", 
+                log::debug!("Plant {} ({}) grew from {:.1}% to {:.1}% (time: {:.2}x, weather: {:.2}x, cloud: {:.2}x, light: {:.2}x, crowding: {:.2}x, shelter: {:.2}x, water: {:.2}x, mushroom: {:.2}x, total: {:.2}x) [chunk weather: {:?}]", 
                            plant_id, plant_type, old_progress * 100.0, progress_pct, 
-                           base_growth_multiplier, cloud_multiplier, light_multiplier, crowding_multiplier, shelter_multiplier, water_multiplier, mushroom_bonus, total_growth_multiplier);
+                           base_time_multiplier, weather_multiplier, cloud_multiplier, light_multiplier, crowding_multiplier, shelter_multiplier, water_multiplier, mushroom_bonus, total_growth_multiplier, chunk_weather.current_weather);
             }
         }
     }
     
     if plants_matured > 0 || plants_updated > 0 || plants_dormant > 0 {
-        log::info!("Growth check: {} plants matured, {} plants updated, {} plants dormant (season: {:?}, base rate: {:.2}x)", 
-                  plants_matured, plants_updated, plants_dormant, current_season, base_growth_multiplier);
+        log::info!("Growth check: {} plants matured, {} plants updated, {} plants dormant (season: {:?}, time multiplier: {:.2}x)", 
+                  plants_matured, plants_updated, plants_dormant, current_season, base_time_multiplier);
     }
     
     Ok(())
