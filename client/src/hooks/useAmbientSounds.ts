@@ -109,12 +109,12 @@ const AMBIENT_SOUND_DEFINITIONS = {
     distant_thunder: { 
         type: 'random', 
         filename: 'ambient_distant_thunder.mp3', 
-        baseVolume: 1.0, // Increased from 0.075 for more dramatic storm atmosphere
-        minInterval: 30000, // 30 seconds minimum - more frequent during storms
-        maxInterval: 90000, // 1.5 minutes maximum - regular thunder during storms
+        baseVolume: 1.5, // Very loud and dramatic for heavy storm atmosphere (2x louder than before)
+        minInterval: 8000, // 8 seconds minimum - frequent like wind gusts
+        maxInterval: 25000, // 25 seconds maximum - constant storm activity
         variations: 3,
         stormOnly: true, // Only play during heavy storms
-        description: 'Thunder sounds during heavy storms'
+        description: 'Frequent thunder rumbles during heavy storms - like wind gusts but storm-specific'
     },
     structure_creak: { 
         type: 'random', 
@@ -1122,7 +1122,7 @@ export const useAmbientSounds = ({
 
     // Initialize ambient sound system - ALWAYS ensure update loop is running
     useEffect(() => {
-        // console.log('🌊 Initializing/Reinitializing Aleutian Island ambient sound system...');
+            // console.log('🌊 Initializing/Reinitializing Aleutian Island ambient sound system...');
 
         // Clear any existing interval first (in case of hot reload)
         if (updateIntervalRef.current) {
@@ -1135,11 +1135,13 @@ export const useAmbientSounds = ({
         if (!isInitializedRef.current) {
             isInitializedRef.current = true;
             // console.log('🌊 Setting up random sound schedules (first time only)...');
+            // console.log(`🌊 Initial state: chunkWeather=${chunkWeather ? 'available' : 'null'}, localPlayer=${localPlayer ? 'available' : 'null'}`);
             
             // Start all random sound schedules
             Object.keys(AMBIENT_SOUND_DEFINITIONS).forEach(soundType => {
                 const definition = AMBIENT_SOUND_DEFINITIONS[soundType as AmbientSoundType];
                 if (definition.type === 'random') {
+                    // console.log(`🌊 Scheduling random sound: ${soundType}`);
                     scheduleRandomSound(soundType as AmbientSoundType);
                 }
             });
@@ -1186,11 +1188,12 @@ export const useAmbientSounds = ({
                 globalUpdateIntervalId = undefined;
             }
             
-            // Only clean up random sounds on actual unmount, not hot reload
-            if (isInitializedRef.current) {
-                randomSoundTimers.forEach(timer => window.clearTimeout(timer));
-                randomSoundTimers.clear();
-            }
+            // Clean up random sounds and reset initialization flags on hot reload
+            randomSoundTimers.forEach(timer => window.clearTimeout(timer));
+            randomSoundTimers.clear();
+            
+            // Reset initialization flag so sounds get rescheduled after hot reload
+            isInitializedRef.current = false;
             
             // Fire-and-forget cleanup of seamless sounds on unmount
             activeSeamlessLoopingSounds.forEach((_, soundType) => {
