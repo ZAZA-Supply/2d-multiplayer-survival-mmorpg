@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ItemDefinition, InventoryItem, DbConnection, Campfire as SpacetimeDBCampfire, HotbarLocationData, EquipmentSlotType, Stash, Player, ActiveConsumableEffect, ActiveEquipment, RangedWeaponStats, BrothPot as SpacetimeDBBrothPot } from '../generated';
 import { Identity, Timestamp } from 'spacetimedb';
-import { isWaterContainer, hasWaterContent, getWaterLevelPercentage, isSaltWater } from '../utils/waterContainerHelpers';
+import { isWaterContainer, hasWaterContent, getWaterLevelPercentage, isSaltWater, getWaterCapacity } from '../utils/waterContainerHelpers';
 import { isPlantableSeed } from '../utils/plantsUtils';
 
 // Import Custom Components
@@ -78,6 +78,8 @@ interface TooltipState {
       thirst: number;
       hunger: number;
     };
+    waterContentMl?: number; // Water content in mL for water containers
+    isSaltWater?: boolean; // Whether the water container has salt water
   } | null;
   position: {
     x: number;
@@ -100,15 +102,11 @@ const canFillWithWater = (item: PopulatedItem): boolean => {
 
 // Add helper function to get remaining capacity of water container
 const getWaterContainerRemainingCapacity = (item: PopulatedItem): number => {
-  const maxCapacities: { [key: string]: number } = {
-    'Reed Water Bottle': 500, // 500 mL capacity
-    'Plastic Water Jug': 2000, // 2000 mL capacity
-  };
+  const maxCapacityLiters = getWaterCapacity(item.definition.name);
+  const maxCapacityMl = maxCapacityLiters * 1000; // Convert liters to mL
+  const currentWater = hasWaterContent(item.instance) ? getWaterLevelPercentage(item.instance, item.definition.name) * maxCapacityMl : 0;
   
-  const maxCapacity = maxCapacities[item.definition.name] || 0;
-  const currentWater = hasWaterContent(item.instance) ? getWaterLevelPercentage(item.instance, item.definition.name) * maxCapacity : 0;
-  
-  return Math.max(0, maxCapacity - currentWater);
+  return Math.max(0, maxCapacityMl - currentWater);
 };
 
 // --- Hotbar Component ---
@@ -162,6 +160,8 @@ const Hotbar: React.FC<HotbarProps> = ({
   const numSlots = 6;
   const prevSelectedSlotRef = useRef<number>(selectedSlot);
   const prevActiveEffectsRef = useRef<Set<string>>(new Set());
+  const hoveredSlotRef = useRef<number | null>(null); // Track which slot is currently hovered for tooltip
+  const lastTooltipItemRef = useRef<{ instanceId: bigint; waterContentMl: number | undefined; quantity: number; isSaltWater: boolean | undefined } | null>(null); // Track last tooltip values for change detection
 
   // Cleanup refs on unmount
   useEffect(() => {
@@ -1035,17 +1035,10 @@ const Hotbar: React.FC<HotbarProps> = ({
     });
   }, [numSlots, activateHotbarSlot, isGameMenuOpen]); // activateHotbarSlot is a dependency
 
-  // Tooltip handlers
-  const handleSlotMouseEnter = useCallback((slotIndex: number, event: React.MouseEvent) => {
+  // Helper function to update tooltip content for a given slot
+  const updateTooltipContent = useCallback((slotIndex: number, position?: { x: number; y: number }, updateRef: boolean = true) => {
     const item = findItemForSlot(slotIndex);
     if (!item) return;
-
-    const slotElement = event.currentTarget as HTMLElement;
-    const rect = slotElement.getBoundingClientRect();
-    
-    // Position tooltip to the left of the slot, similar to status bar panel
-    const tooltipX = rect.left - 10; // 10px gap from slot
-    const tooltipY = rect.top + (rect.height / 2); // Center vertically with slot
 
     // Check if item has consumable stats (works for Consumable category AND Placeable seeds)
     let consumableStats: { health: number; thirst: number; hunger: number } | undefined = undefined;
@@ -1059,21 +1052,105 @@ const Hotbar: React.FC<HotbarProps> = ({
       consumableStats = { health, thirst, hunger };
     }
 
-    setTooltip({
+    // Calculate water content for water containers
+    let waterContentMl: number | undefined = undefined;
+    let isSaltWaterValue: boolean | undefined = undefined;
+    if (isWaterContainer(item.definition.name) && hasWaterContent(item.instance)) {
+      const maxCapacityLiters = getWaterCapacity(item.definition.name);
+      const maxCapacityMl = maxCapacityLiters * 1000; // Convert liters to mL
+      const waterLevelPercentage = getWaterLevelPercentage(item.instance, item.definition.name);
+      waterContentMl = Math.round(waterLevelPercentage * maxCapacityMl);
+      isSaltWaterValue = isSaltWater(item.instance);
+    }
+
+    // Update tracking ref if requested
+    if (updateRef) {
+      lastTooltipItemRef.current = {
+        instanceId: BigInt(item.instance.instanceId),
+        waterContentMl,
+        quantity: item.instance.quantity,
+        isSaltWater: isSaltWaterValue
+      };
+    }
+
+    setTooltip(prev => ({
       visible: true,
       content: {
         name: item.definition.name,
         quantity: item.instance.quantity,
-        consumableStats
+        consumableStats,
+        waterContentMl,
+        isSaltWater: isSaltWaterValue
       },
-      position: {
-        x: tooltipX,
-        y: tooltipY
-      }
-    });
+      position: position || prev.position
+    }));
   }, [findItemForSlot]);
 
+  // Effect to update tooltip in real-time when item data changes (water content, quantity, etc.)
+  useEffect(() => {
+    if (tooltip.visible && hoveredSlotRef.current !== null) {
+      const slotIndex = hoveredSlotRef.current;
+      const item = findItemForSlot(slotIndex);
+      
+      if (item) {
+        // Calculate current values
+        let currentWaterContentMl: number | undefined = undefined;
+        let currentIsSaltWater: boolean | undefined = undefined;
+        if (isWaterContainer(item.definition.name) && hasWaterContent(item.instance)) {
+          const maxCapacityLiters = getWaterCapacity(item.definition.name);
+          const maxCapacityMl = maxCapacityLiters * 1000; // Convert liters to mL
+          const waterLevelPercentage = getWaterLevelPercentage(item.instance, item.definition.name);
+          currentWaterContentMl = Math.round(waterLevelPercentage * maxCapacityMl);
+          currentIsSaltWater = isSaltWater(item.instance);
+        }
+        
+        const currentInstanceId = BigInt(item.instance.instanceId);
+        const currentQuantity = item.instance.quantity;
+        
+        // Check if values have changed
+        const lastValues = lastTooltipItemRef.current;
+        const hasChanged = !lastValues ||
+          lastValues.instanceId !== currentInstanceId ||
+          lastValues.waterContentMl !== currentWaterContentMl ||
+          lastValues.quantity !== currentQuantity ||
+          lastValues.isSaltWater !== currentIsSaltWater;
+        
+        // Only update if values changed
+        if (hasChanged) {
+          updateTooltipContent(slotIndex, undefined, true);
+        }
+      } else {
+        // Item was removed from slot, hide tooltip
+        hoveredSlotRef.current = null;
+        lastTooltipItemRef.current = null;
+        setTooltip({
+          visible: false,
+          content: null,
+          position: { x: 0, y: 0 }
+        });
+      }
+    }
+  }, [inventoryItems, tooltip.visible, updateTooltipContent, findItemForSlot]);
+
+  // Tooltip handlers
+  const handleSlotMouseEnter = useCallback((slotIndex: number, event: React.MouseEvent) => {
+    const item = findItemForSlot(slotIndex);
+    if (!item) return;
+
+    const slotElement = event.currentTarget as HTMLElement;
+    const rect = slotElement.getBoundingClientRect();
+    
+    // Position tooltip to the left of the slot, similar to status bar panel
+    const tooltipX = rect.left - 10; // 10px gap from slot
+    const tooltipY = rect.top + (rect.height / 2); // Center vertically with slot
+
+    hoveredSlotRef.current = slotIndex;
+    updateTooltipContent(slotIndex, { x: tooltipX, y: tooltipY });
+  }, [findItemForSlot, updateTooltipContent]);
+
   const handleSlotMouseLeave = useCallback(() => {
+    hoveredSlotRef.current = null;
+    lastTooltipItemRef.current = null;
     setTooltip({
       visible: false,
       content: null,
@@ -1401,6 +1478,11 @@ const Hotbar: React.FC<HotbarProps> = ({
                   🍖 {tooltip.content.consumableStats.hunger > 0 ? '+' : ''}{tooltip.content.consumableStats.hunger}
                 </span>
               )}
+            </div>
+          )}
+          {tooltip.content.waterContentMl !== undefined && (
+            <div style={{ fontSize: '10px', color: 'rgba(100, 200, 255, 0.9)', marginBottom: '2px' }}>
+              {tooltip.content.isSaltWater ? '🌊' : '💧'} {tooltip.content.waterContentMl} mL
             </div>
           )}
           <div style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.7)' }}>

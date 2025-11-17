@@ -84,6 +84,8 @@ const SOUND_DEFINITIONS = {
     error_planting: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Planting error sound (client-side immediate for instant feedback when planting in invalid location)
     error_chest_placement: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Chest placement error sound (client-side immediate for instant feedback when Matron's Chest placement fails)
     error_foundation_monument: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Foundation monument error sound (client-side immediate for instant feedback when trying to place foundation in rune stone light area)
+    error_jar_placement: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Jar placement error sound (client-side immediate for instant feedback when trying to place soup back into broth pot output slot)
+    error_broth_not_compatible: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Broth not compatible error sound (when trying to place incompatible item in broth pot)
 } as const;
 
 type SoundType = keyof typeof SOUND_DEFINITIONS;
@@ -97,6 +99,8 @@ const NO_PITCH_VARIATION_SOUNDS: Set<SoundType> = new Set([
     'error_planting',
     'error_chest_placement',
     'error_foundation_monument',
+    'error_jar_placement',
+    'error_broth_not_compatible',
 ] as SoundType[]);
 
 // Track active error sounds to prevent multiple from playing simultaneously
@@ -566,6 +570,10 @@ const playLocalSound = async (
                 variationCount = 1; // error_chest_placement.mp3
             } else if (soundType === 'error_foundation_monument') {
                 variationCount = 1; // error_foundation_monument.mp3
+            } else if (soundType === 'error_jar_placement') {
+                variationCount = 1; // error_jar_placement.mp3
+            } else if (soundType === 'error_broth_not_compatible') {
+                variationCount = 1; // error_broth_not_compatible.mp3
             } else if (soundType === 'arrow_hit') {
                 variationCount = 1; // arrow_hit.mp3
             } else if (soundType === 'shoot_bow') {

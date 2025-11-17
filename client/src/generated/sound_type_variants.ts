@@ -76,4 +76,7 @@ export type FoundationTwigDestroyed = { tag: "FoundationTwigDestroyed" };
 export type ItemThrown = { tag: "ItemThrown" };
 export type ErrorResources = { tag: "ErrorResources" };
 export type DoneCooking = { tag: "DoneCooking" };
+export type SoupBoiling = { tag: "SoupBoiling" };
+export type ErrorJarPlacement = { tag: "ErrorJarPlacement" };
+export type ErrorBrothNotCompatible = { tag: "ErrorBrothNotCompatible" };
 

@@ -1069,7 +1069,7 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
                                         : null;
                                     
                                     const outputSlotInfo = {
-                                        type: getContainerConfig('broth_pot').slotType as any,
+                                        type: 'broth_pot_output' as any, // Special slot type for output slot
                                         index: 3, // 4th slot (0-indexed)
                                         parentId: attachedBrothPot.id
                                     };
@@ -1093,7 +1093,21 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
                                                     sourceSlot={outputSlotInfo}
                                                     onItemDragStart={onItemDragStart}
                                                     onItemDrop={handleItemDropWithTracking}
-                                                    onContextMenu={(event) => brothPotCallbacks?.contextMenuHandler(event, outputItem, 3)}
+                                                    onContextMenu={(event) => {
+                                                        event.preventDefault();
+                                                        // Block context menu for 200ms after drag completion  
+                                                        const timeSinceLastDrag = Date.now() - lastDragCompleteTime.current;
+                                                        if (timeSinceLastDrag < 200) return;
+                                                        
+                                                        if (!connection?.reducers || !outputItem || !attachedBrothPot) return;
+                                                        
+                                                        try {
+                                                            // Output slot quick move doesn't take slot index
+                                                            (connection.reducers as any).quickMoveFromBrothPotOutput(attachedBrothPot.id);
+                                                        } catch (e: any) {
+                                                            console.error(`[OutputSlot QuickMove]`, e);
+                                                        }
+                                                    }}
                                                     onMouseEnter={(e) => onExternalItemMouseEnter(outputItem, e)}
                                                     onMouseLeave={onExternalItemMouseLeave}
                                                     onMouseMove={onExternalItemMouseMove}
@@ -1158,6 +1172,47 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
                                     }} />
                                 </div>
                         </div>
+
+                        {/* Currently Brewing Indicator - pulsing animation */}
+                        {attachedBrothPot.isCooking && (
+                            <div style={{
+                                marginTop: '8px',
+                                marginBottom: '12px',
+                                padding: '8px 12px',
+                                backgroundColor: 'rgba(255, 150, 0, 0.15)',
+                                border: '1px solid rgba(255, 200, 0, 0.5)',
+                                borderRadius: '4px',
+                                textAlign: 'center',
+                                animation: 'pulse 2s ease-in-out infinite',
+                                boxShadow: '0 0 12px rgba(255, 200, 0, 0.4)',
+                            }}>
+                                <style>{`
+                                    @keyframes pulse {
+                                        0%, 100% {
+                                            opacity: 1;
+                                            box-shadow: 0 0 12px rgba(255, 200, 0, 0.4);
+                                        }
+                                        50% {
+                                            opacity: 0.7;
+                                            box-shadow: 0 0 20px rgba(255, 200, 0, 0.7);
+                                        }
+                                    }
+                                `}</style>
+                                <div style={{
+                                    fontSize: '13px',
+                                    color: '#ffcc44',
+                                    fontWeight: 'bold',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                }}>
+                                    <span style={{ fontSize: '16px' }}>🍲</span>
+                                    <span>Currently Brewing {attachedBrothPot.currentRecipeName || 'Soup'}</span>
+                                    <span style={{ fontSize: '16px' }}>🍲</span>
+                                </div>
+                            </div>
+                        )}
 
                     {/* Bidirectional water transfer buttons */}
                     <button

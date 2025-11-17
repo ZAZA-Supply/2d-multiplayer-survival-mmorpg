@@ -161,6 +161,10 @@ import { ManualCleanupThunderEvents } from "./manual_cleanup_thunder_events_redu
 export { ManualCleanupThunderEvents };
 import { MoveItemFromBox } from "./move_item_from_box_reducer.ts";
 export { MoveItemFromBox };
+import { MoveItemFromBrothPot } from "./move_item_from_broth_pot_reducer.ts";
+export { MoveItemFromBrothPot };
+import { MoveItemFromBrothPotOutput } from "./move_item_from_broth_pot_output_reducer.ts";
+export { MoveItemFromBrothPotOutput };
 import { MoveItemFromBrothPotWaterContainer } from "./move_item_from_broth_pot_water_container_reducer.ts";
 export { MoveItemFromBrothPotWaterContainer };
 import { MoveItemFromCampfireToPlayerSlot } from "./move_item_from_campfire_to_player_slot_reducer.ts";
@@ -179,6 +183,8 @@ import { MoveItemFromStash } from "./move_item_from_stash_reducer.ts";
 export { MoveItemFromStash };
 import { MoveItemToBox } from "./move_item_to_box_reducer.ts";
 export { MoveItemToBox };
+import { MoveItemToBrothPot } from "./move_item_to_broth_pot_reducer.ts";
+export { MoveItemToBrothPot };
 import { MoveItemToBrothPotWaterContainer } from "./move_item_to_broth_pot_water_container_reducer.ts";
 export { MoveItemToBrothPotWaterContainer };
 import { MoveItemToCampfire } from "./move_item_to_campfire_reducer.ts";
@@ -201,6 +207,8 @@ import { MoveItemToStash } from "./move_item_to_stash_reducer.ts";
 export { MoveItemToStash };
 import { MoveItemWithinBox } from "./move_item_within_box_reducer.ts";
 export { MoveItemWithinBox };
+import { MoveItemWithinBrothPot } from "./move_item_within_broth_pot_reducer.ts";
+export { MoveItemWithinBrothPot };
 import { MoveItemWithinCampfire } from "./move_item_within_campfire_reducer.ts";
 export { MoveItemWithinCampfire };
 import { MoveItemWithinCorpse } from "./move_item_within_corpse_reducer.ts";
@@ -285,6 +293,10 @@ import { QueryHearthUpkeepCosts } from "./query_hearth_upkeep_costs_reducer.ts";
 export { QueryHearthUpkeepCosts };
 import { QuickMoveFromBox } from "./quick_move_from_box_reducer.ts";
 export { QuickMoveFromBox };
+import { QuickMoveFromBrothPot } from "./quick_move_from_broth_pot_reducer.ts";
+export { QuickMoveFromBrothPot };
+import { QuickMoveFromBrothPotOutput } from "./quick_move_from_broth_pot_output_reducer.ts";
+export { QuickMoveFromBrothPotOutput };
 import { QuickMoveFromBrothPotWaterContainer } from "./quick_move_from_broth_pot_water_container_reducer.ts";
 export { QuickMoveFromBrothPotWaterContainer };
 import { QuickMoveFromCampfire } from "./quick_move_from_campfire_reducer.ts";
@@ -385,6 +397,8 @@ import { SplitStack } from "./split_stack_reducer.ts";
 export { SplitStack };
 import { SplitStackFromBox } from "./split_stack_from_box_reducer.ts";
 export { SplitStackFromBox };
+import { SplitStackFromBrothPot } from "./split_stack_from_broth_pot_reducer.ts";
+export { SplitStackFromBrothPot };
 import { SplitStackFromCampfire } from "./split_stack_from_campfire_reducer.ts";
 export { SplitStackFromCampfire };
 import { SplitStackFromCorpse } from "./split_stack_from_corpse_reducer.ts";
@@ -399,6 +413,8 @@ import { SplitStackFromStash } from "./split_stack_from_stash_reducer.ts";
 export { SplitStackFromStash };
 import { SplitStackIntoBox } from "./split_stack_into_box_reducer.ts";
 export { SplitStackIntoBox };
+import { SplitStackIntoBrothPot } from "./split_stack_into_broth_pot_reducer.ts";
+export { SplitStackIntoBrothPot };
 import { SplitStackIntoCampfire } from "./split_stack_into_campfire_reducer.ts";
 export { SplitStackIntoCampfire };
 import { SplitStackIntoCorpse } from "./split_stack_into_corpse_reducer.ts";
@@ -413,6 +429,8 @@ import { SplitStackIntoStash } from "./split_stack_into_stash_reducer.ts";
 export { SplitStackIntoStash };
 import { SplitStackWithinBox } from "./split_stack_within_box_reducer.ts";
 export { SplitStackWithinBox };
+import { SplitStackWithinBrothPot } from "./split_stack_within_broth_pot_reducer.ts";
+export { SplitStackWithinBrothPot };
 import { SplitStackWithinCampfire } from "./split_stack_within_campfire_reducer.ts";
 export { SplitStackWithinCampfire };
 import { SplitStackWithinCorpse } from "./split_stack_within_corpse_reducer.ts";
@@ -2042,6 +2060,14 @@ const REMOTE_MODULE = {
       reducerName: "move_item_from_box",
       argsType: MoveItemFromBox.getTypeScriptAlgebraicType(),
     },
+    move_item_from_broth_pot: {
+      reducerName: "move_item_from_broth_pot",
+      argsType: MoveItemFromBrothPot.getTypeScriptAlgebraicType(),
+    },
+    move_item_from_broth_pot_output: {
+      reducerName: "move_item_from_broth_pot_output",
+      argsType: MoveItemFromBrothPotOutput.getTypeScriptAlgebraicType(),
+    },
     move_item_from_broth_pot_water_container: {
       reducerName: "move_item_from_broth_pot_water_container",
       argsType: MoveItemFromBrothPotWaterContainer.getTypeScriptAlgebraicType(),
@@ -2077,6 +2103,10 @@ const REMOTE_MODULE = {
     move_item_to_box: {
       reducerName: "move_item_to_box",
       argsType: MoveItemToBox.getTypeScriptAlgebraicType(),
+    },
+    move_item_to_broth_pot: {
+      reducerName: "move_item_to_broth_pot",
+      argsType: MoveItemToBrothPot.getTypeScriptAlgebraicType(),
     },
     move_item_to_broth_pot_water_container: {
       reducerName: "move_item_to_broth_pot_water_container",
@@ -2121,6 +2151,10 @@ const REMOTE_MODULE = {
     move_item_within_box: {
       reducerName: "move_item_within_box",
       argsType: MoveItemWithinBox.getTypeScriptAlgebraicType(),
+    },
+    move_item_within_broth_pot: {
+      reducerName: "move_item_within_broth_pot",
+      argsType: MoveItemWithinBrothPot.getTypeScriptAlgebraicType(),
     },
     move_item_within_campfire: {
       reducerName: "move_item_within_campfire",
@@ -2289,6 +2323,14 @@ const REMOTE_MODULE = {
     quick_move_from_box: {
       reducerName: "quick_move_from_box",
       argsType: QuickMoveFromBox.getTypeScriptAlgebraicType(),
+    },
+    quick_move_from_broth_pot: {
+      reducerName: "quick_move_from_broth_pot",
+      argsType: QuickMoveFromBrothPot.getTypeScriptAlgebraicType(),
+    },
+    quick_move_from_broth_pot_output: {
+      reducerName: "quick_move_from_broth_pot_output",
+      argsType: QuickMoveFromBrothPotOutput.getTypeScriptAlgebraicType(),
     },
     quick_move_from_broth_pot_water_container: {
       reducerName: "quick_move_from_broth_pot_water_container",
@@ -2490,6 +2532,10 @@ const REMOTE_MODULE = {
       reducerName: "split_stack_from_box",
       argsType: SplitStackFromBox.getTypeScriptAlgebraicType(),
     },
+    split_stack_from_broth_pot: {
+      reducerName: "split_stack_from_broth_pot",
+      argsType: SplitStackFromBrothPot.getTypeScriptAlgebraicType(),
+    },
     split_stack_from_campfire: {
       reducerName: "split_stack_from_campfire",
       argsType: SplitStackFromCampfire.getTypeScriptAlgebraicType(),
@@ -2518,6 +2564,10 @@ const REMOTE_MODULE = {
       reducerName: "split_stack_into_box",
       argsType: SplitStackIntoBox.getTypeScriptAlgebraicType(),
     },
+    split_stack_into_broth_pot: {
+      reducerName: "split_stack_into_broth_pot",
+      argsType: SplitStackIntoBrothPot.getTypeScriptAlgebraicType(),
+    },
     split_stack_into_campfire: {
       reducerName: "split_stack_into_campfire",
       argsType: SplitStackIntoCampfire.getTypeScriptAlgebraicType(),
@@ -2545,6 +2595,10 @@ const REMOTE_MODULE = {
     split_stack_within_box: {
       reducerName: "split_stack_within_box",
       argsType: SplitStackWithinBox.getTypeScriptAlgebraicType(),
+    },
+    split_stack_within_broth_pot: {
+      reducerName: "split_stack_within_broth_pot",
+      argsType: SplitStackWithinBrothPot.getTypeScriptAlgebraicType(),
     },
     split_stack_within_campfire: {
       reducerName: "split_stack_within_campfire",
@@ -2773,6 +2827,8 @@ export type Reducer = never
 | { name: "ManageSeasonalPlants", args: ManageSeasonalPlants }
 | { name: "ManualCleanupThunderEvents", args: ManualCleanupThunderEvents }
 | { name: "MoveItemFromBox", args: MoveItemFromBox }
+| { name: "MoveItemFromBrothPot", args: MoveItemFromBrothPot }
+| { name: "MoveItemFromBrothPotOutput", args: MoveItemFromBrothPotOutput }
 | { name: "MoveItemFromBrothPotWaterContainer", args: MoveItemFromBrothPotWaterContainer }
 | { name: "MoveItemFromCampfireToPlayerSlot", args: MoveItemFromCampfireToPlayerSlot }
 | { name: "MoveItemFromCorpse", args: MoveItemFromCorpse }
@@ -2782,6 +2838,7 @@ export type Reducer = never
 | { name: "MoveItemFromRainCollector", args: MoveItemFromRainCollector }
 | { name: "MoveItemFromStash", args: MoveItemFromStash }
 | { name: "MoveItemToBox", args: MoveItemToBox }
+| { name: "MoveItemToBrothPot", args: MoveItemToBrothPot }
 | { name: "MoveItemToBrothPotWaterContainer", args: MoveItemToBrothPotWaterContainer }
 | { name: "MoveItemToCampfire", args: MoveItemToCampfire }
 | { name: "MoveItemToCorpse", args: MoveItemToCorpse }
@@ -2793,6 +2850,7 @@ export type Reducer = never
 | { name: "MoveItemToRainCollector", args: MoveItemToRainCollector }
 | { name: "MoveItemToStash", args: MoveItemToStash }
 | { name: "MoveItemWithinBox", args: MoveItemWithinBox }
+| { name: "MoveItemWithinBrothPot", args: MoveItemWithinBrothPot }
 | { name: "MoveItemWithinCampfire", args: MoveItemWithinCampfire }
 | { name: "MoveItemWithinCorpse", args: MoveItemWithinCorpse }
 | { name: "MoveItemWithinFurnace", args: MoveItemWithinFurnace }
@@ -2835,6 +2893,8 @@ export type Reducer = never
 | { name: "PurchaseMemoryGridNode", args: PurchaseMemoryGridNode }
 | { name: "QueryHearthUpkeepCosts", args: QueryHearthUpkeepCosts }
 | { name: "QuickMoveFromBox", args: QuickMoveFromBox }
+| { name: "QuickMoveFromBrothPot", args: QuickMoveFromBrothPot }
+| { name: "QuickMoveFromBrothPotOutput", args: QuickMoveFromBrothPotOutput }
 | { name: "QuickMoveFromBrothPotWaterContainer", args: QuickMoveFromBrothPotWaterContainer }
 | { name: "QuickMoveFromCampfire", args: QuickMoveFromCampfire }
 | { name: "QuickMoveFromCorpse", args: QuickMoveFromCorpse }
@@ -2885,6 +2945,7 @@ export type Reducer = never
 | { name: "SplitAndMoveFromFurnace", args: SplitAndMoveFromFurnace }
 | { name: "SplitStack", args: SplitStack }
 | { name: "SplitStackFromBox", args: SplitStackFromBox }
+| { name: "SplitStackFromBrothPot", args: SplitStackFromBrothPot }
 | { name: "SplitStackFromCampfire", args: SplitStackFromCampfire }
 | { name: "SplitStackFromCorpse", args: SplitStackFromCorpse }
 | { name: "SplitStackFromFurnace", args: SplitStackFromFurnace }
@@ -2892,6 +2953,7 @@ export type Reducer = never
 | { name: "SplitStackFromLantern", args: SplitStackFromLantern }
 | { name: "SplitStackFromStash", args: SplitStackFromStash }
 | { name: "SplitStackIntoBox", args: SplitStackIntoBox }
+| { name: "SplitStackIntoBrothPot", args: SplitStackIntoBrothPot }
 | { name: "SplitStackIntoCampfire", args: SplitStackIntoCampfire }
 | { name: "SplitStackIntoCorpse", args: SplitStackIntoCorpse }
 | { name: "SplitStackIntoFurnace", args: SplitStackIntoFurnace }
@@ -2899,6 +2961,7 @@ export type Reducer = never
 | { name: "SplitStackIntoLantern", args: SplitStackIntoLantern }
 | { name: "SplitStackIntoStash", args: SplitStackIntoStash }
 | { name: "SplitStackWithinBox", args: SplitStackWithinBox }
+| { name: "SplitStackWithinBrothPot", args: SplitStackWithinBrothPot }
 | { name: "SplitStackWithinCampfire", args: SplitStackWithinCampfire }
 | { name: "SplitStackWithinCorpse", args: SplitStackWithinCorpse }
 | { name: "SplitStackWithinFurnace", args: SplitStackWithinFurnace }
@@ -3905,6 +3968,38 @@ export class RemoteReducers {
     this.connection.offReducer("move_item_from_box", callback);
   }
 
+  moveItemFromBrothPot(brothPotId: number, sourceSlotIndex: number, targetSlotType: string, targetSlotIndex: number) {
+    const __args = { brothPotId, sourceSlotIndex, targetSlotType, targetSlotIndex };
+    let __writer = new __BinaryWriter(1024);
+    MoveItemFromBrothPot.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("move_item_from_broth_pot", __argsBuffer, this.setCallReducerFlags.moveItemFromBrothPotFlags);
+  }
+
+  onMoveItemFromBrothPot(callback: (ctx: ReducerEventContext, brothPotId: number, sourceSlotIndex: number, targetSlotType: string, targetSlotIndex: number) => void) {
+    this.connection.onReducer("move_item_from_broth_pot", callback);
+  }
+
+  removeOnMoveItemFromBrothPot(callback: (ctx: ReducerEventContext, brothPotId: number, sourceSlotIndex: number, targetSlotType: string, targetSlotIndex: number) => void) {
+    this.connection.offReducer("move_item_from_broth_pot", callback);
+  }
+
+  moveItemFromBrothPotOutput(brothPotId: number, targetSlotType: string, targetSlotIndex: number) {
+    const __args = { brothPotId, targetSlotType, targetSlotIndex };
+    let __writer = new __BinaryWriter(1024);
+    MoveItemFromBrothPotOutput.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("move_item_from_broth_pot_output", __argsBuffer, this.setCallReducerFlags.moveItemFromBrothPotOutputFlags);
+  }
+
+  onMoveItemFromBrothPotOutput(callback: (ctx: ReducerEventContext, brothPotId: number, targetSlotType: string, targetSlotIndex: number) => void) {
+    this.connection.onReducer("move_item_from_broth_pot_output", callback);
+  }
+
+  removeOnMoveItemFromBrothPotOutput(callback: (ctx: ReducerEventContext, brothPotId: number, targetSlotType: string, targetSlotIndex: number) => void) {
+    this.connection.offReducer("move_item_from_broth_pot_output", callback);
+  }
+
   moveItemFromBrothPotWaterContainer(brothPotId: number, targetSlotType: string, targetSlotIndex: number) {
     const __args = { brothPotId, targetSlotType, targetSlotIndex };
     let __writer = new __BinaryWriter(1024);
@@ -4047,6 +4142,22 @@ export class RemoteReducers {
 
   removeOnMoveItemToBox(callback: (ctx: ReducerEventContext, boxId: number, targetSlotIndex: number, itemInstanceId: bigint) => void) {
     this.connection.offReducer("move_item_to_box", callback);
+  }
+
+  moveItemToBrothPot(brothPotId: number, targetSlotIndex: number, itemInstanceId: bigint) {
+    const __args = { brothPotId, targetSlotIndex, itemInstanceId };
+    let __writer = new __BinaryWriter(1024);
+    MoveItemToBrothPot.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("move_item_to_broth_pot", __argsBuffer, this.setCallReducerFlags.moveItemToBrothPotFlags);
+  }
+
+  onMoveItemToBrothPot(callback: (ctx: ReducerEventContext, brothPotId: number, targetSlotIndex: number, itemInstanceId: bigint) => void) {
+    this.connection.onReducer("move_item_to_broth_pot", callback);
+  }
+
+  removeOnMoveItemToBrothPot(callback: (ctx: ReducerEventContext, brothPotId: number, targetSlotIndex: number, itemInstanceId: bigint) => void) {
+    this.connection.offReducer("move_item_to_broth_pot", callback);
   }
 
   moveItemToBrothPotWaterContainer(brothPotId: number, itemInstanceId: bigint) {
@@ -4223,6 +4334,22 @@ export class RemoteReducers {
 
   removeOnMoveItemWithinBox(callback: (ctx: ReducerEventContext, boxId: number, sourceSlotIndex: number, targetSlotIndex: number) => void) {
     this.connection.offReducer("move_item_within_box", callback);
+  }
+
+  moveItemWithinBrothPot(brothPotId: number, sourceSlotIndex: number, targetSlotIndex: number) {
+    const __args = { brothPotId, sourceSlotIndex, targetSlotIndex };
+    let __writer = new __BinaryWriter(1024);
+    MoveItemWithinBrothPot.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("move_item_within_broth_pot", __argsBuffer, this.setCallReducerFlags.moveItemWithinBrothPotFlags);
+  }
+
+  onMoveItemWithinBrothPot(callback: (ctx: ReducerEventContext, brothPotId: number, sourceSlotIndex: number, targetSlotIndex: number) => void) {
+    this.connection.onReducer("move_item_within_broth_pot", callback);
+  }
+
+  removeOnMoveItemWithinBrothPot(callback: (ctx: ReducerEventContext, brothPotId: number, sourceSlotIndex: number, targetSlotIndex: number) => void) {
+    this.connection.offReducer("move_item_within_broth_pot", callback);
   }
 
   moveItemWithinCampfire(campfireId: number, sourceSlotIndex: number, targetSlotIndex: number) {
@@ -4895,6 +5022,38 @@ export class RemoteReducers {
 
   removeOnQuickMoveFromBox(callback: (ctx: ReducerEventContext, boxId: number, sourceSlotIndex: number) => void) {
     this.connection.offReducer("quick_move_from_box", callback);
+  }
+
+  quickMoveFromBrothPot(brothPotId: number, sourceSlotIndex: number) {
+    const __args = { brothPotId, sourceSlotIndex };
+    let __writer = new __BinaryWriter(1024);
+    QuickMoveFromBrothPot.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("quick_move_from_broth_pot", __argsBuffer, this.setCallReducerFlags.quickMoveFromBrothPotFlags);
+  }
+
+  onQuickMoveFromBrothPot(callback: (ctx: ReducerEventContext, brothPotId: number, sourceSlotIndex: number) => void) {
+    this.connection.onReducer("quick_move_from_broth_pot", callback);
+  }
+
+  removeOnQuickMoveFromBrothPot(callback: (ctx: ReducerEventContext, brothPotId: number, sourceSlotIndex: number) => void) {
+    this.connection.offReducer("quick_move_from_broth_pot", callback);
+  }
+
+  quickMoveFromBrothPotOutput(brothPotId: number) {
+    const __args = { brothPotId };
+    let __writer = new __BinaryWriter(1024);
+    QuickMoveFromBrothPotOutput.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("quick_move_from_broth_pot_output", __argsBuffer, this.setCallReducerFlags.quickMoveFromBrothPotOutputFlags);
+  }
+
+  onQuickMoveFromBrothPotOutput(callback: (ctx: ReducerEventContext, brothPotId: number) => void) {
+    this.connection.onReducer("quick_move_from_broth_pot_output", callback);
+  }
+
+  removeOnQuickMoveFromBrothPotOutput(callback: (ctx: ReducerEventContext, brothPotId: number) => void) {
+    this.connection.offReducer("quick_move_from_broth_pot_output", callback);
   }
 
   quickMoveFromBrothPotWaterContainer(brothPotId: number) {
@@ -5665,6 +5824,22 @@ export class RemoteReducers {
     this.connection.offReducer("split_stack_from_box", callback);
   }
 
+  splitStackFromBrothPot(brothPotId: number, sourceSlotIndex: number, quantityToSplit: number, targetSlotType: string, targetSlotIndex: number) {
+    const __args = { brothPotId, sourceSlotIndex, quantityToSplit, targetSlotType, targetSlotIndex };
+    let __writer = new __BinaryWriter(1024);
+    SplitStackFromBrothPot.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("split_stack_from_broth_pot", __argsBuffer, this.setCallReducerFlags.splitStackFromBrothPotFlags);
+  }
+
+  onSplitStackFromBrothPot(callback: (ctx: ReducerEventContext, brothPotId: number, sourceSlotIndex: number, quantityToSplit: number, targetSlotType: string, targetSlotIndex: number) => void) {
+    this.connection.onReducer("split_stack_from_broth_pot", callback);
+  }
+
+  removeOnSplitStackFromBrothPot(callback: (ctx: ReducerEventContext, brothPotId: number, sourceSlotIndex: number, quantityToSplit: number, targetSlotType: string, targetSlotIndex: number) => void) {
+    this.connection.offReducer("split_stack_from_broth_pot", callback);
+  }
+
   splitStackFromCampfire(sourceCampfireId: number, sourceSlotIndex: number, quantityToSplit: number, targetSlotType: string, targetSlotIndex: number) {
     const __args = { sourceCampfireId, sourceSlotIndex, quantityToSplit, targetSlotType, targetSlotIndex };
     let __writer = new __BinaryWriter(1024);
@@ -5777,6 +5952,22 @@ export class RemoteReducers {
     this.connection.offReducer("split_stack_into_box", callback);
   }
 
+  splitStackIntoBrothPot(brothPotId: number, targetSlotIndex: number, sourceItemInstanceId: bigint, quantityToSplit: number) {
+    const __args = { brothPotId, targetSlotIndex, sourceItemInstanceId, quantityToSplit };
+    let __writer = new __BinaryWriter(1024);
+    SplitStackIntoBrothPot.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("split_stack_into_broth_pot", __argsBuffer, this.setCallReducerFlags.splitStackIntoBrothPotFlags);
+  }
+
+  onSplitStackIntoBrothPot(callback: (ctx: ReducerEventContext, brothPotId: number, targetSlotIndex: number, sourceItemInstanceId: bigint, quantityToSplit: number) => void) {
+    this.connection.onReducer("split_stack_into_broth_pot", callback);
+  }
+
+  removeOnSplitStackIntoBrothPot(callback: (ctx: ReducerEventContext, brothPotId: number, targetSlotIndex: number, sourceItemInstanceId: bigint, quantityToSplit: number) => void) {
+    this.connection.offReducer("split_stack_into_broth_pot", callback);
+  }
+
   splitStackIntoCampfire(sourceItemInstanceId: bigint, quantityToSplit: number, targetCampfireId: number, targetSlotIndex: number) {
     const __args = { sourceItemInstanceId, quantityToSplit, targetCampfireId, targetSlotIndex };
     let __writer = new __BinaryWriter(1024);
@@ -5887,6 +6078,22 @@ export class RemoteReducers {
 
   removeOnSplitStackWithinBox(callback: (ctx: ReducerEventContext, boxId: number, sourceSlotIndex: number, targetSlotIndex: number, quantityToSplit: number) => void) {
     this.connection.offReducer("split_stack_within_box", callback);
+  }
+
+  splitStackWithinBrothPot(brothPotId: number, sourceSlotIndex: number, targetSlotIndex: number, quantityToSplit: number) {
+    const __args = { brothPotId, sourceSlotIndex, targetSlotIndex, quantityToSplit };
+    let __writer = new __BinaryWriter(1024);
+    SplitStackWithinBrothPot.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("split_stack_within_broth_pot", __argsBuffer, this.setCallReducerFlags.splitStackWithinBrothPotFlags);
+  }
+
+  onSplitStackWithinBrothPot(callback: (ctx: ReducerEventContext, brothPotId: number, sourceSlotIndex: number, targetSlotIndex: number, quantityToSplit: number) => void) {
+    this.connection.onReducer("split_stack_within_broth_pot", callback);
+  }
+
+  removeOnSplitStackWithinBrothPot(callback: (ctx: ReducerEventContext, brothPotId: number, sourceSlotIndex: number, targetSlotIndex: number, quantityToSplit: number) => void) {
+    this.connection.offReducer("split_stack_within_broth_pot", callback);
   }
 
   splitStackWithinCampfire(campfireId: number, sourceSlotIndex: number, quantityToSplit: number, targetSlotIndex: number) {
@@ -6707,6 +6914,16 @@ export class SetReducerFlags {
     this.moveItemFromBoxFlags = flags;
   }
 
+  moveItemFromBrothPotFlags: __CallReducerFlags = 'FullUpdate';
+  moveItemFromBrothPot(flags: __CallReducerFlags) {
+    this.moveItemFromBrothPotFlags = flags;
+  }
+
+  moveItemFromBrothPotOutputFlags: __CallReducerFlags = 'FullUpdate';
+  moveItemFromBrothPotOutput(flags: __CallReducerFlags) {
+    this.moveItemFromBrothPotOutputFlags = flags;
+  }
+
   moveItemFromBrothPotWaterContainerFlags: __CallReducerFlags = 'FullUpdate';
   moveItemFromBrothPotWaterContainer(flags: __CallReducerFlags) {
     this.moveItemFromBrothPotWaterContainerFlags = flags;
@@ -6750,6 +6967,11 @@ export class SetReducerFlags {
   moveItemToBoxFlags: __CallReducerFlags = 'FullUpdate';
   moveItemToBox(flags: __CallReducerFlags) {
     this.moveItemToBoxFlags = flags;
+  }
+
+  moveItemToBrothPotFlags: __CallReducerFlags = 'FullUpdate';
+  moveItemToBrothPot(flags: __CallReducerFlags) {
+    this.moveItemToBrothPotFlags = flags;
   }
 
   moveItemToBrothPotWaterContainerFlags: __CallReducerFlags = 'FullUpdate';
@@ -6805,6 +7027,11 @@ export class SetReducerFlags {
   moveItemWithinBoxFlags: __CallReducerFlags = 'FullUpdate';
   moveItemWithinBox(flags: __CallReducerFlags) {
     this.moveItemWithinBoxFlags = flags;
+  }
+
+  moveItemWithinBrothPotFlags: __CallReducerFlags = 'FullUpdate';
+  moveItemWithinBrothPot(flags: __CallReducerFlags) {
+    this.moveItemWithinBrothPotFlags = flags;
   }
 
   moveItemWithinCampfireFlags: __CallReducerFlags = 'FullUpdate';
@@ -7015,6 +7242,16 @@ export class SetReducerFlags {
   quickMoveFromBoxFlags: __CallReducerFlags = 'FullUpdate';
   quickMoveFromBox(flags: __CallReducerFlags) {
     this.quickMoveFromBoxFlags = flags;
+  }
+
+  quickMoveFromBrothPotFlags: __CallReducerFlags = 'FullUpdate';
+  quickMoveFromBrothPot(flags: __CallReducerFlags) {
+    this.quickMoveFromBrothPotFlags = flags;
+  }
+
+  quickMoveFromBrothPotOutputFlags: __CallReducerFlags = 'FullUpdate';
+  quickMoveFromBrothPotOutput(flags: __CallReducerFlags) {
+    this.quickMoveFromBrothPotOutputFlags = flags;
   }
 
   quickMoveFromBrothPotWaterContainerFlags: __CallReducerFlags = 'FullUpdate';
@@ -7267,6 +7504,11 @@ export class SetReducerFlags {
     this.splitStackFromBoxFlags = flags;
   }
 
+  splitStackFromBrothPotFlags: __CallReducerFlags = 'FullUpdate';
+  splitStackFromBrothPot(flags: __CallReducerFlags) {
+    this.splitStackFromBrothPotFlags = flags;
+  }
+
   splitStackFromCampfireFlags: __CallReducerFlags = 'FullUpdate';
   splitStackFromCampfire(flags: __CallReducerFlags) {
     this.splitStackFromCampfireFlags = flags;
@@ -7302,6 +7544,11 @@ export class SetReducerFlags {
     this.splitStackIntoBoxFlags = flags;
   }
 
+  splitStackIntoBrothPotFlags: __CallReducerFlags = 'FullUpdate';
+  splitStackIntoBrothPot(flags: __CallReducerFlags) {
+    this.splitStackIntoBrothPotFlags = flags;
+  }
+
   splitStackIntoCampfireFlags: __CallReducerFlags = 'FullUpdate';
   splitStackIntoCampfire(flags: __CallReducerFlags) {
     this.splitStackIntoCampfireFlags = flags;
@@ -7335,6 +7582,11 @@ export class SetReducerFlags {
   splitStackWithinBoxFlags: __CallReducerFlags = 'FullUpdate';
   splitStackWithinBox(flags: __CallReducerFlags) {
     this.splitStackWithinBoxFlags = flags;
+  }
+
+  splitStackWithinBrothPotFlags: __CallReducerFlags = 'FullUpdate';
+  splitStackWithinBrothPot(flags: __CallReducerFlags) {
+    this.splitStackWithinBrothPotFlags = flags;
   }
 
   splitStackWithinCampfireFlags: __CallReducerFlags = 'FullUpdate';

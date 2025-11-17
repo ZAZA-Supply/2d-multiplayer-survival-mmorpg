@@ -263,6 +263,9 @@ import oldHardtackBiscuitsIcon from '../assets/items/old_hardtack_biscuits.png';
 import expiredSovietChocolateIcon from '../assets/items/expired_soviet_chocolate.png';
 import mysteryCanIcon from '../assets/items/mystery_can.png';
 
+// Brewed soups
+import soupStoneSoupIcon from '../assets/items/soup_stone_soup.png';
+
 // === SEEDS ===
 // All plantable items
 
@@ -639,6 +642,9 @@ const iconMap: { [key: string]: string | undefined } = {
   
   // Misc/Special
   'death_marker.png': deathMarkerIcon,
+
+  // === BREWED SOUPS ===
+  'soup_stone_soup.png': soupStoneSoupIcon,
 };
 
 // Export a function that provides the fallback logic

@@ -11,6 +11,7 @@ import {
 } from '../generated';
 import { PopulatedItem } from '../components/InventoryUI';
 import { DragSourceSlotInfo, DraggedItemInfo, SlotType } from '../types/dragDropTypes';
+import { playImmediateSound } from '../hooks/useSoundSystem';
 
 // Container type definitions based on actual usage
 export type ContainerType = 
@@ -120,7 +121,8 @@ export function getContainerTypeFromSlotType(slotType: string): ContainerType | 
         'rain_collector': 'rain_collector',
         'homestead_hearth': 'homestead_hearth',
         'broth_pot': 'broth_pot',
-        'broth_pot_water_container': 'broth_pot' // Special slot type for water container
+        'broth_pot_water_container': 'broth_pot', // Special slot type for water container
+        'broth_pot_output': 'broth_pot' // Special slot type for output slot
     };
     
     return mapping[slotType] || null;
@@ -170,8 +172,7 @@ export function handleWorldDrop(
         }
         
         if (entityIdNum === null || slotIndexNum === null || isNaN(quantityToDrop) || quantityToDrop <= 0) {
-            setDropError(`Cannot drop item: Invalid container ID, slot index, or quantity.`);
-            return true;
+            return true; // Silently reject - invalid parameters
         }
         
         // Call the appropriate reducer
@@ -180,22 +181,21 @@ export function handleWorldDrop(
             if (connection.reducers[reducerName]) {
                 connection.reducers[reducerName](entityIdNum, slotIndexNum, quantityToDrop);
             } else {
-                setDropError(`Drop action not available for ${containerType}.`);
+                // Silently reject - reducer not available
             }
         } else {
             const reducerName = reducers.dropToWorld;
             if (connection.reducers[reducerName]) {
                 connection.reducers[reducerName](entityIdNum, slotIndexNum);
             } else {
-                setDropError(`Drop action not available for ${containerType}.`);
+                // Silently reject - reducer not available
             }
         }
         
         return true;
     } catch (error) {
         console.error(`[WorldDrop ${containerType}]`, error);
-        setDropError(`Failed to drop item: ${(error as any)?.message || error}`);
-        return true;
+        return true; // Silently reject - error occurred
     }
 }
 
@@ -226,14 +226,15 @@ export function handleContainerToPlayerMove(
             : parseInt(sourceInfo.sourceSlot.index.toString(), 10);
         
         if (sourceEntityId === null || isNaN(sourceSlotIndex)) {
-            setDropError("Cannot move item: Source context lost.");
-            return true;
+            return true; // Silently reject - invalid source context
         }
         
-        // Special handling for water container slot
+        // Special handling for water container slot and output slot
         let reducerName: string;
         if (sourceInfo.sourceSlot.type === 'broth_pot_water_container') {
             reducerName = 'moveItemFromBrothPotWaterContainer';
+        } else if (sourceInfo.sourceSlot.type === 'broth_pot_output') {
+            reducerName = 'moveItemFromBrothPotOutput';
         } else {
             reducerName = reducers.moveToPlayer;
         }
@@ -247,8 +248,7 @@ export function handleContainerToPlayerMove(
             // Check if reducer exists
             if (!connection.reducers[reducerName]) {
                 console.error(`[ContainerToPlayer WaterContainer] Reducer ${reducerName} not found. Available reducers:`, Object.keys(connection.reducers || {}));
-                setDropError(`Move action not available: reducer ${reducerName} not found.`);
-                return true;
+                return true; // Silently reject - reducer not found
             }
             
             console.log(`[ContainerToPlayer WaterContainer] Calling ${reducerName} with:`, {
@@ -263,14 +263,37 @@ export function handleContainerToPlayerMove(
                 (connection.reducers as any)[reducerName](sourceEntityId, targetTypeStr, targetIndexNum);
             } catch (error: any) {
                 console.error(`[ContainerToPlayer WaterContainer] Error calling reducer:`, error);
-                setDropError(`Failed to move item: ${error?.message || error}`);
-                return true;
+                return true; // Silently reject - reducer error
+            }
+        } else if (sourceInfo.sourceSlot.type === 'broth_pot_output') {
+            // Output slot reducer: (broth_pot_id, target_slot_type, target_slot_index)
+            const targetTypeStr = String(targetSlotType);
+            const targetIndexNum = typeof targetSlotIndex === 'number' ? targetSlotIndex : parseInt(String(targetSlotIndex), 10);
+            
+            // Check if reducer exists
+            if (!connection.reducers[reducerName]) {
+                console.error(`[ContainerToPlayer Output] Reducer ${reducerName} not found. Available reducers:`, Object.keys(connection.reducers || {}));
+                return true; // Silently reject - reducer not found
+            }
+            
+            console.log(`[ContainerToPlayer Output] Calling ${reducerName} with:`, {
+                brothPotId: sourceEntityId,
+                targetSlotType: targetTypeStr,
+                targetSlotIndex: targetIndexNum,
+                sourceSlotType: sourceInfo.sourceSlot.type,
+                sourceSlotParentId: sourceInfo.sourceSlot.parentId
+            });
+            
+            try {
+                (connection.reducers as any)[reducerName](sourceEntityId, targetTypeStr, targetIndexNum);
+            } catch (error: any) {
+                console.error(`[ContainerToPlayer Output] Error calling reducer:`, error);
+                return true; // Silently reject - reducer error
             }
         } else {
             if (!connection.reducers[reducerName]) {
                 console.error(`[ContainerToPlayer] Reducer ${reducerName} not found. Available reducers:`, Object.keys(connection.reducers || {}));
-                setDropError(`Move action not available for ${containerType}.`);
-                return true;
+                return true; // Silently reject - reducer not found
             }
             connection.reducers[reducerName](sourceEntityId, sourceSlotIndex, targetSlotType, targetSlotIndex);
         }
@@ -278,8 +301,7 @@ export function handleContainerToPlayerMove(
         return true;
     } catch (error) {
         console.error(`[ContainerToPlayer ${containerType}]`, error);
-        setDropError(`Failed to move item: ${(error as any)?.message || error}`);
-        return true;
+        return true; // Silently reject - error occurred
     }
 }
 
@@ -304,8 +326,7 @@ export function handlePlayerToContainerMove(
             : parseInt(targetSlot.index.toString(), 10);
         
         if (isNaN(targetIndexNum)) {
-            setDropError("Invalid slot.");
-            return true;
+            return true; // Silently reject - invalid slot
         }
         
         // Get container ID from targetSlot.parentId or interactingWith
@@ -317,8 +338,13 @@ export function handlePlayerToContainerMove(
         }
         
         if (containerIdNum === null || isNaN(containerIdNum)) {
-            setDropError(`Cannot move item: ${containerType} context lost.`);
-            return true;
+            return true; // Silently reject - context lost
+        }
+        
+        // Special validation: Prevent placing items into broth pot output slot
+        if (targetSlot.type === 'broth_pot_output') {
+            playImmediateSound('error_jar_placement', 1.0);
+            return true; // Silently reject - sound provides feedback
         }
         
         // Use appropriate reducer based on container type and slot type
@@ -331,6 +357,7 @@ export function handlePlayerToContainerMove(
             // Special handling for water container slot
             reducerName = 'moveItemToBrothPotWaterContainer';
         } else {
+            // Use standard reducer pattern (includes broth_pot ingredient slots)
             reducerName = reducers.moveFromPlayer;
         }
         
@@ -341,17 +368,18 @@ export function handlePlayerToContainerMove(
                 // Water container slot reducer only takes broth_pot_id and item_instance_id
                 connection.reducers[reducerName](containerIdNum, itemInstanceId);
             } else {
+                // Standard pattern: (container_id, slot_index, item_instance_id)
+                // This works for broth_pot ingredient slots too: moveItemToBrothPot(broth_pot_id, slot_index, item_instance_id)
                 connection.reducers[reducerName](containerIdNum, targetIndexNum, itemInstanceId);
             }
         } else {
-            setDropError(`Move action not available for ${containerType}.`);
+            // Silently reject - reducer not available
         }
         
         return true;
     } catch (error) {
         console.error(`[PlayerToContainer ${containerType}]`, error);
-        setDropError(`Failed to move item: ${(error as any)?.message || error}`);
-        return true;
+        return true; // Silently reject - error occurred
     }
 }
 
@@ -378,21 +406,18 @@ export function handleWithinContainerMove(
             : parseInt(targetSlot.index.toString(), 10);
         
         if (isNaN(sourceSlotIndex) || isNaN(targetSlotIndex)) {
-            setDropError("Invalid source or target slot.");
-            return true;
+            return true; // Silently reject - invalid slots
         }
         
         const sourceContainerId = sourceInfo.sourceSlot.parentId ? Number(sourceInfo.sourceSlot.parentId) : null;
         const targetContainerId = targetSlot.parentId ? Number(targetSlot.parentId) : null;
         
         if (sourceContainerId !== targetContainerId) {
-            setDropError(`Cannot move items between different ${containerType}s.`);
-            return true;
+            return true; // Silently reject - different containers
         }
         
         if (sourceContainerId === null) {
-            setDropError(`Cannot move item: ${containerType} context lost.`);
-            return true;
+            return true; // Silently reject - context lost
         }
         
         // Use standardized moveWithin reducer for all containers
@@ -401,14 +426,13 @@ export function handleWithinContainerMove(
         if (connection.reducers[reducerName]) {
             connection.reducers[reducerName](sourceContainerId, sourceSlotIndex, targetSlotIndex);
         } else {
-            setDropError(`Within-container move not available for ${containerType}.`);
+            // Silently reject - reducer not available
         }
         
         return true;
     } catch (error) {
         console.error(`[WithinContainer ${containerType}]`, error);
-        setDropError(`Failed to move item: ${(error as any)?.message || error}`);
-        return true;
+        return true; // Silently reject - error occurred
     }
 }
 
@@ -676,8 +700,7 @@ export function handlePlayerToContainerSplit(
             : parseInt(targetSlot.index.toString(), 10);
         
         if (isNaN(targetSlotIndexNum)) {
-            setDropError("Invalid target slot index.");
-            return true;
+            return true; // Silently reject - invalid slot index
         }
         
         let targetContainerIdNum: number | null = null;
@@ -686,8 +709,7 @@ export function handlePlayerToContainerSplit(
         }
         
         if (targetContainerIdNum === null || isNaN(targetContainerIdNum)) {
-            setDropError(`Invalid target slot or context for ${containerType} split.`);
-            return true;
+            return true; // Silently reject - invalid context
         }
         
         // Use appropriate reducer based on container type
@@ -705,15 +727,13 @@ export function handlePlayerToContainerSplit(
                 connection.reducers[reducerName](targetContainerIdNum, targetSlotIndexNum, sourceInstanceId, quantityToSplit);
             }
         } else {
-            setDropError(`Split action not available for ${containerType}.`);
-            return true;
+            // Silently reject - reducer not available
         }
         
         return true;
     } catch (error) {
         console.error(`[PlayerToContainerSplit ${containerType}]`, error);
-        setDropError(`Failed to split item: ${(error as any)?.message || error}`);
-        return true;
+        return true; // Silently reject - error occurred
     }
 }
 
@@ -762,8 +782,7 @@ export function handleContainerToPlayerSplit(
         const quantityToSplitNum = Number(quantityToSplit);
         
         if (sourceEntityId === null || sourceSlotIndex === null || isNaN(quantityToSplitNum) || quantityToSplitNum <= 0) {
-            setDropError("Could not determine source container slot for split or invalid quantity.");
-            return true;
+            return true; // Silently reject - invalid parameters
         }
         
         const reducerName = reducers.splitToPlayer;
@@ -776,14 +795,13 @@ export function handleContainerToPlayerSplit(
                 targetSlotIndexNum
             );
         } else {
-            setDropError(`Split action not available for ${containerType}.`);
+            // Silently reject - reducer not available
         }
         
         return true;
     } catch (error) {
         console.error(`[ContainerToPlayerSplit ${containerType}]`, error);
-        setDropError(`Failed to split item: ${(error as any)?.message || error}`);
-        return true;
+        return true; // Silently reject - error occurred
     }
 }
 
@@ -828,8 +846,7 @@ export function handleWithinContainerSplit(
         }
         
         if (sourceSlotIndex === null || targetSlotIndex === null) {
-            setDropError("Invalid source or target slot for split.");
-            return true;
+            return true; // Silently reject - invalid slots
         }
         
         // Convert container IDs to numbers
@@ -856,21 +873,18 @@ export function handleWithinContainerSplit(
         }
         
         if (sourceContainerId !== targetContainerId) {
-            setDropError(`Cannot split between different ${containerType}s.`);
-            return true;
+            return true; // Silently reject - different containers
         }
         
         if (sourceContainerId === null) {
-            setDropError(`Cannot split within ${containerType}: container context lost.`);
-            return true;
+            return true; // Silently reject - context lost
         }
         
         // Ensure quantityToSplit is a number
         const quantityToSplitNum = Number(quantityToSplit);
         
         if (isNaN(quantityToSplitNum) || quantityToSplitNum <= 0) {
-            setDropError("Invalid quantity for split.");
-            return true;
+            return true; // Silently reject - invalid quantity
         }
         
         const reducerName = reducers.splitWithin;
@@ -896,13 +910,12 @@ export function handleWithinContainerSplit(
                 );
             }
         } else {
-            setDropError(`Within-container split not available for ${containerType}.`);
+            // Silently reject - reducer not available
         }
         
         return true;
     } catch (error) {
         console.error(`[WithinContainerSplit ${containerType}]`, error);
-        setDropError(`Failed to split item: ${(error as any)?.message || error}`);
-        return true;
+        return true; // Silently reject - error occurred
     }
 } 

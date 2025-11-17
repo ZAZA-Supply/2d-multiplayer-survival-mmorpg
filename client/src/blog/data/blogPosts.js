@@ -10,9 +10,11 @@ import babushkaSpriteEvolution from './posts/babushka-sprite-evolution';
 import buildingSystem2DChallenges from './posts/building-system-2d-challenges';
 import armorSystemDesign from './posts/armor-system-design';
 import customBabushkaArtDirection from './posts/custom-babushka-art-direction';
+import minimapSpatialSubscriptions from './posts/minimap-spatial-subscriptions';
 
 // Export posts as an array, sorted by date (newest first)
 export const blogPosts = [
+  minimapSpatialSubscriptions, // November 17, 2025 - Minimap System
   customBabushkaArtDirection, // November 16, 2025 - Custom Art Direction
   fieldCauldronMechanics, // November 16, 2025
   armorSystemDesign, // November 16, 2025
