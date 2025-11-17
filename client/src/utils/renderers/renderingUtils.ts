@@ -910,14 +910,7 @@ export const renderYSortedEntities = ({
             }
         } else if (type === 'broth_pot') {
             const brothPot = entity as SpacetimeDBBrothPot;
-            const isTheClosestTarget = closestInteractableTarget?.type === 'broth_pot' && closestInteractableTarget?.id === brothPot.id;
             renderBrothPot(ctx, brothPot, nowMs, cycleProgress);
-            
-            // Draw outline only if this is THE closest interactable target
-            if (isTheClosestTarget) {
-                const outlineColor = getInteractionOutlineColor('open');
-                drawInteractionOutline(ctx, brothPot.posX, brothPot.posY - 40, 80, 80, cycleProgress, outlineColor);
-            }
         } else if (type === 'dropped_item') {
             const droppedItem = entity as SpacetimeDBDroppedItem;
             const itemDef = itemDefinitions.get(droppedItem.itemDefId.toString());

@@ -61,86 +61,198 @@ const ActiveCraftingQueueUI: React.FC<ActiveCraftingQueueUIProps> = ({
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  const progressPercent = Math.max(0, Math.min(100, ((currentTime - Number(activeItem.startTime.microsSinceUnixEpoch / 1000n)) / 
+    (Number(activeItem.finishTime.microsSinceUnixEpoch / 1000n) - Number(activeItem.startTime.microsSinceUnixEpoch / 1000n))) * 100));
+  const isNearComplete = remainingTime <= 5;
+
   return (
     <div style={{
       position: 'fixed',
-      bottom: '15px', // Same bottom position as status bars
-      right: '285px', // Position to the left of status bars (which are at right: '15px' with ~220px width)
+      bottom: '15px',
+      right: '285px',
       display: 'flex',
       alignItems: 'center',
-      backgroundColor: 'rgba(40, 40, 55, 0.92)',
-      color: 'white',
-      padding: '8px 12px',
-      borderRadius: '4px',
-      border: '1px solid #a0a0e0',
-      boxShadow: '0 0 8px rgba(160, 160, 224, 0.7)',
-      fontFamily: "'Courier New', 'Consolas', 'Monaco', monospace", /* Cyberpunk font */
-      fontSize: '10px',
-      minWidth: '200px',
-      zIndex: 75, // Between notifications (100) and status bars (50)
+      backgroundColor: 'rgba(0, 10, 20, 0.95)',
+      color: '#00ffff',
+      padding: '10px 14px',
+      borderRadius: '2px',
+      border: isNearComplete ? '1px solid #00ff88' : '1px solid #00ffff',
+      boxShadow: isNearComplete 
+        ? '0 0 20px rgba(0, 255, 136, 0.7), inset 0 0 20px rgba(0, 255, 136, 0.1)' 
+        : '0 0 15px rgba(0, 255, 255, 0.6), inset 0 0 20px rgba(0, 255, 255, 0.05)',
+      fontFamily: "'Courier New', 'Consolas', 'Monaco', monospace",
+      fontSize: '11px',
+      fontWeight: 'bold',
+      minWidth: '220px',
+      zIndex: 75,
+      backdropFilter: 'blur(4px)',
+      overflow: 'hidden',
+      transition: 'all 0.3s ease-out',
     }}>
-      {/* Crafting Icon */}
+      {/* Scanline effect overlay */}
       <div style={{
-        width: '24px',
-        height: '24px',
-        marginRight: '10px',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 255, 0.03) 2px, rgba(0, 255, 255, 0.03) 4px)',
+        pointerEvents: 'none',
+        zIndex: 1,
+      }} />
+
+      {/* Animated progress background */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: `linear-gradient(90deg, 
+          transparent ${Math.max(0, progressPercent - 10)}%, 
+          rgba(0, 255, 255, 0.1) ${progressPercent}%, 
+          transparent ${Math.min(100, progressPercent + 10)}%)`,
+        pointerEvents: 'none',
+        zIndex: 0,
+        transition: 'all 0.5s ease-out',
+      }} />
+
+      {/* Crafting Icon with enhanced glow */}
+      <div style={{
+        width: '28px',
+        height: '28px',
+        marginRight: '12px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(60, 60, 80, 0.8)',
+        backgroundColor: 'rgba(0, 255, 255, 0.15)',
         borderRadius: '2px',
-        border: '1px solid #505070',
+        border: isNearComplete ? '1px solid #00ff88' : '1px solid rgba(0, 255, 255, 0.5)',
+        boxShadow: isNearComplete 
+          ? '0 0 12px rgba(0, 255, 136, 0.6), inset 0 0 8px rgba(0, 255, 136, 0.2)' 
+          : '0 0 10px rgba(0, 255, 255, 0.4), inset 0 0 8px rgba(0, 255, 255, 0.1)',
+        position: 'relative',
+        zIndex: 2,
+        transition: 'all 0.3s ease-out',
       }}>
         <img 
           src={getItemIcon(itemIcon)} 
           alt={itemName}
           style={{ 
-            width: '20px', 
-            height: '20px', 
-            imageRendering: 'pixelated' 
+            width: '22px', 
+            height: '22px', 
+            imageRendering: 'pixelated',
+            filter: isNearComplete 
+              ? 'drop-shadow(0 0 4px rgba(0, 255, 136, 0.8))' 
+              : 'drop-shadow(0 0 3px rgba(0, 255, 255, 0.6))',
           }}
         />
       </div>
 
       {/* Progress Info */}
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, position: 'relative', zIndex: 2 }}>
         <div style={{ 
-          color: '#ffffff',
-          fontSize: '10px',
-          marginBottom: '4px'
+          color: '#00ffff',
+          fontSize: '11px',
+          marginBottom: '4px',
+          textShadow: '0 0 6px rgba(0, 255, 255, 0.6)',
+          letterSpacing: '0.5px',
         }}>
           {itemName}
         </div>
         <div style={{ 
-          color: remainingTime <= 5 ? '#40ff40' : '#a0a0c0',
-          fontSize: '9px'
+          color: isNearComplete ? '#00ff88' : '#00ccff',
+          fontSize: '10px',
+          textShadow: isNearComplete 
+            ? '0 0 8px rgba(0, 255, 136, 0.8)' 
+            : '0 0 6px rgba(0, 204, 255, 0.6)',
+          fontWeight: 'bold',
         }}>
           {formatTime(remainingTime)}
         </div>
       </div>
 
-      {/* Optional progress bar */}
+      {/* Vertical progress bar with enhanced styling */}
       <div style={{
-        width: '4px',
-        height: '40px',
-        backgroundColor: '#333',
+        width: '6px',
+        height: '48px',
+        backgroundColor: 'rgba(0, 50, 80, 0.6)',
         borderRadius: '2px',
         overflow: 'hidden',
-        marginLeft: '8px',
+        marginLeft: '10px',
+        border: '1px solid rgba(0, 255, 255, 0.3)',
+        position: 'relative',
+        zIndex: 2,
+        boxShadow: 'inset 0 0 8px rgba(0, 0, 0, 0.5)',
       }}>
+        {/* Progress fill from bottom */}
         <div style={{
-          width: '100%',
-          height: `${Math.max(0, Math.min(100, ((currentTime - Number(activeItem.startTime.microsSinceUnixEpoch / 1000n)) / 
-            (Number(activeItem.finishTime.microsSinceUnixEpoch / 1000n) - Number(activeItem.startTime.microsSinceUnixEpoch / 1000n))) * 100))}%`,
-          backgroundColor: remainingTime <= 5 ? '#40ff40' : '#ffa040',
-          transition: 'height 0.3s ease-in-out, background-color 0.3s ease-in-out',
-          position: 'relative',
+          position: 'absolute',
           bottom: 0,
-          marginTop: 'auto',
-        }} />
+          left: 0,
+          right: 0,
+          height: `${progressPercent}%`,
+          background: isNearComplete 
+            ? 'linear-gradient(to top, #00ff88, #00ffaa)' 
+            : 'linear-gradient(to top, #0099ff, #00ffff)',
+          boxShadow: isNearComplete 
+            ? '0 0 12px rgba(0, 255, 136, 0.8)' 
+            : '0 0 10px rgba(0, 255, 255, 0.6)',
+          transition: 'height 0.5s ease-out, background 0.3s ease-out, box-shadow 0.3s ease-out',
+        }}>
+          {/* Animated shimmer effect */}
+          <div style={{
+            position: 'absolute',
+            top: '-50%',
+            left: 0,
+            right: 0,
+            height: '50%',
+            background: 'linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.3), transparent)',
+            animation: 'shimmer 2s infinite',
+          }} />
+        </div>
       </div>
+
+      {/* Corner accents */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '8px',
+        height: '8px',
+        borderTop: isNearComplete ? '2px solid #00ff88' : '2px solid #00ffff',
+        borderLeft: isNearComplete ? '2px solid #00ff88' : '2px solid #00ffff',
+        zIndex: 2,
+      }} />
+      <div style={{
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        width: '8px',
+        height: '8px',
+        borderBottom: isNearComplete ? '2px solid #00ff88' : '2px solid #00ffff',
+        borderRight: isNearComplete ? '2px solid #00ff88' : '2px solid #00ffff',
+        zIndex: 2,
+      }} />
     </div>
   );
 };
+
+// Define keyframes for shimmer animation
+const styles = `
+  @keyframes shimmer {
+    0% { transform: translateY(100%); }
+    100% { transform: translateY(-100%); }
+  }
+`;
+
+// Inject styles into the document head
+if (!document.getElementById('active-crafting-queue-styles')) {
+  const styleSheet = document.createElement("style");
+  styleSheet.id = 'active-crafting-queue-styles';
+  styleSheet.type = "text/css";
+  styleSheet.innerText = styles;
+  document.head.appendChild(styleSheet);
+}
 
 export default React.memo(ActiveCraftingQueueUI); 

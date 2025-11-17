@@ -210,6 +210,11 @@ pub fn place_rain_collector(ctx: &ReducerContext, item_instance_id: u64, world_x
         return Err("Cannot place rain collector on a wall.".to_string());
     }
 
+    // Check if placement position is on a foundation
+    if crate::building::is_position_on_foundation(ctx, world_x, world_y) {
+        return Err("Cannot place rain collector on a foundation.".to_string());
+    }
+
     // --- Check for collisions with other rain collectors ---
     let collectors = ctx.db.rain_collector();
     for existing_collector in collectors.iter() {

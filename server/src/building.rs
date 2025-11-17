@@ -1894,6 +1894,30 @@ pub fn is_line_blocked_by_walls(
     check_line_hits_wall(ctx, start_x, start_y, end_x, end_y).is_some()
 }
 
+/// Checks if a world position is on any foundation (for blocking placement)
+pub fn is_position_on_foundation(
+    ctx: &ReducerContext,
+    world_x: f32,
+    world_y: f32,
+) -> bool {
+    // Convert world position to foundation cell coordinates
+    let cell_x = (world_x / FOUNDATION_TILE_SIZE_PX as f32).floor() as i32;
+    let cell_y = (world_y / FOUNDATION_TILE_SIZE_PX as f32).floor() as i32;
+    
+    // Check if there's a foundation at this cell
+    for foundation in ctx.db.foundation_cell().iter() {
+        if foundation.is_destroyed {
+            continue;
+        }
+        
+        if foundation.cell_x == cell_x && foundation.cell_y == cell_y {
+            return true;
+        }
+    }
+    
+    false
+}
+
 /// Checks if a world position is too close to any wall (with buffer zone)
 /// Used to prevent placing placeables on or near walls
 /// Returns true if the position is within the buffer zone around a wall, false otherwise

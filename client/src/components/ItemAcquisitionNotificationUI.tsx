@@ -60,6 +60,7 @@ const ItemAcquisitionNotificationUI: React.FC<ItemAcquisitionNotificationUIProps
     }}>
       {visibleNotifications.map((notif, index) => {
         const isMostRecent = index === visibleNotifications.length - 1;
+        const isPositive = notif.quantityChange > 0;
         // Apply 'fading-out' class if isFadingOut is true
         const itemClassName = `notification-item ${notif.isFadingOut ? 'fading-out' : ''}`;
         return (
@@ -69,30 +70,107 @@ const ItemAcquisitionNotificationUI: React.FC<ItemAcquisitionNotificationUIProps
             style={{
               display: 'flex',
               alignItems: 'center',
-              backgroundColor: isMostRecent ? 'rgba(40, 40, 55, 0.92)' : 'rgba(30, 30, 45, 0.9)', // Lighter for recent
-              color: 'white',
-              padding: '6px 10px',
-              borderRadius: '4px',
-              border: isMostRecent ? '1px solid #a0a0e0' : '1px solid #505070',
-              marginBottom: '5px',
-              boxShadow: isMostRecent ? '0 0 8px rgba(160, 160, 224, 0.7)' : '1px 1px 0px rgba(0,0,0,0.4)',
-              fontFamily: '"Press Start 2P", cursive',
+              position: 'relative',
+              backgroundColor: isMostRecent ? 'rgba(0, 10, 20, 0.95)' : 'rgba(0, 5, 15, 0.9)',
+              color: '#00ffff',
+              padding: '8px 12px',
+              borderRadius: '2px',
+              border: isMostRecent 
+                ? `1px solid ${isPositive ? '#00ffff' : '#ff3366'}` 
+                : `1px solid ${isPositive ? 'rgba(0, 255, 255, 0.4)' : 'rgba(255, 51, 102, 0.4)'}`,
+              marginBottom: '6px',
+              boxShadow: isMostRecent 
+                ? `0 0 15px ${isPositive ? 'rgba(0, 255, 255, 0.6)' : 'rgba(255, 51, 102, 0.6)'}, inset 0 0 20px rgba(0, 255, 255, 0.05)` 
+                : 'inset 0 0 20px rgba(0, 255, 255, 0.03)',
+              fontFamily: "'Courier New', 'Consolas', 'Monaco', monospace",
               fontSize: '11px',
-              minWidth: '180px',
-              transition: 'border 0.3s ease-out, box-shadow 0.3s ease-out', // Smooth transition for highlight
+              fontWeight: 'bold',
+              minWidth: '200px',
+              transition: 'all 0.3s ease-out',
+              backdropFilter: 'blur(4px)',
+              overflow: 'hidden',
             }}
           >
-            <img 
-              src={itemIcons[notif.itemIcon] || itemIcons['unknown']} // Fallback to unknown icon
-              alt={notif.itemName}
-              style={{ width: '20px', height: '20px', marginRight: '8px', imageRendering: 'pixelated' }}
-            />
-            <span>
-                {`${notif.quantityChange > 0 ? '+' : ''}${notif.quantityChange} ${notif.itemName}`}
+            {/* Scanline effect overlay */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 255, 0.03) 2px, rgba(0, 255, 255, 0.03) 4px)',
+              pointerEvents: 'none',
+              zIndex: 1,
+            }} />
+
+            {/* Icon container with glow */}
+            <div style={{
+              width: '24px',
+              height: '24px',
+              marginRight: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(0, 255, 255, 0.1)',
+              borderRadius: '2px',
+              border: '1px solid rgba(0, 255, 255, 0.3)',
+              boxShadow: isMostRecent ? '0 0 8px rgba(0, 255, 255, 0.4)' : 'none',
+              position: 'relative',
+              zIndex: 2,
+            }}>
+              <img 
+                src={itemIcons[notif.itemIcon] || itemIcons['unknown']}
+                alt={notif.itemName}
+                style={{ 
+                  width: '20px', 
+                  height: '20px', 
+                  imageRendering: 'pixelated',
+                  filter: isMostRecent ? 'drop-shadow(0 0 2px rgba(0, 255, 255, 0.6))' : 'none',
+                }}
+              />
+            </div>
+
+            {/* Text content */}
+            <span style={{ position: 'relative', zIndex: 2 }}>
+                <span style={{ 
+                  color: isPositive ? '#00ff88' : '#ff3366',
+                  textShadow: isMostRecent 
+                    ? `0 0 8px ${isPositive ? 'rgba(0, 255, 136, 0.8)' : 'rgba(255, 51, 102, 0.8)'}` 
+                    : 'none',
+                }}>
+                  {`${notif.quantityChange > 0 ? '+' : ''}${notif.quantityChange}`}
+                </span>
+                {' '}
+                <span style={{ 
+                  color: '#00ffff',
+                  textShadow: isMostRecent ? '0 0 6px rgba(0, 255, 255, 0.6)' : 'none',
+                }}>
+                  {notif.itemName}
+                </span>
                 {notif.currentTotalInInventory !== undefined && (
-                    <span style={{ color: 'rgba(200, 200, 200, 0.9)', marginLeft: '5px' }}>{`(${notif.currentTotalInInventory})`}</span>
+                    <span style={{ 
+                      color: 'rgba(0, 255, 255, 0.6)', 
+                      marginLeft: '6px',
+                      fontSize: '10px',
+                    }}>
+                      {`[${notif.currentTotalInInventory}]`}
+                    </span>
                 )}
             </span>
+
+            {/* Corner accent (top-right) */}
+            {isMostRecent && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '8px',
+                height: '8px',
+                borderTop: `2px solid ${isPositive ? '#00ffff' : '#ff3366'}`,
+                borderRight: `2px solid ${isPositive ? '#00ffff' : '#ff3366'}`,
+                zIndex: 2,
+              }} />
+            )}
           </div>
         );
       })}

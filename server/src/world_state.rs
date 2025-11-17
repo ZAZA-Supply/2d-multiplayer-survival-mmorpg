@@ -740,6 +740,11 @@ fn update_all_rain_collectors(
             continue;
         }
         
+        // Skip if collector is inside a building (can't collect rain indoors)
+        if crate::building_enclosure::is_position_inside_building(ctx, collector.pos_x, collector.pos_y) {
+            continue;
+        }
+        
         // Get weather for this collector's chunk
         let chunk_index = calculate_chunk_index(collector.pos_x, collector.pos_y);
         let chunk_weather = chunk_weather_table.chunk_index().find(&chunk_index);

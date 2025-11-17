@@ -1359,7 +1359,10 @@ pub fn process_broth_pot_logic_scheduled(
     // Check if it's raining at the broth pot's location
     let chunk_weather = get_weather_for_position(ctx, broth_pot.pos_x, broth_pot.pos_y);
     
-    if chunk_weather.current_weather != WeatherType::Clear {
+    // Only collect rain if it's raining AND the pot is NOT inside a building
+    let is_inside_building = crate::building_enclosure::is_position_inside_building(ctx, broth_pot.pos_x, broth_pot.pos_y);
+    
+    if chunk_weather.current_weather != WeatherType::Clear && !is_inside_building {
         // Get collection rate based on weather type
         let collection_rate_ml_per_sec = match chunk_weather.current_weather {
             WeatherType::LightRain => LIGHT_RAIN_COLLECTION_RATE_ML_PER_SEC,

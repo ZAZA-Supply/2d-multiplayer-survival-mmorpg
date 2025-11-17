@@ -211,27 +211,146 @@ interface MinimapProps {
   showGridCoordinates?: boolean; // Whether to show grid coordinate labels (A1, B2, etc.)
 }
 
-// Cyberpunk SOVA-style terrain color mapping with neon accents
+// Cyberpunk SOVA-style terrain color mapping with enhanced differentiation
+// Keeps dark aesthetic but improves clarity between terrain types
 function getTerrainColor(colorValue: number): [number, number, number] {
   switch (colorValue) {
-    case 0:   // Sea - Deep cyberpunk blue with slight purple tint
-      return [10, 25, 47]; // Very dark blue-black
-    case 64:  // Beach - Desaturated with slight cyan tint
-      return [45, 52, 54]; // Dark grey-blue
-    case 96:  // Sand - Darker, more muted
-      return [40, 44, 46]; // Dark grey
-    case 128: // Grass - Dark with slight green tint
-      return [25, 35, 30]; // Very dark green-grey
-    case 192: // Dirt - Very dark brown-grey
-      return [30, 28, 26]; // Almost black brown
-    case 224: // DirtRoad - Darkest terrain
-      return [20, 20, 22]; // Near black
+    case 0:   // Sea - Deep cyberpunk blue with stronger blue tint
+      return [8, 20, 42]; // Dark blue-black (more blue, less purple)
+    case 64:  // Beach - Lighter grey-blue with cyan tint
+      return [50, 58, 62]; // Medium grey-blue (lighter than before)
+    case 96:  // Sand - Warm beige-grey
+      return [48, 46, 42]; // Warm dark grey (distinct from beach)
+    case 128: // Grass - Dark green with stronger green tint
+      return [20, 38, 28]; // Dark green (more green, less grey)
+    case 192: // Dirt - Warm brown-grey
+      return [38, 32, 28]; // Dark brown (warmer, more distinct)
+    case 224: // DirtRoad - Darkest but with slight warm tint
+      return [24, 22, 20]; // Near black with warm brown hint
     default:  // Fallback
       return [25, 35, 30]; // Dark green-grey
   }
 }
 
-// Cyberpunk edge detection for SOVA-style outlines
+// AAA Pixel Art Studio Style: Efficient region-based rendering
+// Instead of drawing every pixel, we downscale and draw filled regions with clean edges
+
+// Get terrain type from color value (simplified classification)
+function getTerrainType(colorValue: number): number {
+  // Group similar terrain types together for region detection
+  if (colorValue === 0) return 0; // Sea
+  if (colorValue === 64) return 1; // Beach
+  if (colorValue === 96) return 2; // Sand
+  if (colorValue >= 128 && colorValue < 192) return 3; // Grass
+  if (colorValue >= 192 && colorValue < 224) return 4; // Dirt
+  return 5; // DirtRoad/other
+}
+
+// Render regions as filled rectangles with clean edges (AAA Pixel Art Style)
+// Much more efficient than pixel-by-pixel rendering
+function renderRegionsWithEdges(
+  ctx: CanvasRenderingContext2D,
+  cacheData: Uint8Array,
+  width: number,
+  height: number,
+  targetX: number,
+  targetY: number,
+  targetWidth: number,
+  targetHeight: number,
+  scaleDown: number = 4 // Downscale factor (4 = 1/4 resolution - optimized for performance)
+) {
+  ctx.save();
+  
+  // Scale factors
+  const scaleX = targetWidth / width;
+  const scaleY = targetHeight / height;
+  const downWidth = Math.ceil(width / scaleDown);
+  const downHeight = Math.ceil(height / scaleDown);
+  const cellSizeX = scaleDown * scaleX;
+  const cellSizeY = scaleDown * scaleY;
+  
+  // Helper to get terrain type at downscaled position
+  const getTerrainAt = (x: number, y: number): number => {
+    const srcX = Math.min(Math.floor(x * scaleDown), width - 1);
+    const srcY = Math.min(Math.floor(y * scaleDown), height - 1);
+    const colorValue = cacheData[srcY * width + srcX];
+    return getTerrainType(colorValue);
+  };
+  
+  // First pass: Draw filled regions (downscaled cells)
+  for (let y = 0; y < downHeight; y++) {
+    for (let x = 0; x < downWidth; x++) {
+      const terrainType = getTerrainAt(x, y);
+      const srcX = Math.min(Math.floor(x * scaleDown), width - 1);
+      const srcY = Math.min(Math.floor(y * scaleDown), height - 1);
+      const colorValue = cacheData[srcY * width + srcX];
+      const [r, g, b] = getTerrainColor(colorValue);
+      
+      // Draw filled cell
+      ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+      ctx.fillRect(
+        targetX + x * cellSizeX,
+        targetY + y * cellSizeY,
+        cellSizeX,
+        cellSizeY
+      );
+    }
+  }
+  
+  // Second pass: Draw clean edges between different terrain types (OPTIMIZED - batched)
+  // Enhanced visibility for better terrain differentiation
+  ctx.strokeStyle = 'rgba(0, 212, 255, 0.4)'; // More visible cyan edges
+  ctx.lineWidth = 1.5; // Slightly thicker for clarity
+  ctx.shadowColor = 'rgba(0, 212, 255, 0.2)'; // Subtle glow
+  ctx.shadowBlur = 1;
+  
+  // Batch all edges into a single path for much better performance
+  ctx.beginPath();
+  
+  for (let y = 0; y < downHeight; y++) {
+    for (let x = 0; x < downWidth; x++) {
+      const currentTerrain = getTerrainAt(x, y);
+      const screenX = targetX + x * cellSizeX;
+      const screenY = targetY + y * cellSizeY;
+      
+      // Check neighbors and add edges to path where terrain changes
+      // Top edge
+      if (y > 0 && getTerrainAt(x, y - 1) !== currentTerrain) {
+        ctx.moveTo(screenX, screenY);
+        ctx.lineTo(screenX + cellSizeX, screenY);
+      }
+      
+      // Left edge
+      if (x > 0 && getTerrainAt(x - 1, y) !== currentTerrain) {
+        ctx.moveTo(screenX, screenY);
+        ctx.lineTo(screenX, screenY + cellSizeY);
+      }
+      
+      // Right edge (only draw if at boundary or next cell is different)
+      if (x < downWidth - 1 && getTerrainAt(x + 1, y) !== currentTerrain) {
+        ctx.moveTo(screenX + cellSizeX, screenY);
+        ctx.lineTo(screenX + cellSizeX, screenY + cellSizeY);
+      }
+      
+      // Bottom edge (only draw if at boundary or next cell is different)
+      if (y < downHeight - 1 && getTerrainAt(x, y + 1) !== currentTerrain) {
+        ctx.moveTo(screenX, screenY + cellSizeY);
+        ctx.lineTo(screenX + cellSizeX, screenY + cellSizeY);
+      }
+    }
+  }
+  
+  // Single stroke call for all edges (much faster than individual strokes)
+  ctx.stroke();
+  
+  // Reset shadow for other drawing operations
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent';
+  
+  ctx.restore();
+}
+
+// Cyberpunk edge detection for SOVA-style outlines (kept for fallback)
 function applyEdgeDetection(
   imageData: ImageData,
   width: number,
@@ -285,7 +404,7 @@ function applyEdgeDetection(
   return output;
 }
 
-// Apply cyberpunk scan line effect
+// Apply cyberpunk scan line effect (optimized - fewer lines, batched drawing)
 function applyScanLines(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -298,13 +417,14 @@ function applyScanLines(
   ctx.strokeStyle = '#00d4ff';
   ctx.lineWidth = 1;
   
-  // Horizontal scan lines
-  for (let i = 0; i < height; i += 3) {
-    ctx.beginPath();
+  // Batch all scan lines into a single path for better performance
+  ctx.beginPath();
+  // Horizontal scan lines - reduced frequency (every 6px instead of 3px)
+  for (let i = 0; i < height; i += 6) {
     ctx.moveTo(x, y + i);
     ctx.lineTo(x + width, y + i);
-    ctx.stroke();
   }
+  ctx.stroke(); // Single stroke call for all lines
   
   ctx.restore();
 }
@@ -426,26 +546,24 @@ export function drawMinimapOntoCanvas({
   // Apply current animated opacity (smoothly transitioning)
   ctx.globalAlpha = animatedOpacity;
 
-  // Apply cyberpunk glow shadow effect
+  // Apply cyberpunk glow shadow effect (optimized - reduced blur)
   const shadowOffset = 4;
   ctx.shadowColor = MINIMAP_GLOW_COLOR;
-  ctx.shadowBlur = 12;
+  ctx.shadowBlur = 8; // Reduced from 12 for better performance
   ctx.fillStyle = 'rgba(0,0,0,0.8)';
   ctx.fillRect(minimapX + shadowOffset, minimapY + shadowOffset, minimapWidth, minimapHeight);
   ctx.shadowBlur = 0; // Reset shadow
 
-  // 1. Draw Overall Minimap Background with cyberpunk gradient
-  const bgGradient = ctx.createLinearGradient(minimapX, minimapY, minimapX + minimapWidth, minimapY + minimapHeight);
-  bgGradient.addColorStop(0, isMouseOverMinimap ? MINIMAP_BG_COLOR_HOVER : MINIMAP_BG_COLOR_NORMAL);
-  bgGradient.addColorStop(1, 'rgba(30, 41, 59, 0.95)'); // Darker blue-slate at bottom
-  ctx.fillStyle = bgGradient;
+  // 1. Draw Overall Minimap Background (optimized - solid color instead of gradient)
+  // Gradients are expensive, use solid color with slight variation if needed
+  ctx.fillStyle = isMouseOverMinimap ? MINIMAP_BG_COLOR_HOVER : MINIMAP_BG_COLOR_NORMAL;
   ctx.fillRect(minimapX, minimapY, minimapWidth, minimapHeight);
 
-  // Draw enhanced cyberpunk border with glow effect
+  // Draw enhanced cyberpunk border with glow effect (optimized - reduced blur)
   ctx.strokeStyle = MINIMAP_BORDER_COLOR;
   ctx.lineWidth = MINIMAP_BORDER_WIDTH;
   ctx.shadowColor = MINIMAP_GLOW_COLOR;
-  ctx.shadowBlur = 8;
+  ctx.shadowBlur = 6; // Reduced from 8 for better performance
   ctx.strokeRect(minimapX, minimapY, minimapWidth, minimapHeight);
   ctx.shadowBlur = 0; // Reset shadow
   
@@ -475,85 +593,37 @@ export function drawMinimapOntoCanvas({
   ctx.fillStyle = MINIMAP_WORLD_BG_COLOR; 
   ctx.fillRect(worldRectScreenX, worldRectScreenY, worldRectScreenWidth, worldRectScreenHeight);
 
-  // --- Draw Cached Minimap Background with Cyberpunk Effects ---
+  // --- Draw Cached Minimap Background with AAA Pixel Art Studio Style ---
   if (minimapCache && minimapCache.data && minimapCache.data.length > 0) {
-    // console.log(`[Minimap] Using cached minimap data: ${minimapCache.width}x${minimapCache.height}, ${minimapCache.data.length} bytes`);
+    // Calculate the world bounds within the minimap
+    const worldRectScreenX = drawOffsetX + 0 * currentScale; // World X=0
+    const worldRectScreenY = drawOffsetY + 0 * currentScale; // World Y=0
+    const worldRectScreenWidth = worldPixelWidth * currentScale;
+    const worldRectScreenHeight = worldPixelHeight * currentScale;
     
-    // Create an ImageData object from the cached minimap data
-    const canvas = document.createElement('canvas');
-    canvas.width = minimapCache.width;
-    canvas.height = minimapCache.height;
-    const tempCtx = canvas.getContext('2d');
+    // Use new region-based rendering for AAA pixel art style
+    // Use cache data directly if already Uint8Array, otherwise create view (efficient)
+    const cacheData = minimapCache.data instanceof Uint8Array 
+      ? minimapCache.data 
+      : new Uint8Array(minimapCache.data);
     
-    if (tempCtx) {
-      const imageData = tempCtx.createImageData(minimapCache.width, minimapCache.height);
-      
-      // Convert color values to RGBA pixels with cyberpunk colors
-      for (let i = 0; i < minimapCache.data.length; i++) {
-        const colorValue = minimapCache.data[i];
-        const pixelIndex = i * 4;
-        
-        // Map color values to dark cyberpunk terrain colors
-        const [r, g, b] = getTerrainColor(colorValue);
-        imageData.data[pixelIndex] = r;     // Red
-        imageData.data[pixelIndex + 1] = g; // Green  
-        imageData.data[pixelIndex + 2] = b; // Blue
-        imageData.data[pixelIndex + 3] = 255; // Alpha (fully opaque)
-      }
-      
-      // Apply edge detection for SOVA-style outlines
-      const processedImageData = applyEdgeDetection(imageData, minimapCache.width, minimapCache.height);
-      tempCtx.putImageData(processedImageData, 0, 0);
-      
-      // Calculate the world bounds within the minimap
-      // The cached minimap represents the entire game world
-      const worldWidthPx = gameConfig.worldWidthPx; // Derived from gameConfig
-      const worldHeightPx = gameConfig.worldHeightPx; // Derived from gameConfig
-      
-      // Calculate where the world bounds appear in the current minimap view
-      const worldRectScreenX = drawOffsetX + 0 * currentScale; // World X=0
-      const worldRectScreenY = drawOffsetY + 0 * currentScale; // World Y=0
-      const worldRectScreenWidth = worldPixelWidth * currentScale;
-      const worldRectScreenHeight = worldPixelHeight * currentScale;
-      
-      // Draw the cached minimap scaled to fit the world bounds area
-      ctx.drawImage(
-        canvas,
-        worldRectScreenX,
-        worldRectScreenY, 
-        worldRectScreenWidth,
-        worldRectScreenHeight
-      );
-      
-      // Apply scan line overlay for cyberpunk effect
-      applyScanLines(ctx, worldRectScreenX, worldRectScreenY, worldRectScreenWidth, worldRectScreenHeight);
-      
-      // Add subtle animated radar sweep effect
-      const time = Date.now() / 3000; // Slow rotation
-      const sweepAngle = (time % (Math.PI * 2));
-      const centerX = worldRectScreenX + worldRectScreenWidth / 2;
-      const centerY = worldRectScreenY + worldRectScreenHeight / 2;
-      const sweepRadius = Math.max(worldRectScreenWidth, worldRectScreenHeight);
-      
-      ctx.save();
-      ctx.globalAlpha = 0.08;
-      const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, sweepRadius);
-      gradient.addColorStop(0, 'rgba(0, 212, 255, 0.3)');
-      gradient.addColorStop(0.5, 'rgba(0, 212, 255, 0.1)');
-      gradient.addColorStop(1, 'rgba(0, 212, 255, 0)');
-      
-      ctx.translate(centerX, centerY);
-      ctx.rotate(sweepAngle);
-      ctx.translate(-centerX, -centerY);
-      
-      ctx.beginPath();
-      ctx.moveTo(centerX, centerY);
-      ctx.arc(centerX, centerY, sweepRadius, -Math.PI / 6, Math.PI / 6);
-      ctx.closePath();
-      ctx.fillStyle = gradient;
-      ctx.fill();
-      ctx.restore();
-    }
+    // Render regions with clean edges (much more efficient than pixel-by-pixel)
+    // Uses downscaled cells with clean edges for AAA pixel art studio style
+    // Note: cacheData is a view, not a copy, so it's efficient
+    renderRegionsWithEdges(
+      ctx,
+      cacheData,
+      minimapCache.width,
+      minimapCache.height,
+      worldRectScreenX,
+      worldRectScreenY,
+      worldRectScreenWidth,
+      worldRectScreenHeight,
+      4 // scaleDown factor (4 = 1/4 resolution - optimized for performance while maintaining quality)
+    );
+    
+    // Apply scan line overlay for cyberpunk effect
+    applyScanLines(ctx, worldRectScreenX, worldRectScreenY, worldRectScreenWidth, worldRectScreenHeight);
   } else {
     // Debug: Show what we actually have
     // console.log(`[Minimap] No cached minimap data available. minimapCache:`, minimapCache);

@@ -804,25 +804,7 @@ export function useInteractionFinder({
                     distance: Math.sqrt(closestWaterDistSq)
                 });
             }
-            if (closestBrothPotId) {
-                const brothPot = brothPots?.get(String(closestBrothPotId));
-                if (brothPot) {
-                    // Check if broth pot is empty (no ingredients and no water)
-                    const isEmpty = brothPot.waterLevelMl === 0 && 
-                                   !brothPot.ingredientInstanceId0 && 
-                                   !brothPot.ingredientInstanceId1 && 
-                                   !brothPot.ingredientInstanceId2;
-                    candidates.push({
-                        type: 'broth_pot',
-                        id: closestBrothPotId,
-                        position: { x: brothPot.posX, y: brothPot.posY },
-                        distance: Math.sqrt(closestBrothPotDistSq),
-                        data: {
-                            isEmpty: isEmpty
-                        }
-                    });
-                }
-            }
+            // Broth pot removed from candidates - it now works through campfire interaction
 
             // Find the closest target using priority selection
             if (candidates.length > 0) {

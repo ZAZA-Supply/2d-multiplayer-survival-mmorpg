@@ -408,17 +408,6 @@ export function renderInteractionLabels({
             }
             break;
         }
-        case 'broth_pot': {
-            const brothPot = brothPots.get(closestInteractableTarget.id.toString());
-            if (brothPot) {
-                const BROTH_POT_HEIGHT = 80;
-                const visualCenterY = brothPot.posY - (BROTH_POT_HEIGHT / 2);
-                textX = brothPot.posX;
-                textY = visualCenterY - 50;
-                renderStyledInteractionLabel(ctx, text, textX, textY);
-            }
-            break;
-        }
     }
 
     ctx.restore(); // Restore original context state

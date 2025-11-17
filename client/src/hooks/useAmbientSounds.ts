@@ -109,11 +109,12 @@ const AMBIENT_SOUND_DEFINITIONS = {
     distant_thunder: { 
         type: 'random', 
         filename: 'ambient_distant_thunder.mp3', 
-        baseVolume: 0.075, // Halved from 0.15 for very distant atmospheric feel
-        minInterval: 120000, // 2 minutes minimum
-        maxInterval: 300000, // 5 minutes maximum
+        baseVolume: 1.0, // Increased from 0.075 for more dramatic storm atmosphere
+        minInterval: 30000, // 30 seconds minimum - more frequent during storms
+        maxInterval: 90000, // 1.5 minutes maximum - regular thunder during storms
         variations: 3,
-        description: 'Very distant thunder for atmosphere'
+        stormOnly: true, // Only play during heavy storms
+        description: 'Thunder sounds during heavy storms'
     },
     structure_creak: { 
         type: 'random', 
@@ -1017,6 +1018,23 @@ export const useAmbientSounds = ({
             }
         }
 
+        // Check storm-only restrictions (thunder should only play during heavy storms)
+        if ('stormOnly' in definition && definition.stormOnly) {
+            // Check if player is in a heavy storm chunk
+            if (!chunkWeather || !localPlayer) {
+                return; // No weather data, don't play storm sounds
+            }
+            
+            const playerChunkIndex = calculateChunkIndex(localPlayer.positionX, localPlayer.positionY);
+            const playerChunkData = chunkWeather.get(playerChunkIndex.toString());
+            const playerWeatherTag = playerChunkData?.currentWeather?.tag || 'Clear';
+            
+            // Only play during HeavyStorm or HeavyRain
+            if (playerWeatherTag !== 'HeavyStorm' && playerWeatherTag !== 'HeavyRain') {
+                return;
+            }
+        }
+
         const playRandomSound = async () => {
             try {
                 // Limit concurrent random sounds
@@ -1100,7 +1118,7 @@ export const useAmbientSounds = ({
         };
 
         scheduleNext();
-    }, [masterVolume, effectiveEnvironmentalVolume, timeOfDay]);
+    }, [masterVolume, effectiveEnvironmentalVolume, timeOfDay, chunkWeather, localPlayer]);
 
     // Initialize ambient sound system - ALWAYS ensure update loop is running
     useEffect(() => {

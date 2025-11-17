@@ -114,6 +114,22 @@ fn get_weather_growth_multiplier(weather: &WeatherType, rain_intensity: f32) -> 
     }
 }
 
+/// Check if a plant dies due to severe weather conditions
+/// Returns true if the plant should die
+fn check_plant_death_from_weather(ctx: &ReducerContext, weather: &WeatherType) -> bool {
+    match weather {
+        WeatherType::HeavyRain => {
+            // 2% chance per growth check to die in heavy rain
+            ctx.rng().gen_range(0..100) < 2
+        }
+        WeatherType::HeavyStorm => {
+            // 5% chance per growth check to die in heavy storm
+            ctx.rng().gen_range(0..100) < 5
+        }
+        _ => false, // No death chance in other weather conditions
+    }
+}
+
 /// Calculate cloud cover growth modifier for a specific planted seed
 /// Returns a multiplier between 0.4 (heavy cloud cover) and 1.0 (no clouds)
 fn get_cloud_cover_growth_multiplier(ctx: &ReducerContext, plant_x: f32, plant_y: f32) -> f32 {
@@ -727,6 +743,7 @@ pub fn check_plant_growth(ctx: &ReducerContext, _args: PlantedSeedGrowthSchedule
     let mut plants_updated = 0;
     let mut plants_matured = 0;
     let mut plants_dormant = 0;
+    let mut plants_died = 0;
     
     // Process all planted seeds to update their growth
     let all_plants: Vec<PlantedSeed> = ctx.db.planted_seed().iter().collect();
@@ -761,6 +778,25 @@ pub fn check_plant_growth(ctx: &ReducerContext, _args: PlantedSeedGrowthSchedule
         
         // Get chunk-specific weather for this plant's location
         let chunk_weather = crate::world_state::get_weather_for_position(ctx, plant.pos_x, plant.pos_y);
+        
+        // Check if plant dies from severe weather
+        if check_plant_death_from_weather(ctx, &chunk_weather.current_weather) {
+            let plant_id = plant.id;
+            let plant_type = plant.seed_type.clone();
+            let plant_pos_x = plant.pos_x;
+            let plant_pos_y = plant.pos_y;
+            let weather = chunk_weather.current_weather;
+            
+            // Delete the plant - it died from weather
+            ctx.db.planted_seed().id().delete(plant.id);
+            plants_died += 1;
+            
+            log::info!("Plant {} ({}) died from {:?} at ({:.1}, {:.1}) - progress was {:.1}%", 
+                      plant_id, plant_type, weather, plant_pos_x, plant_pos_y, plant.growth_progress * 100.0);
+            
+            continue; // Skip to next plant
+        }
+        
         let weather_multiplier = get_weather_growth_multiplier(&chunk_weather.current_weather, chunk_weather.rain_intensity);
         
         // Calculate base growth multiplier (time * weather)
@@ -869,9 +905,9 @@ pub fn check_plant_growth(ctx: &ReducerContext, _args: PlantedSeedGrowthSchedule
         }
     }
     
-    if plants_matured > 0 || plants_updated > 0 || plants_dormant > 0 {
-        log::info!("Growth check: {} plants matured, {} plants updated, {} plants dormant (season: {:?}, time multiplier: {:.2}x)", 
-                  plants_matured, plants_updated, plants_dormant, current_season, base_time_multiplier);
+    if plants_matured > 0 || plants_updated > 0 || plants_dormant > 0 || plants_died > 0 {
+        log::info!("Growth check: {} plants matured, {} plants updated, {} plants dormant, {} plants died from weather (season: {:?}, time multiplier: {:.2}x)", 
+                  plants_matured, plants_updated, plants_dormant, plants_died, current_season, base_time_multiplier);
     }
     
     Ok(())
