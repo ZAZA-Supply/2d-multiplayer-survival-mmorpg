@@ -84,6 +84,7 @@ mod homestead_hearth; // <<< ADDED: Homestead Hearth for building privilege syst
 mod building_decay; // <<< ADDED: Building decay system
 mod rune_stone; // <<< ADDED: Rune stone system
 mod broth_pot; // <<< ADDED: Broth pot cooking system
+mod recipes; // <<< ADDED: Recipe system for broth pot cooking
 
 // ADD: Re-export respawn reducer
 pub use respawn::respawn_randomly;
@@ -232,9 +233,13 @@ pub use player_corpse::{
 // Re-export broth pot reducers for client bindings
 pub use broth_pot::{
     place_broth_pot_on_campfire, pickup_broth_pot,
-    interact_with_broth_pot, quick_move_to_broth_pot,
+    interact_with_broth_pot,
+    move_item_to_broth_pot, move_item_from_broth_pot, move_item_within_broth_pot,
+    split_stack_into_broth_pot, split_stack_from_broth_pot, split_stack_within_broth_pot,
+    quick_move_to_broth_pot, quick_move_from_broth_pot,
     move_item_to_broth_pot_water_container, move_item_from_broth_pot_water_container,
     quick_move_to_broth_pot_water_container, quick_move_from_broth_pot_water_container,
+    move_item_from_broth_pot_output, quick_move_from_broth_pot_output,
     transfer_water_from_container_to_pot,
     schedule_next_broth_pot_processing, process_broth_pot_logic_scheduled
 };  

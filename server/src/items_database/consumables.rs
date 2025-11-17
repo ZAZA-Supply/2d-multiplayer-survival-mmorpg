@@ -995,5 +995,27 @@ pub fn get_consumable_definitions() -> Vec<ItemDefinition> {
             .respawn_time(105)
             .build(),
 
+        // === STONE SOUP VARIANTS (Brewing System Test) ===
+        ItemBuilder::new("Stone Soup", "A basic broth made by boiling stones in water. A classic survival recipe that extracts minerals from the stones.", ItemCategory::Consumable)
+            .icon("soup_stone_soup.png")
+            .stackable(5)
+            .consumable(20.0, 40.0, 15.0) // Basic tier: modest stats
+            .respawn_time(0) // Not a respawnable item - created by brewing
+            .build(),
+
+        ItemBuilder::new("Hearty Stone Soup", "A richer broth made with multiple stones. More nutritious than basic stone soup.", ItemCategory::Consumable)
+            .icon("soup_stone_soup.png")
+            .stackable(5)
+            .consumable(35.0, 65.0, 20.0) // Hearty tier: better stats
+            .respawn_time(0) // Not a respawnable item - created by brewing
+            .build(),
+
+        ItemBuilder::new("Gourmet Stone Soup", "A perfectly balanced broth made with three carefully selected stones. The ultimate stone soup experience.", ItemCategory::Consumable)
+            .icon("soup_stone_soup.png")
+            .stackable(5)
+            .consumable(50.0, 90.0, 25.0) // Gourmet tier: best stats
+            .respawn_time(0) // Not a respawnable item - created by brewing
+            .build(),
+
     ]
 }

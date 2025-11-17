@@ -55,6 +55,9 @@ pub enum SoundType {
     ItemThrown,                // item_thrown.mp3 (1 variation - when a weapon/item is thrown)
     ErrorResources,           // error_resources.mp3 (1 variation - when player doesn't have enough resources)
     DoneCooking,              // done_cooking.mp3 (1 variation - when items finish cooking in campfire)
+    SoupBoiling,              // soup_boiling.mp3 (1 variation - looping sound while soup is brewing)
+    ErrorJarPlacement,       // error_jar_placement.mp3 (1 variation - when trying to place jar back in output slot)
+    ErrorBrothNotCompatible, // error_broth_not_compatible.mp3 (1 variation - when trying to place incompatible item in broth pot)
     // Thunder removed - system disabled for now
     // Add more as needed - extensible system
 }
@@ -111,6 +114,9 @@ impl SoundType {
             SoundType::ItemThrown => "item_thrown",
             SoundType::ErrorResources => "error_resources",
             SoundType::DoneCooking => "done_cooking",
+            SoundType::SoupBoiling => "soup_boiling",
+            SoundType::ErrorJarPlacement => "error_jar_placement",
+            SoundType::ErrorBrothNotCompatible => "error_broth_not_compatible",
         }
     }
 
@@ -165,6 +171,9 @@ impl SoundType {
             SoundType::ItemThrown => 1,
             SoundType::ErrorResources => 3, // error_resources.mp3, error_resources2.mp3, error_resources3.mp3
             SoundType::DoneCooking => 1,
+            SoundType::SoupBoiling => 1, // soup_boiling.mp3 (single variation - looping sound)
+            SoundType::ErrorJarPlacement => 1, // error_jar_placement.mp3 (single variation)
+            SoundType::ErrorBrothNotCompatible => 1, // error_broth_not_compatible.mp3 (single variation)
         }
     }
 
@@ -911,6 +920,7 @@ fn create_unique_object_id(object_type: &str, object_id: u64) -> u64 {
     let type_hash = match object_type {
         "campfire" => 1_000_000_000_u64, // Campfires start at 1 billion
         "lantern" => 2_000_000_000_u64,  // Lanterns start at 2 billion
+        "broth_pot" => 3_000_000_000_u64, // Broth pots start at 3 billion
         _ => 0_u64, // Default for unknown types
     };
     type_hash + object_id
@@ -951,6 +961,36 @@ pub fn stop_lantern_sound(ctx: &ReducerContext, lantern_id: u64) {
     log::info!("🏮 STOPPING LANTERN SOUND for lantern {} (unique_id: {})", lantern_id, unique_id);
     if let Err(e) = stop_continuous_sound(ctx, unique_id) {
         log::error!("Failed to stop lantern sound: {}", e);
+    }
+}
+
+/// Start soup boiling looping sound for a broth pot
+pub fn start_soup_boiling_sound(ctx: &ReducerContext, broth_pot_id: u32, pos_x: f32, pos_y: f32) {
+    let unique_id = create_unique_object_id("broth_pot", broth_pot_id as u64);
+    if let Err(e) = start_continuous_sound(ctx, unique_id, SoundType::SoupBoiling, pos_x, pos_y, 1.0, 525.0) {
+        log::error!("Failed to start soup boiling sound: {}", e);
+    }
+}
+
+/// Stop soup boiling looping sound for a broth pot
+pub fn stop_soup_boiling_sound(ctx: &ReducerContext, broth_pot_id: u32) {
+    let unique_id = create_unique_object_id("broth_pot", broth_pot_id as u64);
+    if let Err(e) = stop_continuous_sound(ctx, unique_id) {
+        log::error!("Failed to stop soup boiling sound: {}", e);
+    }
+}
+
+/// Emit error jar placement sound (when trying to place jar back in output slot)
+pub fn emit_error_jar_placement_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, player_id: Identity) {
+    if let Err(e) = emit_sound_at_position(ctx, SoundType::ErrorJarPlacement, pos_x, pos_y, 1.0, player_id) {
+        log::warn!("Failed to emit error jar placement sound: {}", e);
+    }
+}
+
+/// Emit error broth not compatible sound (when trying to place incompatible item in broth pot)
+pub fn emit_error_broth_not_compatible_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, player_id: Identity) {
+    if let Err(e) = emit_sound_at_position(ctx, SoundType::ErrorBrothNotCompatible, pos_x, pos_y, 1.0, player_id) {
+        log::warn!("Failed to emit error broth not compatible sound: {}", e);
     }
 }
 

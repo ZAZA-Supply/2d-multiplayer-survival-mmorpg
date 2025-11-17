@@ -25,6 +25,8 @@ use crate::player_inventory::{move_item_to_inventory, move_item_to_hotbar, find_
 use crate::active_equipment;
 // Import for active_equipment table trait
 use crate::active_equipment::active_equipment as ActiveEquipmentTableTrait;
+// Import for broth_pot table trait (needed for validation)
+use crate::broth_pot::broth_pot as BrothPotTableTrait;
 
 // Corrected imports for WoodenStorageBox (used as an example ItemContainer implementor, not for direct table access here)
 use crate::wooden_storage_box::WoodenStorageBox; 
@@ -140,6 +142,61 @@ pub(crate) fn handle_move_to_container_slot<C: ItemContainer>(
     // --- Validate Target Slot Index --- 
     if target_slot_index >= container.num_slots() as u8 {
         return Err(format!("Target slot index {} out of bounds.", target_slot_index));
+    }
+    
+    // --- Special validation for Broth Pot ---
+    if container.get_container_type() == crate::models::ContainerType::BrothPot {
+        // Check if item is a soup (output items that shouldn't be placed back)
+        if item_def_to_move.name.contains("Soup") {
+            // Get player position for error sound
+            let players = ctx.db.player();
+            if let Some(player) = players.identity().find(sender_id) {
+                // Get broth pot position
+                let broth_pots = ctx.db.broth_pot();
+                if let Some(broth_pot) = broth_pots.id().find(container.get_container_id() as u32) {
+                    crate::sound_events::emit_error_jar_placement_sound(
+                        ctx, 
+                        broth_pot.pos_x, 
+                        broth_pot.pos_y, 
+                        sender_id
+                    );
+                }
+            }
+            return Err("Cannot place soup items back into the broth pot. Soups can only be removed, not returned.".to_string());
+        }
+        
+        // Validate ingredient slots: Only Material, Consumable, or Seeds allowed
+        // Note: Water container slot (slot 0) is handled separately, ingredient slots are 0-2
+        // But wait, water container uses slot_index 0 but is tracked separately, so ingredient slots are actually 0-2
+        // Let me check if this is an ingredient slot by checking if target_slot_index < 3
+        if target_slot_index < 3 {
+            // Check if item is compatible: Material, Consumable, or Seed
+            use crate::items::ItemCategory;
+            use crate::metadata_providers::is_plantable_seed;
+            
+            let is_compatible = match item_def_to_move.category {
+                ItemCategory::Material => true,
+                ItemCategory::Consumable => true,
+                _ => false,
+            };
+            
+            // Also check if it's a seed (seeds are typically Consumable but check by name)
+            let is_seed = is_plantable_seed(&item_def_to_move.name);
+            
+            if !is_compatible && !is_seed {
+                // Get broth pot position for error sound
+                let broth_pots = ctx.db.broth_pot();
+                if let Some(broth_pot) = broth_pots.id().find(container.get_container_id() as u32) {
+                    crate::sound_events::emit_error_broth_not_compatible_sound(
+                        ctx,
+                        broth_pot.pos_x,
+                        broth_pot.pos_y,
+                        sender_id
+                    );
+                }
+                return Err(format!("Item '{}' cannot be placed in the broth pot. Only materials, consumables, and seeds are allowed.", item_def_to_move.name));
+            }
+        }
     }
     let target_instance_id_opt = container.get_slot_instance_id(target_slot_index);
     let new_item_location = ItemLocation::Container(crate::models::ContainerLocationData {
