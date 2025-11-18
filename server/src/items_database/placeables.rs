@@ -57,7 +57,7 @@ pub fn get_placeable_definitions() -> Vec<ItemDefinition> {
         ItemBuilder::new("Sleeping Bag", "A rolled-up bag for sleeping outdoors. Sets a respawn point.", ItemCategory::Placeable)
             .icon("sleeping_bag.png")
             .crafting_cost(vec![
-                CostIngredient { item_name: "Cloth".to_string(), quantity: 25 },
+                CostIngredient { item_name: "Cloth".to_string(), quantity: 15 }, // Reduced from 25 to 15 for easier early game
             ])
             .crafting_output(1, 15)
             .respawn_time(420)
@@ -99,9 +99,9 @@ pub fn get_placeable_definitions() -> Vec<ItemDefinition> {
         )
             .icon("hearth.png")
             .crafting_cost(vec![
-                CostIngredient { item_name: "Stone".to_string(), quantity: 200 },
-                CostIngredient { item_name: "Wood".to_string(), quantity: 150 },
-                CostIngredient { item_name: "Cloth".to_string(), quantity: 20 },
+                CostIngredient { item_name: "Wood".to_string(), quantity: 300 },  // Primary material - achievable after building starter base
+                CostIngredient { item_name: "Stone".to_string(), quantity: 100 }, // Reduced from 200 - easier to gather
+                CostIngredient { item_name: "Cloth".to_string(), quantity: 10 },  // Reduced from 20 - blessing cloth lining
             ])
             .crafting_output(1, 45)
             .respawn_time(600)

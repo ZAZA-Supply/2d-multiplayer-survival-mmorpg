@@ -8,6 +8,7 @@ pub mod viper;
 pub mod walrus;
 pub mod respawn;
 pub mod animal_corpse;
+pub mod survival;
 
 // Re-export core types and functionality
 pub use core::*;
@@ -18,4 +19,7 @@ pub use viper::ViperBehavior;
 pub use walrus::WalrusBehavior;
 
 // Re-export animal corpse functionality
-pub use animal_corpse::*; 
+pub use animal_corpse::*;
+
+// Re-export survival functionality
+pub use survival::*; 

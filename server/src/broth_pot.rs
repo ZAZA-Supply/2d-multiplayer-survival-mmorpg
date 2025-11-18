@@ -1416,6 +1416,37 @@ pub fn process_broth_pot_logic_scheduled(
         return Ok(());
     }
     
+    // --- Clean up ghost ingredient references ---
+    // If an ingredient instance_id points to a deleted item, clear the slot
+    let items = ctx.db.inventory_item();
+    let mut cleaned_any = false;
+    
+    if let Some(id) = broth_pot.ingredient_instance_id_0 {
+        if items.instance_id().find(&id).is_none() {
+            broth_pot.ingredient_instance_id_0 = None;
+            broth_pot.ingredient_def_id_0 = None;
+            cleaned_any = true;
+        }
+    }
+    if let Some(id) = broth_pot.ingredient_instance_id_1 {
+        if items.instance_id().find(&id).is_none() {
+            broth_pot.ingredient_instance_id_1 = None;
+            broth_pot.ingredient_def_id_1 = None;
+            cleaned_any = true;
+        }
+    }
+    if let Some(id) = broth_pot.ingredient_instance_id_2 {
+        if items.instance_id().find(&id).is_none() {
+            broth_pot.ingredient_instance_id_2 = None;
+            broth_pot.ingredient_def_id_2 = None;
+            cleaned_any = true;
+        }
+    }
+    
+    if cleaned_any {
+        log::debug!("[BrothPot] Cleaned ghost ingredient references in pot {}", broth_pot_id);
+    }
+    
     // Calculate elapsed time since last processing (approximately 1 second per tick)
     let elapsed_seconds = 1.0; // BROTH_POT_PROCESS_INTERVAL_SECS
     
@@ -1842,9 +1873,15 @@ pub fn schedule_next_broth_pot_processing(ctx: &ReducerContext, broth_pot_id: u3
     let broth_pot = broth_pot_opt.unwrap();
 
     // Check if pot has ingredients that could start brewing
-    let has_ingredients = broth_pot.ingredient_instance_id_0.is_some() ||
-                         broth_pot.ingredient_instance_id_1.is_some() ||
-                         broth_pot.ingredient_instance_id_2.is_some();
+    // CRITICAL: Check if actual InventoryItem exists, not just if instance_id is Some (ghost item bug)
+    let items = ctx.db.inventory_item();
+    let has_ingredients = 
+        (broth_pot.ingredient_instance_id_0.is_some() && 
+         broth_pot.ingredient_instance_id_0.as_ref().map_or(false, |id| items.instance_id().find(id).is_some())) ||
+        (broth_pot.ingredient_instance_id_1.is_some() && 
+         broth_pot.ingredient_instance_id_1.as_ref().map_or(false, |id| items.instance_id().find(id).is_some())) ||
+        (broth_pot.ingredient_instance_id_2.is_some() && 
+         broth_pot.ingredient_instance_id_2.as_ref().map_or(false, |id| items.instance_id().find(id).is_some()));
 
     // Schedule if cooking, desalinating, has ingredients (could start brewing), has output (needs processing), 
     // OR if pot has capacity for rain collection

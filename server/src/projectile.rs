@@ -27,6 +27,14 @@ use crate::stash::{Stash, stash as StashTableTrait};
 use crate::sleeping_bag::{SleepingBag, SLEEPING_BAG_COLLISION_RADIUS, SLEEPING_BAG_COLLISION_Y_OFFSET, sleeping_bag as SleepingBagTableTrait};
 use crate::barrel::{Barrel, barrel as BarrelTableTrait};
 use crate::player_corpse::{PlayerCorpse, CORPSE_COLLISION_RADIUS, CORPSE_COLLISION_Y_OFFSET, player_corpse as PlayerCorpseTableTrait};
+use crate::rain_collector::{RainCollector, RAIN_COLLECTOR_COLLISION_RADIUS, RAIN_COLLECTOR_COLLISION_Y_OFFSET, rain_collector as RainCollectorTableTrait};
+use crate::furnace::{Furnace, FURNACE_COLLISION_RADIUS, FURNACE_COLLISION_Y_OFFSET, furnace as FurnaceTableTrait};
+use crate::lantern::{Lantern, lantern as LanternTableTrait};
+// Lantern collision constants (not exported from lantern.rs, so define here)
+const PROJECTILE_LANTERN_HIT_RADIUS: f32 = 25.0; // Generous radius for lanterns
+const PROJECTILE_LANTERN_Y_OFFSET: f32 = 0.0; // No Y offset needed
+use crate::homestead_hearth::{HomesteadHearth, HEARTH_COLLISION_RADIUS, HEARTH_COLLISION_Y_OFFSET, homestead_hearth as HomesteadHearthTableTrait};
+use crate::wild_animal_npc::animal_corpse::{AnimalCorpse, ANIMAL_CORPSE_COLLISION_RADIUS, ANIMAL_CORPSE_COLLISION_Y_OFFSET, animal_corpse as AnimalCorpseTableTrait};
 
 // Import natural obstacle modules for collision detection
 use crate::tree::{Tree, tree as TreeTableTrait};
@@ -656,6 +664,91 @@ fn calculate_projectile_damage(
 }
 // --- END NEW HELPER FUNCTION ---
 
+// --- HELPER FUNCTION FOR FIRE PATCH CREATION ---
+/// Creates a fire patch if the projectile is a fire arrow
+/// Returns true if a fire patch was created, false otherwise
+fn create_fire_patch_if_fire_arrow(
+    ctx: &ReducerContext,
+    ammo_item_def: &crate::items::ItemDefinition,
+    pos_x: f32,
+    pos_y: f32,
+    owner_id: Identity,
+) -> bool {
+    if ammo_item_def.name != "Fire Arrow" {
+        return false;
+    }
+
+    // Check if it hit a wooden structure (wall or foundation)
+    use crate::building::{wall_cell, foundation_cell, FOUNDATION_TILE_SIZE_PX};
+    let mut hit_wooden_structure = false;
+    let mut attached_wall_id = None;
+    let mut attached_foundation_id = None;
+    
+    // Check walls
+    for wall in ctx.db.wall_cell().iter() {
+        if wall.is_destroyed {
+            continue;
+        }
+        
+        let wall_world_x = (wall.cell_x as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+        let wall_world_y = (wall.cell_y as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+        
+        let dx = wall_world_x - pos_x;
+        let dy = wall_world_y - pos_y;
+        let dist_sq = dx * dx + dy * dy;
+        
+        if dist_sq < (40.0 * 40.0) { // Within 40px of wall
+            hit_wooden_structure = true;
+            attached_wall_id = Some(wall.id);
+            break;
+        }
+    }
+    
+    // Check foundations if no wall found
+    if !hit_wooden_structure {
+        for foundation in ctx.db.foundation_cell().iter() {
+            if foundation.is_destroyed {
+                continue;
+            }
+            
+            let foundation_world_x = (foundation.cell_x as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+            let foundation_world_y = (foundation.cell_y as f32 * FOUNDATION_TILE_SIZE_PX as f32) + (FOUNDATION_TILE_SIZE_PX as f32 / 2.0);
+            
+            let dx = foundation_world_x - pos_x;
+            let dy = foundation_world_y - pos_y;
+            let dist_sq = dx * dx + dy * dy;
+            
+            if dist_sq < (40.0 * 40.0) { // Within 40px of foundation
+                hit_wooden_structure = true;
+                attached_foundation_id = Some(foundation.id);
+                break;
+            }
+        }
+    }
+    
+    // Create fire patch (100% chance for fire arrows)
+    match crate::fire_patch::create_fire_patch(
+        ctx,
+        pos_x,
+        pos_y,
+        owner_id,
+        hit_wooden_structure,
+        attached_wall_id,
+        attached_foundation_id,
+    ) {
+        Ok(fire_id) => {
+            log::info!("[FireArrow] Created fire patch {} at ({:.1}, {:.1}) (on_wood: {})", 
+                      fire_id, pos_x, pos_y, hit_wooden_structure);
+            true
+        }
+        Err(e) => {
+            log::warn!("[FireArrow] Failed to create fire patch at ({:.1}, {:.1}): {}", pos_x, pos_y, e);
+            false
+        }
+    }
+}
+// --- END HELPER FUNCTION ---
+
 #[reducer]
 pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule) -> Result<(), String> {
     // Security check - only allow scheduler to call this
@@ -770,6 +863,11 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
                 );
             }
             
+            // Create fire patch if this is a fire arrow (100% chance)
+            if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, collision_x, collision_y, projectile.owner_id);
+            }
+            
             // Projectile hit wall - stop it and create dropped item
             missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, collision_x, collision_y));
             projectiles_to_delete.push(projectile.id);
@@ -795,6 +893,11 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
                         );
                         
                         // Projectile hit own shelter from inside - consume projectile but don't damage shelter
+                        // Create fire patch if this is a fire arrow (100% chance)
+                        if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                            create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, collision_x, collision_y, projectile.owner_id);
+                        }
+                        
                         missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, collision_x, collision_y));
                         projectiles_to_delete.push(projectile.id);
                         continue;
@@ -861,6 +964,12 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
                 );
             }
             
+            // Create fire patch if this is a fire arrow (100% chance)
+            let item_defs_table = ctx.db.item_definition();
+            if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, collision_x, collision_y, projectile.owner_id);
+            }
+            
             // Projectile hit shelter wall - store info for dropped item creation
             missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, collision_x, collision_y));
             projectiles_to_delete.push(projectile.id);
@@ -889,6 +998,11 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
                     "[ProjectileUpdate] Projectile {} from owner {:?} hit Tree {} along path from ({:.1}, {:.1}) to ({:.1}, {:.1})",
                     projectile.id, projectile.owner_id, tree.id, prev_x, prev_y, current_x, current_y
                 );
+                
+                // Create fire patch if this is a fire arrow (100% chance)
+                if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                    create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, current_x, current_y, projectile.owner_id);
+                }
                 
                 // Trees block projectiles but don't take damage - projectile becomes dropped item
                 missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
@@ -921,6 +1035,11 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
                     "[ProjectileUpdate] Projectile {} from owner {:?} hit Stone {} along path from ({:.1}, {:.1}) to ({:.1}, {:.1})",
                     projectile.id, projectile.owner_id, stone.id, prev_x, prev_y, current_x, current_y
                 );
+                
+                // Create fire patch if this is a fire arrow (100% chance)
+                if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                    create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, current_x, current_y, projectile.owner_id);
+                }
                 
                 // Stones block projectiles but don't take damage - projectile becomes dropped item
                 missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
@@ -982,6 +1101,11 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
                     }
                 }
                 
+                // Create fire patch if this is a fire arrow (100% chance)
+                if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                    create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, current_x, current_y, projectile.owner_id);
+                }
+                
                 // Add projectile to dropped item system (with break chance) like shelters
                 missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
                 projectiles_to_delete.push(projectile.id);
@@ -1039,6 +1163,11 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
                     }
                 }
                 
+                // Create fire patch if this is a fire arrow (100% chance)
+                if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                    create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, current_x, current_y, projectile.owner_id);
+                }
+                
                 // Add projectile to dropped item system (with break chance) like shelters
                 missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
                 projectiles_to_delete.push(projectile.id);
@@ -1091,6 +1220,11 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
                             }
                         }
                     }
+                }
+                
+                // Create fire patch if this is a fire arrow (100% chance)
+                if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                    create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, current_x, current_y, projectile.owner_id);
                 }
                 
                 // Add projectile to dropped item system (with break chance) like shelters
@@ -1150,6 +1284,11 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
                     }
                 }
                 
+                // Create fire patch if this is a fire arrow (100% chance)
+                if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                    create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, current_x, current_y, projectile.owner_id);
+                }
+                
                 // Add projectile to dropped item system (with break chance) like shelters
                 missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
                 projectiles_to_delete.push(projectile.id);
@@ -1199,6 +1338,11 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
                             }
                         }
                     }
+                }
+                
+                // Create fire patch if this is a fire arrow (100% chance)
+                if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                    create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, current_x, current_y, projectile.owner_id);
                 }
                 
                 // Add projectile to dropped item system (with break chance) like other hits
@@ -1259,7 +1403,295 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
                     }
                 }
                 
+                // Create fire patch if this is a fire arrow (100% chance)
+                if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                    create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, current_x, current_y, projectile.owner_id);
+                }
+                
                 // Add projectile to dropped item system (with break chance) like other hits
+                missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
+                projectiles_to_delete.push(projectile.id);
+                hit_deployable_this_tick = true;
+                break;
+            }
+        }
+        
+        if hit_deployable_this_tick {
+            continue;
+        }
+        
+        // Check rain collector collisions
+        for rain_collector in ctx.db.rain_collector().iter() {
+            if rain_collector.is_destroyed {
+                continue;
+            }
+            
+            const PROJECTILE_RAIN_COLLECTOR_HIT_RADIUS: f32 = 35.0; // Larger than collision radius (30.0)
+            let collector_hit_y = rain_collector.pos_y - RAIN_COLLECTOR_COLLISION_Y_OFFSET;
+            
+            if line_intersects_circle(prev_x, prev_y, current_x, current_y, rain_collector.pos_x, collector_hit_y, PROJECTILE_RAIN_COLLECTOR_HIT_RADIUS) {
+                log::info!(
+                    "[ProjectileUpdate] Projectile {} from owner {:?} hit Rain Collector {} along path from ({:.1}, {:.1}) to ({:.1}, {:.1})",
+                    projectile.id, projectile.owner_id, rain_collector.id, prev_x, prev_y, current_x, current_y
+                );
+                
+                // Apply damage using existing combat system
+                if let Some(weapon_item_def) = item_defs_table.id().find(projectile.item_def_id) {
+                    if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                        let final_damage = calculate_projectile_damage(&weapon_item_def, &ammo_item_def, &projectile, &mut rng);
+
+                        if final_damage > 0.0 {
+                            match combat::damage_rain_collector(ctx, projectile.owner_id, rain_collector.id, final_damage, current_time, &mut rng) {
+                                Ok(attack_result) => {
+                                    if attack_result.hit {
+                                        log::info!(
+                                            "[ProjectileUpdate] Projectile {} dealt {:.1} damage to Rain Collector {}",
+                                            projectile.id, final_damage, rain_collector.id
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    log::error!(
+                                        "[ProjectileUpdate] Error applying projectile damage to Rain Collector {}: {}",
+                                        rain_collector.id, e
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Create fire patch if this is a fire arrow (100% chance)
+                if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                    create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, current_x, current_y, projectile.owner_id);
+                }
+                
+                missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
+                projectiles_to_delete.push(projectile.id);
+                hit_deployable_this_tick = true;
+                break;
+            }
+        }
+        
+        if hit_deployable_this_tick {
+            continue;
+        }
+        
+        // Check furnace collisions
+        for furnace in ctx.db.furnace().iter() {
+            if furnace.is_destroyed {
+                continue; // Skip destroyed furnaces
+            }
+            
+            const PROJECTILE_FURNACE_HIT_RADIUS: f32 = 40.0; // Larger than collision radius (35.0)
+            let furnace_hit_y = furnace.pos_y - FURNACE_COLLISION_Y_OFFSET;
+            
+            if line_intersects_circle(prev_x, prev_y, current_x, current_y, furnace.pos_x, furnace_hit_y, PROJECTILE_FURNACE_HIT_RADIUS) {
+                log::info!(
+                    "[ProjectileUpdate] Projectile {} from owner {:?} hit Furnace {} along path from ({:.1}, {:.1}) to ({:.1}, {:.1})",
+                    projectile.id, projectile.owner_id, furnace.id, prev_x, prev_y, current_x, current_y
+                );
+                
+                // Apply damage using existing combat system
+                if let Some(weapon_item_def) = item_defs_table.id().find(projectile.item_def_id) {
+                    if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                        let final_damage = calculate_projectile_damage(&weapon_item_def, &ammo_item_def, &projectile, &mut rng);
+
+                        if final_damage > 0.0 {
+                            match combat::damage_furnace(ctx, projectile.owner_id, furnace.id, final_damage, current_time, &mut rng) {
+                                Ok(attack_result) => {
+                                    if attack_result.hit {
+                                        log::info!(
+                                            "[ProjectileUpdate] Projectile {} dealt {:.1} damage to Furnace {}",
+                                            projectile.id, final_damage, furnace.id
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    log::error!(
+                                        "[ProjectileUpdate] Error applying projectile damage to Furnace {}: {}",
+                                        furnace.id, e
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Create fire patch if this is a fire arrow (100% chance)
+                if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                    create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, current_x, current_y, projectile.owner_id);
+                }
+                
+                missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
+                projectiles_to_delete.push(projectile.id);
+                hit_deployable_this_tick = true;
+                break;
+            }
+        }
+        
+        if hit_deployable_this_tick {
+            continue;
+        }
+        
+        // Check lantern collisions
+        for lantern in ctx.db.lantern().iter() {
+            if lantern.is_destroyed {
+                continue;
+            }
+            
+            let lantern_hit_y = lantern.pos_y - PROJECTILE_LANTERN_Y_OFFSET;
+            
+            if line_intersects_circle(prev_x, prev_y, current_x, current_y, lantern.pos_x, lantern_hit_y, PROJECTILE_LANTERN_HIT_RADIUS) {
+                log::info!(
+                    "[ProjectileUpdate] Projectile {} from owner {:?} hit Lantern {} along path from ({:.1}, {:.1}) to ({:.1}, {:.1})",
+                    projectile.id, projectile.owner_id, lantern.id, prev_x, prev_y, current_x, current_y
+                );
+                
+                // Apply damage using existing combat system
+                if let Some(weapon_item_def) = item_defs_table.id().find(projectile.item_def_id) {
+                    if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                        let final_damage = calculate_projectile_damage(&weapon_item_def, &ammo_item_def, &projectile, &mut rng);
+
+                        if final_damage > 0.0 {
+                            match combat::damage_lantern(ctx, projectile.owner_id, lantern.id, final_damage, current_time, &mut rng) {
+                                Ok(attack_result) => {
+                                    if attack_result.hit {
+                                        log::info!(
+                                            "[ProjectileUpdate] Projectile {} dealt {:.1} damage to Lantern {}",
+                                            projectile.id, final_damage, lantern.id
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    log::error!(
+                                        "[ProjectileUpdate] Error applying projectile damage to Lantern {}: {}",
+                                        lantern.id, e
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Create fire patch if this is a fire arrow (100% chance)
+                if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                    create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, current_x, current_y, projectile.owner_id);
+                }
+                
+                missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
+                projectiles_to_delete.push(projectile.id);
+                hit_deployable_this_tick = true;
+                break;
+            }
+        }
+        
+        if hit_deployable_this_tick {
+            continue;
+        }
+        
+        // Check homestead hearth collisions
+        for hearth in ctx.db.homestead_hearth().iter() {
+            // Check if hearth is destroyed (hearths don't have is_destroyed field, check health instead)
+            // Note: HomesteadHearth might not have health field, so we'll check if it exists
+            let hearth_hit_y = hearth.pos_y - HEARTH_COLLISION_Y_OFFSET;
+            const PROJECTILE_HEARTH_HIT_RADIUS: f32 = 60.0; // Larger than collision radius (55.0)
+            
+            if line_intersects_circle(prev_x, prev_y, current_x, current_y, hearth.pos_x, hearth_hit_y, PROJECTILE_HEARTH_HIT_RADIUS) {
+                log::info!(
+                    "[ProjectileUpdate] Projectile {} from owner {:?} hit Homestead Hearth {} along path from ({:.1}, {:.1}) to ({:.1}, {:.1})",
+                    projectile.id, projectile.owner_id, hearth.id, prev_x, prev_y, current_x, current_y
+                );
+                
+                // Apply damage using existing combat system
+                if let Some(weapon_item_def) = item_defs_table.id().find(projectile.item_def_id) {
+                    if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                        let final_damage = calculate_projectile_damage(&weapon_item_def, &ammo_item_def, &projectile, &mut rng);
+
+                        if final_damage > 0.0 {
+                            match crate::homestead_hearth::damage_hearth(ctx, projectile.owner_id, hearth.id, final_damage, current_time) {
+                                Ok(_) => {
+                                    log::info!(
+                                        "[ProjectileUpdate] Projectile {} dealt {:.1} damage to Homestead Hearth {}",
+                                        projectile.id, final_damage, hearth.id
+                                    );
+                                }
+                                Err(e) => {
+                                    log::error!(
+                                        "[ProjectileUpdate] Error applying projectile damage to Homestead Hearth {}: {}",
+                                        hearth.id, e
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Create fire patch if this is a fire arrow (100% chance)
+                if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                    create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, current_x, current_y, projectile.owner_id);
+                }
+                
+                missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
+                projectiles_to_delete.push(projectile.id);
+                hit_deployable_this_tick = true;
+                break;
+            }
+        }
+        
+        if hit_deployable_this_tick {
+            continue;
+        }
+        
+        // Check animal corpse collisions
+        for animal_corpse in ctx.db.animal_corpse().iter() {
+            if animal_corpse.health == 0 {
+                continue; // Skip depleted corpses
+            }
+            
+            const PROJECTILE_ANIMAL_CORPSE_HIT_RADIUS: f32 = 20.0; // Generous radius for animal corpses
+            let corpse_hit_y = animal_corpse.pos_y - ANIMAL_CORPSE_COLLISION_Y_OFFSET;
+            
+            if line_intersects_circle(prev_x, prev_y, current_x, current_y, animal_corpse.pos_x, corpse_hit_y, PROJECTILE_ANIMAL_CORPSE_HIT_RADIUS) {
+                log::info!(
+                    "[ProjectileUpdate] Projectile {} from owner {:?} hit Animal Corpse {} along path from ({:.1}, {:.1}) to ({:.1}, {:.1})",
+                    projectile.id, projectile.owner_id, animal_corpse.id, prev_x, prev_y, current_x, current_y
+                );
+                
+                // Apply damage using existing combat system
+                if let Some(weapon_item_def) = item_defs_table.id().find(projectile.item_def_id) {
+                    if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                        let final_damage = calculate_projectile_damage(&weapon_item_def, &ammo_item_def, &projectile, &mut rng);
+
+                        if final_damage > 0.0 {
+                            match combat::damage_animal_corpse(ctx, projectile.owner_id, animal_corpse.id, final_damage, &weapon_item_def, current_time, &mut rng) {
+                                Ok(attack_result) => {
+                                    if attack_result.hit {
+                                        log::info!(
+                                            "[ProjectileUpdate] Projectile {} dealt {:.1} damage to Animal Corpse {}",
+                                            projectile.id, final_damage, animal_corpse.id
+                                        );
+                                        
+                                        // Play arrow hit sound for animal corpse hits
+                                        sound_events::emit_arrow_hit_sound(ctx, animal_corpse.pos_x, animal_corpse.pos_y, projectile.owner_id);
+                                    }
+                                }
+                                Err(e) => {
+                                    log::error!(
+                                        "[ProjectileUpdate] Error applying projectile damage to Animal Corpse {}: {}",
+                                        animal_corpse.id, e
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Create fire patch if this is a fire arrow (100% chance)
+                if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                    create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, current_x, current_y, projectile.owner_id);
+                }
+                
                 missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
                 projectiles_to_delete.push(projectile.id);
                 hit_deployable_this_tick = true;
@@ -1275,6 +1707,12 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
             // Projectile missed - store info for dropped item creation
             log::info!("DEBUG: Projectile {} reached max range/time. Distance: {:.1}, Range: {:.1}, Time: {:.1}s", 
                 projectile.id, travel_distance, projectile.max_range, elapsed_time);
+            
+            // Create fire patch if this is a fire arrow (100% chance)
+            if let Some(ammo_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                create_fire_patch_if_fire_arrow(ctx, &ammo_def, current_x, current_y, projectile.owner_id);
+            }
+            
             missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
             projectiles_to_delete.push(projectile.id);
             continue;
@@ -1352,6 +1790,9 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
                         log::error!("Error applying projectile damage to wild animal {}: {}", wild_animal.id, e);
                     }
                 }
+
+                // Create fire patch if this is a fire arrow (100% chance)
+                create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, current_x, current_y, projectile.owner_id);
 
                 // Add projectile to dropped item system (with break chance) like other hits
                 missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
@@ -1447,6 +1888,9 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
                                 log::error!("Error applying projectile burn effect for ammo '{}' on player {:?}: {}", 
                                     ammo_item_def.name, player_to_check.identity, e);
                             }
+                            
+                            // Create fire patch if this is a fire arrow (100% chance)
+                            create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, player_to_check.position_x, player_to_check.position_y, projectile.owner_id);
                         } else {
                             log::info!("Projectile from {:?} (weapon: {} + ammo: {}) hit player {:?}, but combat::damage_player reported no effective damage (e.g., target already dead).", 
                                      projectile.owner_id, weapon_item_def.name, ammo_item_def.name, player_to_check.identity);

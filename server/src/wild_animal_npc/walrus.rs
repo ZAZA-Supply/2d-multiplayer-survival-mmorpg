@@ -345,6 +345,7 @@ impl AnimalBehavior for ArcticWalrusBehavior {
         
         // 🦭 WILD WALRUS RETALIATION: When attacked, walruses become extremely aggressive
         // They never flee and will chase the attacker relentlessly
+        // 🐺 NOTE: Walruses are NOT intimidated by wolf fur - they're too massive and defensive!
         
         transition_to_state(animal, AnimalState::Chasing, current_time, Some(attacker.identity), "walrus retaliation");
         

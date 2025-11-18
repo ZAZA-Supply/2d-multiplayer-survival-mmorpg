@@ -85,6 +85,7 @@ mod building_decay; // <<< ADDED: Building decay system
 mod rune_stone; // <<< ADDED: Rune stone system
 mod broth_pot; // <<< ADDED: Broth pot cooking system
 mod recipes; // <<< ADDED: Recipe system for broth pot cooking
+mod fire_patch; // <<< ADDED: Fire patch system for fire arrows
 
 // ADD: Re-export respawn reducer
 pub use respawn::respawn_randomly;
@@ -526,6 +527,13 @@ pub struct ClientViewport {
 pub fn init_module(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("Initializing module...");
 
+    // Seed all static game data first (items, recipes, etc.)
+    crate::items::seed_items(ctx)?;
+    crate::items::seed_food_poisoning_risks(ctx)?;
+    crate::items::seed_ranged_weapon_stats(ctx)?;
+    crate::crafting::seed_recipes(ctx)?;
+    crate::environment::seed_environment(ctx)?;
+
     // Initialize the dropped item despawn schedule
     crate::dropped_item::init_dropped_item_schedule(ctx)?;
     // Initialize the crafting finish check schedule
@@ -544,6 +552,9 @@ pub fn init_module(ctx: &ReducerContext) -> Result<(), String> {
     
     // ADD: Initialize water patch cleanup system
     crate::water_patch::init_water_patch_system(ctx)?;
+    
+    // ADD: Initialize fire patch cleanup system
+    crate::fire_patch::init_fire_patch_system(ctx)?;
     
     // ADD: Initialize sound event cleanup system
     crate::sound_events::init_sound_cleanup_system(ctx)?;
@@ -654,18 +665,9 @@ pub fn init_module(ctx: &ReducerContext) -> Result<(), String> {
 /// idempotent, so they can be safely called on every connection.
 #[spacetimedb::reducer(client_connected)]
 pub fn identity_connected(ctx: &ReducerContext) -> Result<(), String> {
-    // Call seeders using qualified paths
-    // IMPORTANT: seed_items must be called BEFORE seed_environment because
-    // seed_environment needs items to be seeded to configure red rune stones
-    crate::items::seed_items(ctx)?; // Call the item seeder
-    crate::environment::seed_environment(ctx)?; // Call the updated seeder
-    crate::items::seed_food_poisoning_risks(ctx)?; // Seed food poisoning risks
-    crate::world_state::seed_world_state(ctx)?; // Call the world state seeder
-    crate::crafting::seed_recipes(ctx)?; // Seed the crafting recipes
-    crate::items::seed_ranged_weapon_stats(ctx)?; // Seed the ranged weapon stats
-    crate::projectile::init_projectile_system(ctx)?; // Initialize projectile collision detection system
-    
-    // No seeder needed for Campfire yet, table will be empty initially
+    // NOTE: All seeders are now called in init_module only, not here
+    // This prevents duplicate inserts when clients reconnect to an existing database
+    // The seeders are idempotent but calling them on every client connection is wasteful
 
     // --- Track Active Connection ---
     let client_identity = ctx.sender;

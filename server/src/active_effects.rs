@@ -1435,6 +1435,13 @@ pub fn apply_burn_effect(
             
             log::info!("Stacked burn effect {} for player {:?}: added {:.1}s duration, total now {:.1}s (total damage: {:.1})", 
                 existing_effect.effect_id, player_id, duration_seconds, total_duration_seconds, new_total_damage);
+            
+            // Trigger white flash when stacking burn effects (each time burn is applied/extended)
+            if let Some(mut player) = ctx.db.player().identity().find(&player_id) {
+                player.last_hit_time = Some(current_time);
+                ctx.db.player().identity().update(player);
+            }
+            
             return Ok(());
         }
         // This should never be reached since we checked !existing_burn_effects.is_empty()
@@ -1463,6 +1470,13 @@ pub fn apply_burn_effect(
             Ok(inserted_effect) => {
                 log::info!("Applied new burn effect {} to player {:?}: {:.1} damage over {:.1}s (every {:.1}s)", 
                     inserted_effect.effect_id, player_id, total_damage, duration_seconds, tick_interval_seconds);
+                
+                // Set last_hit_time to trigger flash white effect (same as when player takes damage)
+                if let Some(mut player) = ctx.db.player().identity().find(&player_id) {
+                    player.last_hit_time = Some(current_time);
+                    ctx.db.player().identity().update(player);
+                }
+                
                 Ok(())
             }
             Err(e) => {

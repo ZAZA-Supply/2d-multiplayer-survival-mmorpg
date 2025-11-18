@@ -1364,13 +1364,13 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
                 created_at: ctx.timestamp,
                 last_hit_time: None,
                 
-                // Initialize pack fields - animals start solo
+                // Pack behavior fields
                 pack_id: None,
                 is_pack_leader: false,
                 pack_join_time: None,
                 last_pack_check: None,
                 
-                // Fire fear override tracking
+                // Fire fear override
                 fire_fear_overridden_by: None,
                 
                 // Taming system fields
@@ -1379,6 +1379,14 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
                 heart_effect_until: None,
                 crying_effect_until: None,
                 last_food_check: None,
+                
+                // Survival system fields
+                hunger: crate::wild_animal_npc::ANIMAL_MAX_HUNGER,
+                thirst: crate::wild_animal_npc::ANIMAL_MAX_THIRST,
+                target_resource_id: None,
+                target_water_x: None,
+                target_water_y: None,
+                survival_action_start_time: None,
             };
 
             match ctx.db.wild_animal().try_insert(new_animal) {
@@ -1837,7 +1845,10 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
                     let pos_y = cell_min_y + cell_height_px * 0.5 + offset_y;
                     
                     // Validate position (not on water, not in central compound)
-                    if is_position_on_water(ctx, pos_x, pos_y) || is_position_in_central_compound(pos_x, pos_y) {
+                    // Explicitly block all water tiles (ocean, inland water, beach water)
+                    if is_position_on_water(ctx, pos_x, pos_y) || 
+                       is_position_on_inland_water(ctx, pos_x, pos_y) ||
+                       is_position_in_central_compound(pos_x, pos_y) {
                         continue;
                     }
                     
@@ -1884,6 +1895,11 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
                     
                     if too_close_to_barrel {
                         continue;
+                    }
+                    
+                    // Final validation: double-check we're not on water (safety measure)
+                    if is_position_on_water(ctx, pos_x, pos_y) || is_position_on_inland_water(ctx, pos_x, pos_y) {
+                        continue; // Skip this position if somehow it's on water
                     }
                     
                     // All distance checks passed - spawn the rune stone

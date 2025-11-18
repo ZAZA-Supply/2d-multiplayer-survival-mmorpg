@@ -805,6 +805,9 @@ pub fn update_player_position_simple(
         }
     }
 
+    // Fire patch damage is now handled by scheduled reducer (like campfires)
+    // No need to check collision on every movement
+
     // --- Update player state directly (no re-fetch to avoid race conditions) ---
     current_player.position_x = final_x;
     current_player.position_y = final_y;

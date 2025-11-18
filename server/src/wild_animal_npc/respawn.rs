@@ -5,7 +5,7 @@ use log;
 use crate::{TILE_SIZE_PX, WORLD_WIDTH_TILES, WORLD_HEIGHT_TILES};
 use crate::environment::{calculate_chunk_index, is_wild_animal_location_suitable, is_position_on_water, is_position_in_central_compound};
 use crate::utils::calculate_tile_bounds;
-use super::core::{AnimalSpecies, AnimalState, MovementPattern, WildAnimal, AnimalBehavior, init_wild_animal_ai_schedule};
+use super::core::{AnimalSpecies, AnimalState, MovementPattern, WildAnimal, AnimalBehavior, init_wild_animal_ai_schedule, ANIMAL_MAX_HUNGER, ANIMAL_MAX_THIRST};
 
 // Table trait imports
 use crate::wild_animal_npc::core::wild_animal;
@@ -268,13 +268,13 @@ fn spawn_animal(
         created_at: ctx.timestamp,
         last_hit_time: None,
         
-        // Initialize pack fields - animals start solo
+        // Pack behavior fields
         pack_id: None,
         is_pack_leader: false,
         pack_join_time: None,
         last_pack_check: None,
         
-        // Fire fear override tracking
+        // Fire fear override
         fire_fear_overridden_by: None,
         
         // Taming system fields
@@ -283,6 +283,14 @@ fn spawn_animal(
         heart_effect_until: None,
         crying_effect_until: None,
         last_food_check: None,
+        
+        // Survival system fields
+        hunger: ANIMAL_MAX_HUNGER,
+        thirst: ANIMAL_MAX_THIRST,
+        target_resource_id: None,
+        target_water_x: None,
+        target_water_y: None,
+        survival_action_start_time: None,
     };
     
     // Attempt to spawn the animal

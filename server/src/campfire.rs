@@ -84,7 +84,7 @@ const CAMPFIRE_DAMAGE_RADIUS: f32 = 50.0; // Increased damage radius
 const CAMPFIRE_DAMAGE_RADIUS_SQUARED: f32 = 2500.0; // 50.0 * 50.0
  const CAMPFIRE_DAMAGE_PER_TICK: f32 = 5.0; // Total damage over the burn duration
  const CAMPFIRE_DAMAGE_EFFECT_DURATION_SECONDS: u64 = 3; // Duration of the burn effect (3 seconds)
- const CAMPFIRE_BURN_TICK_INTERVAL_SECONDS: f32 = 1.0; // Apply burn damage every 1 second
+ const CAMPFIRE_BURN_TICK_INTERVAL_SECONDS: f32 = 2.0; // Apply burn damage every 2 seconds (gives time for white flash to reset)
  const CAMPFIRE_DAMAGE_APPLICATION_COOLDOWN_SECONDS: u64 = 0; // MODIFIED: Apply damage every process tick if player is present
  
  /// --- Campfire Data Structure ---
@@ -146,41 +146,52 @@ const CAMPFIRE_DAMAGE_RADIUS_SQUARED: f32 = 2500.0; // 50.0 * 50.0
   *                           REDUCERS (Generic Handlers)                        *
   ******************************************************************************/
  
- /// --- Add Fuel to Campfire ---
- /// Adds an item from the player's inventory as fuel to a specific campfire slot.
- /// Validates the campfire interaction and fuel item, then uses the generic container handler
+/// --- Add Fuel to Campfire ---
+/// Adds an item from the player's inventory as fuel to a specific campfire slot.
+/// Validates the campfire interaction and fuel item, then uses the generic container handler
 /// to move the item to the campfire. Updates the campfire state after successful addition.
 #[spacetimedb::reducer]
 pub fn move_item_to_campfire(ctx: &ReducerContext, campfire_id: u32, target_slot_index: u8, item_instance_id: u64) -> Result<(), String> {
-     let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
-     
-     // --- Validate item type - prevent water bottles and cauldrons ---
-     let items = ctx.db.inventory_item();
-     let item = items.instance_id().find(&item_instance_id)
-         .ok_or_else(|| "Item not found.".to_string())?;
-     let item_defs = ctx.db.item_definition();
-     let item_def = item_defs.id().find(&item.item_def_id)
-         .ok_or_else(|| "Item definition not found.".to_string())?;
-     
-     // Prevent water containers and cauldrons from being placed in campfires
-     let blocked_items = ["Reed Water Bottle", "Plastic Water Jug", "Cerametal Field Cauldron Mk. II"];
-     if blocked_items.contains(&item_def.name.as_str()) {
-         return Err(format!("Cannot place '{}' in campfire. Use the broth pot's water container slot for water bottles, or place the cauldron on the campfire.", item_def.name));
-     }
-     
-     inventory_management::handle_move_to_container_slot(ctx, &mut campfire, target_slot_index, item_instance_id)?;
-     ctx.db.campfire().id().update(campfire.clone()); // Persist campfire slot changes
-     schedule_next_campfire_processing(ctx, campfire_id); // Reschedule based on new fuel state
-     Ok(())
- }
+    let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
+    
+    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
+    if campfire.attached_broth_pot_id.is_some() {
+        return Err("Cannot add fuel to campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    }
+    
+    // --- Validate item type - prevent water bottles and cauldrons ---
+    let items = ctx.db.inventory_item();
+    let item = items.instance_id().find(&item_instance_id)
+        .ok_or_else(|| "Item not found.".to_string())?;
+    let item_defs = ctx.db.item_definition();
+    let item_def = item_defs.id().find(&item.item_def_id)
+        .ok_or_else(|| "Item definition not found.".to_string())?;
+    
+    // Prevent water containers and cauldrons from being placed in campfires
+    let blocked_items = ["Reed Water Bottle", "Plastic Water Jug", "Cerametal Field Cauldron Mk. II"];
+    if blocked_items.contains(&item_def.name.as_str()) {
+        return Err(format!("Cannot place '{}' in campfire. Use the broth pot's water container slot for water bottles, or place the cauldron on the campfire.", item_def.name));
+    }
+    
+    inventory_management::handle_move_to_container_slot(ctx, &mut campfire, target_slot_index, item_instance_id)?;
+    ctx.db.campfire().id().update(campfire.clone()); // Persist campfire slot changes
+    schedule_next_campfire_processing(ctx, campfire_id); // Reschedule based on new fuel state
+    Ok(())
+}
  
- /// --- Remove Fuel from Campfire ---
- /// Removes the fuel item from a specific campfire slot and returns it to the player inventory/hotbar.
- /// Uses the quick move logic (attempts merge, then finds first empty slot).
- #[spacetimedb::reducer]
- pub fn quick_move_from_campfire(ctx: &ReducerContext, campfire_id: u32, source_slot_index: u8) -> Result<(), String> {
-     let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
-     inventory_management::handle_quick_move_from_container(ctx, &mut campfire, source_slot_index)?;
+/// --- Remove Fuel from Campfire ---
+/// Removes the fuel item from a specific campfire slot and returns it to the player inventory/hotbar.
+/// Uses the quick move logic (attempts merge, then finds first empty slot).
+#[spacetimedb::reducer]
+pub fn quick_move_from_campfire(ctx: &ReducerContext, campfire_id: u32, source_slot_index: u8) -> Result<(), String> {
+    let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
+    
+    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
+    if campfire.attached_broth_pot_id.is_some() {
+        return Err("Cannot remove fuel from campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    }
+    
+    inventory_management::handle_quick_move_from_container(ctx, &mut campfire, source_slot_index)?;
      let still_has_fuel = check_if_campfire_has_fuel(ctx, &campfire);
      if !still_has_fuel && campfire.is_burning {
          campfire.is_burning = false;
@@ -194,19 +205,24 @@ pub fn move_item_to_campfire(ctx: &ReducerContext, campfire_id: u32, target_slot
      Ok(())
  }
  
- /// --- Split Stack Into Campfire ---
- /// Splits a stack from player inventory into a campfire slot.
- #[spacetimedb::reducer]
- pub fn split_stack_into_campfire(
-     ctx: &ReducerContext,
-     source_item_instance_id: u64,
-     quantity_to_split: u32,
-     target_campfire_id: u32,
-     target_slot_index: u8,
- ) -> Result<(), String> {
-     let (_player, mut campfire) = validate_campfire_interaction(ctx, target_campfire_id)?;
-     
-     // --- Validate item type - prevent water bottles and cauldrons ---
+/// --- Split Stack Into Campfire ---
+/// Splits a stack from player inventory into a campfire slot.
+#[spacetimedb::reducer]
+pub fn split_stack_into_campfire(
+    ctx: &ReducerContext,
+    source_item_instance_id: u64,
+    quantity_to_split: u32,
+    target_campfire_id: u32,
+    target_slot_index: u8,
+) -> Result<(), String> {
+    let (_player, mut campfire) = validate_campfire_interaction(ctx, target_campfire_id)?;
+    
+    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
+    if campfire.attached_broth_pot_id.is_some() {
+        return Err("Cannot add fuel to campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    }
+    
+    // --- Validate item type - prevent water bottles and cauldrons ---
      let items = ctx.db.inventory_item();
      let source_item = items.instance_id().find(&source_item_instance_id)
          .ok_or_else(|| "Source item not found.".to_string())?;
@@ -243,50 +259,67 @@ pub fn move_item_to_campfire(ctx: &ReducerContext, campfire_id: u32, target_slot
      Ok(())
  }
  
- /// --- Campfire Internal Item Movement ---
+/// --- Campfire Internal Item Movement ---
 /// Moves/merges/swaps an item BETWEEN two slots within the same campfire.
 #[spacetimedb::reducer]
 pub fn move_item_within_campfire(
-     ctx: &ReducerContext,
-     campfire_id: u32,
-     source_slot_index: u8,
-     target_slot_index: u8,
- ) -> Result<(), String> {
-     let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
-     inventory_management::handle_move_within_container(ctx, &mut campfire, source_slot_index, target_slot_index)?;
+    ctx: &ReducerContext,
+    campfire_id: u32,
+    source_slot_index: u8,
+    target_slot_index: u8,
+) -> Result<(), String> {
+    let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
+    
+    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
+    if campfire.attached_broth_pot_id.is_some() {
+        return Err("Cannot move fuel in campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    }
+    
+    inventory_management::handle_move_within_container(ctx, &mut campfire, source_slot_index, target_slot_index)?;
      ctx.db.campfire().id().update(campfire.clone());
      schedule_next_campfire_processing(ctx, campfire_id);
      Ok(())
  }
  
- /// --- Campfire Internal Stack Splitting ---
- /// Splits a stack FROM one campfire slot TO another within the same campfire.
- #[spacetimedb::reducer]
- pub fn split_stack_within_campfire(
-     ctx: &ReducerContext,
-     campfire_id: u32,
-     source_slot_index: u8,
-     quantity_to_split: u32,
-     target_slot_index: u8,
- ) -> Result<(), String> {
-     let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
-     inventory_management::handle_split_within_container(ctx, &mut campfire, source_slot_index, target_slot_index, quantity_to_split)?;
+/// --- Campfire Internal Stack Splitting ---
+/// Splits a stack FROM one campfire slot TO another within the same campfire.
+#[spacetimedb::reducer]
+pub fn split_stack_within_campfire(
+    ctx: &ReducerContext,
+    campfire_id: u32,
+    source_slot_index: u8,
+    quantity_to_split: u32,
+    target_slot_index: u8,
+) -> Result<(), String> {
+    let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
+    
+    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
+    if campfire.attached_broth_pot_id.is_some() {
+        return Err("Cannot split fuel in campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    }
+    
+    inventory_management::handle_split_within_container(ctx, &mut campfire, source_slot_index, target_slot_index, quantity_to_split)?;
      ctx.db.campfire().id().update(campfire.clone());
      schedule_next_campfire_processing(ctx, campfire_id);
      Ok(())
  }
  
- /// --- Quick Move to Campfire ---
- /// Quickly moves an item from player inventory/hotbar to the first available/mergeable slot in the campfire.
- #[spacetimedb::reducer]
- pub fn quick_move_to_campfire(
-     ctx: &ReducerContext,
-     campfire_id: u32,
-     item_instance_id: u64,
- ) -> Result<(), String> {
-     let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
-     
-     // --- Validate item type - prevent water bottles and cauldrons ---
+/// --- Quick Move to Campfire ---
+/// Quickly moves an item from player inventory/hotbar to the first available/mergeable slot in the campfire.
+#[spacetimedb::reducer]
+pub fn quick_move_to_campfire(
+    ctx: &ReducerContext,
+    campfire_id: u32,
+    item_instance_id: u64,
+) -> Result<(), String> {
+    let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
+    
+    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
+    if campfire.attached_broth_pot_id.is_some() {
+        return Err("Cannot add fuel to campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    }
+    
+    // --- Validate item type - prevent water bottles and cauldrons ---
      let items = ctx.db.inventory_item();
      let item = items.instance_id().find(&item_instance_id)
          .ok_or_else(|| "Item not found.".to_string())?;
@@ -306,18 +339,24 @@ pub fn move_item_within_campfire(
      Ok(())
  }
  
- /// --- Move From Campfire to Player ---
- /// Moves a specific item FROM a campfire slot TO a specific player inventory/hotbar slot.
- #[spacetimedb::reducer]
- pub fn move_item_from_campfire_to_player_slot(
-     ctx: &ReducerContext,
-     campfire_id: u32,
-     source_slot_index: u8,
-     target_slot_type: String,
-     target_slot_index: u32, // u32 to match client flexibility
- ) -> Result<(), String> {
-     let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
-     inventory_management::handle_move_from_container_slot(ctx, &mut campfire, source_slot_index, target_slot_type, target_slot_index)?;
+/// --- Move From Campfire to Player ---
+/// Moves a specific item FROM a campfire slot TO a specific player inventory/hotbar slot.
+#[spacetimedb::reducer]
+pub fn move_item_from_campfire_to_player_slot(
+    ctx: &ReducerContext,
+    campfire_id: u32,
+    source_slot_index: u8,
+    target_slot_type: String,
+    target_slot_index: u32, // u32 to match client flexibility
+) -> Result<(), String> {
+    let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
+    
+    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
+    if campfire.attached_broth_pot_id.is_some() {
+        return Err("Cannot remove fuel from campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    }
+    
+    inventory_management::handle_move_from_container_slot(ctx, &mut campfire, source_slot_index, target_slot_type, target_slot_index)?;
      let still_has_fuel = check_if_campfire_has_fuel(ctx, &campfire);
      if !still_has_fuel && campfire.is_burning {
          campfire.is_burning = false;
@@ -1292,22 +1331,27 @@ pub fn place_campfire(ctx: &ReducerContext, item_instance_id: u64, world_x: f32,
      false
  }
  
- // --- NEW: Drop Item from Campfire Fuel Slot to World ---
- #[spacetimedb::reducer]
- pub fn drop_item_from_campfire_slot_to_world(
-     ctx: &ReducerContext,
-     campfire_id: u32,
-     slot_index: u8, // This will be 0-4 for fuel slots
- ) -> Result<(), String> {
-     let sender_id = ctx.sender;
-     let player_table = ctx.db.player();
-     let mut campfire_table = ctx.db.campfire();
- 
-     log::info!("[DropFromCampfireToWorld] Player {} attempting to drop fuel from campfire ID {}, slot index {}.", 
-              sender_id, campfire_id, slot_index);
- 
-     // 1. Validate interaction and get campfire
-     let (_player_for_validation, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
+// --- NEW: Drop Item from Campfire Fuel Slot to World ---
+#[spacetimedb::reducer]
+pub fn drop_item_from_campfire_slot_to_world(
+    ctx: &ReducerContext,
+    campfire_id: u32,
+    slot_index: u8, // This will be 0-4 for fuel slots
+) -> Result<(), String> {
+    let sender_id = ctx.sender;
+    let player_table = ctx.db.player();
+    let mut campfire_table = ctx.db.campfire();
+
+    log::info!("[DropFromCampfireToWorld] Player {} attempting to drop fuel from campfire ID {}, slot index {}.", 
+             sender_id, campfire_id, slot_index);
+
+    // 1. Validate interaction and get campfire
+    let (_player_for_validation, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
+    
+    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
+    if campfire.attached_broth_pot_id.is_some() {
+        return Err("Cannot drop fuel from campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    }
  
      // 2. Get Player for drop location
      let player_for_drop_location = player_table.identity().find(sender_id)
@@ -1324,23 +1368,28 @@ pub fn place_campfire(ctx: &ReducerContext, item_instance_id: u64, world_x: f32,
      Ok(())
  }
  
- // --- NEW: Split and Drop Item from Campfire Fuel Slot to World ---
- #[spacetimedb::reducer]
- pub fn split_and_drop_item_from_campfire_slot_to_world(
-     ctx: &ReducerContext,
-     campfire_id: u32,
-     slot_index: u8, // This will be 0-4 for fuel slots
-     quantity_to_split: u32,
- ) -> Result<(), String> {
-     let sender_id = ctx.sender;
-     let player_table = ctx.db.player();
-     let mut campfire_table = ctx.db.campfire();
- 
-     log::info!("[SplitDropFromCampfireToWorld] Player {} attempting to split {} fuel from campfire ID {}, slot {}.", 
-              sender_id, quantity_to_split, campfire_id, slot_index);
- 
-     // 1. Validate interaction and get campfire
-     let (_player_for_validation, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
+// --- NEW: Split and Drop Item from Campfire Fuel Slot to World ---
+#[spacetimedb::reducer]
+pub fn split_and_drop_item_from_campfire_slot_to_world(
+    ctx: &ReducerContext,
+    campfire_id: u32,
+    slot_index: u8, // This will be 0-4 for fuel slots
+    quantity_to_split: u32,
+) -> Result<(), String> {
+    let sender_id = ctx.sender;
+    let player_table = ctx.db.player();
+    let mut campfire_table = ctx.db.campfire();
+
+    log::info!("[SplitDropFromCampfireToWorld] Player {} attempting to split {} fuel from campfire ID {}, slot {}.", 
+             sender_id, quantity_to_split, campfire_id, slot_index);
+
+    // 1. Validate interaction and get campfire
+    let (_player_for_validation, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
+    
+    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
+    if campfire.attached_broth_pot_id.is_some() {
+        return Err("Cannot drop fuel from campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    }
  
      // 2. Get Player for drop location
      let player_for_drop_location = player_table.identity().find(sender_id)

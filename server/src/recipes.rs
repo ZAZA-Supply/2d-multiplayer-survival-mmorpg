@@ -63,17 +63,17 @@ fn get_stone_soup_recipe() -> Recipe {
             RecipeTier {
                 min_ingredient_count: 1,
                 output_name: "Stone Soup".to_string(),
-                cooking_time_secs: 60.0,
+                cooking_time_secs: 45.0, // Reduced from 60s - faster early game option
             },
             RecipeTier {
                 min_ingredient_count: 2,
                 output_name: "Hearty Stone Soup".to_string(),
-                cooking_time_secs: 90.0,
+                cooking_time_secs: 75.0, // Reduced from 90s - more efficient
             },
             RecipeTier {
                 min_ingredient_count: 3,
                 output_name: "Gourmet Stone Soup".to_string(),
-                cooking_time_secs: 120.0,
+                cooking_time_secs: 100.0, // Reduced from 120s - still significant investment
             },
         ],
         is_ai_generated: false,

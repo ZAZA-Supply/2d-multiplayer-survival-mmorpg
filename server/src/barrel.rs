@@ -95,40 +95,42 @@ pub fn get_barrel_loot_table(ctx: &ReducerContext) -> Vec<BarrelLootEntry> {
     
     // Define all loot entries as (name, min_qty, max_qty, drop_chance)  
     let loot_definitions = [
-        // --- COMMON TIER (60-80% drop rates) ---
-        ("Memory Shard", 8, 15, 0.98),         // DRAMATICALLY INCREASED: Now 8-15 shards at 98% rate (Rust-competitive)
-        ("Rope", 1, 3, 0.75),                  // Essential crafting material
-        ("Metal Fragments", 2, 4, 0.65),       // Crafting material  
-        ("Wooden Arrow", 3, 8, 0.70),          // Basic ammunition
-        ("Bandage", 1, 3, 0.60),               // Healing consumable
-        ("Tallow", 2, 5, 0.65),                // High-calorie consumable
+        // --- COMMON TIER (40-60% drop rates) - Basic survival items ---
+        ("Memory Shard", 3, 6, 0.55),          // Reduced from 8-15 at 98% - still common but not guaranteed
+        ("Rope", 1, 2, 0.50),                  // Essential crafting material
+        ("Metal Fragments", 1, 3, 0.45),       // Crafting material - reduced quantity
+        ("Wooden Arrow", 2, 5, 0.50),          // Basic ammunition - reduced quantity
+        ("Bandage", 1, 2, 0.45),               // Healing consumable
+        ("Tallow", 1, 3, 0.48),                // High-calorie consumable - reduced quantity
+        ("Wood", 15, 30, 0.42),                // Basic crafting material - reduced quantity
         
-        // --- UNCOMMON TIER (30-50% drop rates) ---
-        ("Bone Arrow", 2, 5, 0.45),            // Better ammunition
-        ("Hollow Reed Arrow", 2, 6, 0.40),     // Special ammunition
-        ("Stone Hatchet", 1, 1, 0.35),         // Useful tool
-        ("AK74 Bayonet", 1, 1, 0.18),          // Fast military melee weapon
-        ("Torch", 1, 1, 0.30),                 // Utility item
-        ("Reed Water Bottle", 1, 2, 0.35),     // Water container
-        ("Tin of Sprats in Oil", 1, 2, 0.40),  // Quality preserved food
-        ("Wood", 25, 50, 0.45),                  // Basic crafting material
+        // --- UNCOMMON TIER (20-35% drop rates) - Useful items ---
+        ("Bone Arrow", 1, 3, 0.28),            // Better ammunition - reduced from 45%
+        ("Hollow Reed Arrow", 1, 3, 0.25),     // Special ammunition - reduced from 40%
+        ("Stone Hatchet", 1, 1, 0.22),         // Useful tool - reduced from 35%
+        ("Torch", 1, 1, 0.20),                 // Utility item - reduced from 30%
+        ("Reed Water Bottle", 1, 1, 0.25),     // Water container - reduced from 35%
+        ("Tin of Sprats in Oil", 1, 2, 0.30),  // Quality preserved food - reduced from 40%
+        ("Tin Can", 1, 2, 0.28),               // Metal source - moved from rare tier
+        ("Fermented Cabbage Jar", 1, 1, 0.25), // Specialty preserved food - reduced from 20%
         
-        // --- RARE TIER (10-25% drop rates) ---
-        ("Hunting Bow", 1, 1, 0.10),           // Ranged weapon
-        ("Fire Arrow", 1, 3, 0.15),            // Special ammunition
-        ("Bush Knife", 1, 1, 0.12),            // Military clearing blade
-        ("Naval Cutlass", 1, 1, 0.08),         // Rare ceremonial naval weapon
-        ("Engineers Maul", 1, 1, 0.10),        // Military engineering tool
-        ("Tin Can", 1, 2, 0.20),               // Metal source
-        ("Fermented Cabbage Jar", 1, 2, 0.20), // Specialty preserved food
-        ("Expired Soviet Chocolate", 1, 1, 0.18), // Morale boost treat
-        ("Mystery Can (Label Missing)", 1, 1, 0.15), // Mysterious find
-        ("Plastic Water Jug", 1, 1, 0.12),     // Large water storage
-        ("Anti-Venom", 1, 1, 0.15),            // Moved from ultra-rare to rare
+        // --- RARE TIER (8-18% drop rates) - Valuable items ---
+        ("AK74 Bayonet", 1, 1, 0.12),          // Fast military melee weapon - reduced from 18%
+        ("Hunting Bow", 1, 1, 0.08),           // Ranged weapon - reduced from 10%
+        ("Fire Arrow", 1, 2, 0.10),            // Special ammunition - reduced quantity
+        ("Bush Knife", 1, 1, 0.09),            // Military clearing blade - reduced from 12%
+        ("Engineers Maul", 1, 1, 0.08),        // Military engineering tool - reduced from 10%
+        ("Expired Soviet Chocolate", 1, 1, 0.12), // Morale boost treat - reduced from 18%
+        ("Mystery Can (Label Missing)", 1, 1, 0.10), // Mysterious find - reduced from 15%
+        ("Plastic Water Jug", 1, 1, 0.09),     // Large water storage - reduced from 12%
+        ("Anti-Venom", 1, 1, 0.10),            // Antidote - reduced from 15%
         
-        // --- ULTRA-RARE TIER (1-5% drop rates) ---
-        ("Military Crowbar", 1, 1, 0.05),      // Highest damage weapon in game
-        ("Scrap Batteries", 1, 2, 0.03),       // Ultra-rare electronics material
+        // --- VERY RARE TIER (3-6% drop rates) - Premium items ---
+        ("Naval Cutlass", 1, 1, 0.05),         // Rare ceremonial naval weapon - reduced from 8%
+        
+        // --- ULTRA-RARE TIER (1-2% drop rates) - Jackpot items ---
+        ("Military Crowbar", 1, 1, 0.02),      // Highest damage weapon in game - reduced from 5%
+        ("Scrap Batteries", 1, 1, 0.015),      // Ultra-rare electronics material - reduced from 3%
     ];
     
     // Process each loot definition
