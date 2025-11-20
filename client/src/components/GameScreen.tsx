@@ -229,6 +229,7 @@ interface GameScreenProps {
 
     // Movement direction for dodge roll system
     movementDirection: { x: number; y: number };
+    isAutoWalking: boolean; // Auto-walk state for dodge roll detection
 
     // ADD: Local facing direction for instant visual feedback (client-authoritative)
     facingDirection?: string;
@@ -975,6 +976,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 setMusicPanelVisible={setIsMusicPanelVisible}
                 environmentalVolume={props.environmentalVolume}
                 movementDirection={movementDirection}
+                isAutoWalking={props.isAutoWalking}
                 playerDodgeRollStates={props.playerDodgeRollStates}
                 treeShadowsEnabled={treeShadowsEnabled}
                 chunkWeather={chunkWeather}

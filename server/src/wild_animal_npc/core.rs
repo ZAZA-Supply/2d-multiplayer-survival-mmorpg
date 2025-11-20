@@ -534,58 +534,73 @@ pub fn process_wild_animal_ai(ctx: &ReducerContext, _schedule: WildAnimalAiSched
     let animals: Vec<WildAnimal> = ctx.db.wild_animal().iter().collect();
     
     for mut animal in animals {
-        // No hiding logic - all animals are always active
+        // CRITICAL FIX: Wrap each animal's processing in error handling to prevent one bad animal from stopping the entire AI system
+        let animal_id = animal.id;
+        let animal_species = animal.species;
+        
+        // Process this animal and catch any errors
+        let process_result = (|| -> Result<(), String> {
+            // No hiding logic - all animals are always active
 
-        let behavior = animal.species.get_behavior();
-        let stats = behavior.get_stats();
-        
-        // Find nearby players for perception checks
-        let nearby_players = find_nearby_players(ctx, &animal, &stats);
-        
-        // Update AI state based on current conditions
-        update_animal_ai_state(ctx, &mut animal, &behavior, &stats, &nearby_players, current_time, &mut rng)?;
-        
-        // Process pack behavior (formation, dissolution, etc.)
-        process_pack_behavior(ctx, &mut animal, current_time, &mut rng)?;
-        
-    // Process taming behavior (food detection and consumption)
-    process_taming_behavior(ctx, &mut animal, current_time)?;
-    
-    // Process survival needs (hunger and thirst)
-    process_survival_needs(ctx, &mut animal, current_time)?;
-        
-        // Check for and execute attacks
-        if animal.state == AnimalState::Chasing {
-            if let Some(target_id) = animal.target_player_id {
-                if let Some(target_player) = ctx.db.player().identity().find(&target_id) {
-                    // CRITICAL FIX: Don't attack dead players - prevents duplicate corpse creation
-                    if target_player.is_dead || target_player.health <= 0.0 {
-                        // Player is dead - stop chasing and return to patrolling
-                        log::info!("[WildAnimal:{}] Stopping chase - target player {} is dead (health: {:.1})", 
-                                 animal.id, target_id, target_player.health);
-                        transition_to_state(&mut animal, AnimalState::Patrolling, current_time, None, "target died");
-                    } else {
-                        let distance_sq = get_distance_squared(
-                            animal.pos_x, animal.pos_y,
-                            target_player.position_x, target_player.position_y
-                        );
-                        
-                        // Check if in attack range and can attack
-                        if distance_sq <= (stats.attack_range * stats.attack_range) && 
-                           can_attack(&animal, current_time, &stats) {
-                            // Execute the attack
-                            execute_attack(ctx, &mut animal, &target_player, &behavior, &stats, current_time, &mut rng)?;
+            let behavior = animal.species.get_behavior();
+            let stats = behavior.get_stats();
+            
+            // Find nearby players for perception checks
+            let nearby_players = find_nearby_players(ctx, &animal, &stats);
+            
+            // Update AI state based on current conditions
+            update_animal_ai_state(ctx, &mut animal, &behavior, &stats, &nearby_players, current_time, &mut rng)?;
+            
+            // Process pack behavior (formation, dissolution, etc.)
+            process_pack_behavior(ctx, &mut animal, current_time, &mut rng)?;
+            
+            // Process taming behavior (food detection and consumption)
+            process_taming_behavior(ctx, &mut animal, current_time)?;
+            
+            // Process survival needs (hunger and thirst)
+            process_survival_needs(ctx, &mut animal, current_time)?;
+            
+            // Check for and execute attacks
+            if animal.state == AnimalState::Chasing {
+                if let Some(target_id) = animal.target_player_id {
+                    if let Some(target_player) = ctx.db.player().identity().find(&target_id) {
+                        // CRITICAL FIX: Don't attack dead players - prevents duplicate corpse creation
+                        if target_player.is_dead || target_player.health <= 0.0 {
+                            // Player is dead - stop chasing and return to patrolling
+                            log::info!("[WildAnimal:{}] Stopping chase - target player {} is dead (health: {:.1})", 
+                                     animal.id, target_id, target_player.health);
+                            transition_to_state(&mut animal, AnimalState::Patrolling, current_time, None, "target died");
+                        } else {
+                            let distance_sq = get_distance_squared(
+                                animal.pos_x, animal.pos_y,
+                                target_player.position_x, target_player.position_y
+                            );
+                            
+                            // Check if in attack range and can attack
+                            if distance_sq <= (stats.attack_range * stats.attack_range) && 
+                               can_attack(&animal, current_time, &stats) {
+                                // Execute the attack
+                                execute_attack(ctx, &mut animal, &target_player, &behavior, &stats, current_time, &mut rng)?;
+                            }
                         }
                     }
                 }
             }
+            
+            // Execute movement based on current state
+            execute_animal_movement(ctx, &mut animal, &behavior, &stats, current_time, &mut rng)?;
+            
+            // Update the animal in database
+            ctx.db.wild_animal().id().update(animal);
+            
+            Ok(())
+        })();
+        
+        // Log any errors but continue processing other animals
+        if let Err(e) = process_result {
+            log::error!("[WildAnimalAI] Error processing {:?} #{}: {}. Skipping this animal but continuing with others.", 
+                       animal_species, animal_id, e);
         }
-        
-        // Execute movement based on current state
-        execute_animal_movement(ctx, &mut animal, &behavior, &stats, current_time, &mut rng)?;
-        
-        // Update the animal in database
-        ctx.db.wild_animal().id().update(animal);
     }
 
     Ok(())

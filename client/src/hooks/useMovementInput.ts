@@ -215,35 +215,21 @@ export const useMovementInput = ({
 
       const key = event.code;
       
-      // Space: Jump
+      // Space: Jump/Dodge Roll - DISABLED in useMovementInput
+      // This is now handled entirely by useInputHandler to avoid duplicate handling
+      // and to properly support auto-walk dodge rolls
       if (key === 'Space') {
         event.preventDefault();
         
         if (isFishing) {
-          console.log('[MovementInput] Jump blocked - player is fishing');
+          console.log('[MovementInput] Space blocked - player is fishing');
           event.stopPropagation();
           event.stopImmediatePropagation();
           return;
         }
         
-        const isMoving = keysPressed.current.has('KeyW') || keysPressed.current.has('KeyS') || 
-                        keysPressed.current.has('KeyA') || keysPressed.current.has('KeyD');
-        
-        if (isMoving) {
-          let dodgeX = 0, dodgeY = 0;
-          if (keysPressed.current.has('KeyW')) dodgeY -= 1;
-          if (keysPressed.current.has('KeyS')) dodgeY += 1;
-          if (keysPressed.current.has('KeyA')) dodgeX -= 1;
-          if (keysPressed.current.has('KeyD')) dodgeX += 1;
-          
-          if (dodgeX !== 0 || dodgeY !== 0) {
-            const magnitude = Math.sqrt(dodgeX * dodgeX + dodgeY * dodgeY);
-            dodgeX /= magnitude;
-            dodgeY /= magnitude;
-          }
-        } else {
-          jump();
-        }
+        // Let useInputHandler handle spacebar for jump/dodge roll
+        // Do NOT handle it here to avoid conflicts with auto-walk
         return;
       }
       

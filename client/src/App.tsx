@@ -260,7 +260,7 @@ function AppContent() {
     const localPlayer = dbIdentity ? players.get(dbIdentity.toHexString()) : undefined;
     
     // Simplified movement input - no complex processing
-    const { inputState } = useMovementInput({ 
+    const { inputState, isAutoWalking } = useMovementInput({ 
         isUIFocused,
         localPlayer,
         onToggleAutoAttack: toggleAutoAttack, // Keep auto-attack functionality
@@ -954,6 +954,7 @@ function AppContent() {
                             setIsMusicPanelVisible={setIsMusicPanelVisible}
                             playerDodgeRollStates={playerDodgeRollStates}
                             movementDirection={inputState.direction}
+                            isAutoWalking={isAutoWalking} // Pass auto-walk state for dodge roll detection
                             facingDirection={facingDirection} // ADD: Pass local facing direction for instant visual feedback
                             chunkWeather={chunkWeather} // ADDED: Chunk-based weather
                         />

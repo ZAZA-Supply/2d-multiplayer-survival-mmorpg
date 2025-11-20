@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './CyberpunkLoadingScreen.css';
 import sovaImage from '../assets/ui/sova.png';
 
@@ -58,7 +58,15 @@ interface CyberpunkLoadingScreenProps {
 }
 
 // Audio preloading and management
-const preloadedAudioFiles: { [key: string]: HTMLAudioElement } = {};
+// Use a global variable that persists across HMR (Hot Module Reload)
+// @ts-ignore - Attach to window to persist across HMR
+if (!window.__SOVA_AUDIO_FILES__) {
+    // @ts-ignore
+    window.__SOVA_AUDIO_FILES__ = {};
+}
+// @ts-ignore
+const preloadedAudioFiles: { [key: string]: HTMLAudioElement } = window.__SOVA_AUDIO_FILES__;
+
 const TOTAL_SOVA_SOUNDS = 21;
 const AUDIO_ENABLED_KEY = 'sova_audio_enabled';
 
@@ -126,11 +134,24 @@ const tryLoadAudio = async (filename: string): Promise<HTMLAudioElement | null> 
 
 // Preload all audio files
 const preloadAudio = async () => {
+    // Check if audio is already preloaded (e.g., from previous HMR reload)
+    const alreadyLoadedCount = Object.keys(preloadedAudioFiles).length;
+    if (alreadyLoadedCount >= TOTAL_SOVA_SOUNDS) {
+        console.log(`🔊 Audio already preloaded (${alreadyLoadedCount}/${TOTAL_SOVA_SOUNDS} sounds), skipping preload`);
+        return;
+    }
+    
     console.log('Preloading SOVA audio files...');
     
     // Preload numbered SOVA sounds (1-21)
     const loadPromises = [];
     for (let i = 1; i <= TOTAL_SOVA_SOUNDS; i++) {
+        // Skip if already loaded
+        if (preloadedAudioFiles[i.toString()]) {
+            console.log(`⏭️ Sound ${i}.mp3 already loaded, skipping`);
+            continue;
+        }
+        
         loadPromises.push(
             tryLoadAudio(`${i}.mp3`).then(audio => {
                 if (audio) {
@@ -182,6 +203,7 @@ const CyberpunkLoadingScreen: React.FC<CyberpunkLoadingScreenProps> = ({ authLoa
     const [showTooltip, setShowTooltip] = useState(false);
     const hasPlayedReconnect = useRef(false);
     const audioPreloadStarted = useRef(false);
+    const isAttemptingAutoPlay = useRef(false); // Prevent multiple simultaneous auto-play attempts
     const consoleLogsRef = useRef<HTMLDivElement>(null);
 
     const logs = React.useMemo(() => {
@@ -240,12 +262,16 @@ const CyberpunkLoadingScreen: React.FC<CyberpunkLoadingScreenProps> = ({ authLoa
     }, []);
 
     // Function to unlock audio context and play random SOVA sound
-    const attemptToPlayRandomSovaSound = async () => {
-        // Don't auto-play if we've already played something or if audio isn't ready
-        if (hasPlayedReconnect.current || !audioPreloaded) {
-            console.log('Skipping auto-play: already played or audio not ready');
+    const attemptToPlayRandomSovaSound = useCallback(async () => {
+        // Don't auto-play if we've already played something, if audio isn't ready, or if we're already attempting
+        if (hasPlayedReconnect.current || !audioPreloaded || isAttemptingAutoPlay.current) {
+            console.log('Skipping auto-play: already played, audio not ready, or attempt in progress');
             return;
         }
+
+        // Set the guard to prevent multiple simultaneous attempts
+        isAttemptingAutoPlay.current = true;
+        console.log('Starting auto-play attempt...');
 
         // Find all available SOVA sounds that are actually loaded
         const availableSounds: string[] = [];
@@ -259,6 +285,7 @@ const CyberpunkLoadingScreen: React.FC<CyberpunkLoadingScreenProps> = ({ authLoa
 
         if (availableSounds.length === 0) {
             console.log('No SOVA sounds loaded and ready, skipping auto-play');
+            isAttemptingAutoPlay.current = false; // Reset guard
             return;
         }
 
@@ -270,6 +297,7 @@ const CyberpunkLoadingScreen: React.FC<CyberpunkLoadingScreenProps> = ({ authLoa
 
         if (!randomAudio) {
             console.log('Selected audio not found, skipping auto-play');
+            isAttemptingAutoPlay.current = false; // Reset guard
             return;
         }
 
@@ -281,6 +309,7 @@ const CyberpunkLoadingScreen: React.FC<CyberpunkLoadingScreenProps> = ({ authLoa
             console.log(`Successfully auto-played SOVA sound ${randomSoundNumber}.mp3`);
             setAudioContextUnlocked(true);
             hasPlayedReconnect.current = true;
+            isAttemptingAutoPlay.current = false; // Reset guard after success
             
             // Save that audio is working for this user
             saveAudioPreference(true);
@@ -297,15 +326,18 @@ const CyberpunkLoadingScreen: React.FC<CyberpunkLoadingScreenProps> = ({ authLoa
             console.log('Auto-play failed (likely due to browser autoplay policy):', error);
             setIsSovaSpeaking(false);
             setCurrentAudio(null);
+            isAttemptingAutoPlay.current = false; // Reset guard after failure
             
             // Show the audio prompt to let user enable audio
             setShowAudioPrompt(true);
             saveAudioPreference(false);
         }
-    };
+    }, [audioPreloaded]); // Only recreate if audioPreloaded changes
 
     // Handle Sova avatar click to play random sounds
     const handleSovaClick = async () => {
+        console.log('🔊 SOVA CLICKED! showAudioPrompt:', showAudioPrompt, 'isSovaSpeaking:', isSovaSpeaking, 'audioPreloaded:', audioPreloaded);
+        
         // If showing audio prompt, clicking SOVA should enable audio AND play a sound
         if (showAudioPrompt) {
             setShowAudioPrompt(false);
@@ -435,7 +467,39 @@ const CyberpunkLoadingScreen: React.FC<CyberpunkLoadingScreenProps> = ({ authLoa
             const timer = setTimeout(attemptToPlayRandomSovaSound, 200);
             return () => clearTimeout(timer);
         }
-    }, [audioPreloaded]); // Depend on audioPreloaded instead of component mount
+    }, [audioPreloaded, attemptToPlayRandomSovaSound]); // Include memoized function
+
+    // Cleanup effect: Stop any playing audio when component unmounts
+    // BUT: Don't stop audio on HMR (Hot Module Reload) - let it keep playing!
+    useEffect(() => {
+        return () => {
+            // Check if this is a real unmount or just HMR
+            // In production or when truly unmounting, we should clean up
+            // But during development with HMR, let the audio continue
+            const isHMR = import.meta.hot !== undefined;
+            
+            if (!isHMR) {
+                console.log('CyberpunkLoadingScreen unmounting (production), stopping any playing audio...');
+                // Stop the currently tracked audio if it exists and is playing
+                if (currentAudio && !currentAudio.paused) {
+                    currentAudio.pause();
+                    currentAudio.currentTime = 0;
+                    console.log('Stopped audio on unmount');
+                }
+                // Also stop any other potentially playing audio
+                for (let i = 1; i <= TOTAL_SOVA_SOUNDS; i++) {
+                    const audio = preloadedAudioFiles[i.toString()];
+                    if (audio && !audio.paused) {
+                        audio.pause();
+                        audio.currentTime = 0;
+                        console.log(`Stopped orphaned audio ${i} on unmount`);
+                    }
+                }
+            } else {
+                console.log('CyberpunkLoadingScreen unmounting (HMR), keeping audio playing...');
+            }
+        };
+    }, [currentAudio]); // Depend on currentAudio to always have latest reference
 
     useEffect(() => {
         if (currentLogIndex < logs.length) {

@@ -78,6 +78,7 @@ interface InputHandlerProps {
     isFishing: boolean;
     setMusicPanelVisible: React.Dispatch<React.SetStateAction<boolean>>;
     movementDirection: { x: number; y: number };
+    isAutoWalking: boolean; // Auto-walk state for dodge roll detection
     targetedFoundation: any | null; // ADDED: Targeted foundation for upgrade menu
     targetedWall: any | null; // ADDED: Targeted wall for upgrade menu
 }
@@ -158,6 +159,7 @@ export const useInputHandler = ({
     isFishing,
     setMusicPanelVisible,
     movementDirection,
+    isAutoWalking, // Auto-walk state for dodge roll detection
     targetedFoundation, // ADDED: Targeted foundation
     targetedWall, // ADDED: Targeted wall
 }: InputHandlerProps): InputHandlerState => {
@@ -173,6 +175,7 @@ export const useInputHandler = ({
     const [isAutoAttacking, setIsAutoAttacking] = useState(false);
     const [isCrouching, setIsCrouching] = useState(false);
     const pendingCrouchToggleRef = useRef<boolean>(false); // Track pending crouch requests
+    const isAutoWalkingRef = useRef<boolean>(isAutoWalking); // Track auto-walk state for event handlers
 
     const keysPressed = useRef<Set<string>>(new Set());
     const isEHeldDownRef = useRef<boolean>(false);
@@ -297,6 +300,7 @@ export const useInputHandler = ({
         }
     }, [buildingState?.isBuilding]);
     useEffect(() => { movementDirectionRef.current = movementDirection; }, [movementDirection]);
+    useEffect(() => { isAutoWalkingRef.current = isAutoWalking; }, [isAutoWalking]);
     
     // Synchronize local crouch state with server state to prevent desync
     // Don't override optimistic state while pending requests are in flight
@@ -648,26 +652,26 @@ export const useInputHandler = ({
                 if (localPlayerRef.current && !localPlayerRef.current.isDead && !localPlayerRef.current.isKnockedOut) {
                     event.preventDefault(); // Prevent spacebar from scrolling the page
 
-                    const isMoving = movementDirectionRef.current.x !== 0 || movementDirectionRef.current.y !== 0;
+                    // Check if player is moving (either via keyboard input or auto-walk)
+                    const moveX = movementDirectionRef.current.x;
+                    const moveY = movementDirectionRef.current.y;
+                    const isMoving = Math.abs(moveX) > 0.01 || Math.abs(moveY) > 0.01 || isAutoWalkingRef.current;
 
                     if (isMoving) {
-                        // Dodge Roll
+                        // Dodge Roll (works with both manual movement and auto-walk)
                         try {
                             if (connectionRef.current?.reducers) {
-                                connectionRef.current.reducers.dodgeRoll(
-                                    movementDirectionRef.current.x,
-                                    movementDirectionRef.current.y,
-                                );
-                                // console.log('[Input] Dodge roll triggered in direction:', movementDirectionRef.current);
+                                connectionRef.current.reducers.dodgeRoll(moveX, moveY);
+                                console.log('[Input] Dodge roll triggered', { direction: { x: moveX, y: moveY }, isAutoWalking: isAutoWalkingRef.current });
                             }
                         } catch (err) {
                             console.error("[InputHandler] Error calling dodgeRoll:", err);
                         }
                     } else {
-                        // Jump (when stationary)
+                        // Jump (only when truly stationary - no manual input AND no auto-walk)
                         try {
                             jump();
-                            console.log('[Input] Jump triggered');
+                            console.log('[Input] Jump triggered (stationary)');
                         } catch (err) {
                             console.error("[InputHandler] Error calling jump:", err);
                         }

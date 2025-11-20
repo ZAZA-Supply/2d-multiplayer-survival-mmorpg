@@ -7,7 +7,7 @@ import { resolveClientCollision, GameEntities } from '../utils/clientCollision';
 const POSITION_UPDATE_INTERVAL_MS = 25; // 40fps for better prediction accuracy with high latency
 const PLAYER_SPEED = 400; // pixels per second - balanced for 60s world traversal
 const SPRINT_MULTIPLIER = 2.0; // 2x speed for sprinting (800 px/s)
-const DODGE_ROLL_SPEED_MULTIPLIER = 3.0; // 3x speed during dodge roll (1200 px/s for 450px in ~375ms)
+// Note: Dodge roll now uses server-authoritative interpolation instead of speed multipliers
 const WATER_SPEED_PENALTY = 0.5; // Half speed in water (matches server WATER_SPEED_PENALTY)
 const EXHAUSTED_SPEED_PENALTY = 0.75; // 25% speed reduction when exhausted (matches server EXHAUSTED_SPEED_PENALTY)
 // REMOVED: Rubber banding constants - proper prediction shouldn't need them
@@ -194,29 +194,54 @@ export const usePredictedMovement = ({ connection, localPlayer, inputState, isUI
 
       let { direction, sprinting } = inputState;
       
-      // Check for active dodge roll and override direction for consistent distance
+      // Check for active dodge roll and use server-authoritative interpolation
       const playerId = localPlayer.identity.toHexString();
       const dodgeRollState = playerDodgeRollStates?.get(playerId);
-      const isDodgeRolling = dodgeRollState && 
-        (Date.now() - Number(dodgeRollState.startTimeMs)) < 500; // 500ms dodge roll duration
+      const dodgeRollElapsedMs = dodgeRollState ? (Date.now() - Number(dodgeRollState.startTimeMs)) : 0;
+      const isDodgeRolling = dodgeRollState && dodgeRollElapsedMs < 500; // 500ms dodge roll duration
       
       if (isDodgeRolling && dodgeRollState) {
-        // Use server-calculated dodge roll direction instead of current input
+        // SERVER-AUTHORITATIVE DODGE ROLL: Use direct interpolation from server start/target positions
+        // This ensures consistent dodge distance regardless of network latency or frame rate
+        const dodgeProgress = Math.min(dodgeRollElapsedMs / 500, 1.0); // 0.0 to 1.0
+        
+        // Apply easing for more natural dodge roll feel (ease-out quad for quick start, slow end)
+        const easedProgress = 1 - Math.pow(1 - dodgeProgress, 2);
+        
+        // Interpolate between server's start and target positions
+        const interpolatedX = dodgeRollState.startX + (dodgeRollState.targetX - dodgeRollState.startX) * easedProgress;
+        const interpolatedY = dodgeRollState.startY + (dodgeRollState.targetY - dodgeRollState.startY) * easedProgress;
+        
+        // Directly set client position to server-interpolated position
+        clientPositionRef.current = { x: interpolatedX, y: interpolatedY };
+        pendingPosition.current = { x: interpolatedX, y: interpolatedY };
+        
+        // Calculate direction for animation purposes (still use server's dodge direction)
         const dodgeRollDx = dodgeRollState.targetX - dodgeRollState.startX;
         const dodgeRollDy = dodgeRollState.targetY - dodgeRollState.startY;
         const dodgeRollMagnitude = Math.sqrt(dodgeRollDx * dodgeRollDx + dodgeRollDy * dodgeRollDy);
         
-        // console.log(`[DODGE DEBUG] Input direction: (${direction.x.toFixed(3)}, ${direction.y.toFixed(3)})`);
-        // console.log(`[DODGE DEBUG] Server dodge vector: (${dodgeRollDx.toFixed(1)}, ${dodgeRollDy.toFixed(1)}), magnitude: ${dodgeRollMagnitude.toFixed(1)}`);
-        
         if (dodgeRollMagnitude > 0) {
-          // Override input direction with server's dodge roll direction
           direction = { 
             x: dodgeRollDx / dodgeRollMagnitude, 
             y: dodgeRollDy / dodgeRollMagnitude 
           };
-          // console.log(`[DODGE DEBUG] Using server direction: (${direction.x.toFixed(3)}, ${direction.y.toFixed(3)})`);
+          
+          // Update facing direction for animation
+          const movementThreshold = 0.1;
+          if (Math.abs(direction.x) > movementThreshold || Math.abs(direction.y) > movementThreshold) {
+            lastFacingDirection.current = Math.abs(direction.x) > movementThreshold
+              ? (direction.x > 0 ? 'right' : 'left')
+              : (direction.y > 0 ? 'down' : 'up');
+          }
         }
+        
+        // Force re-render during dodge roll for smooth animation
+        forceUpdate({});
+        
+        // Skip normal movement processing during dodge roll
+        movementMonitor.logUpdate(performance.now() - updateStartTime, true);
+        return;
       }
       
       isMoving.current = Math.abs(direction.x) > 0.01 || Math.abs(direction.y) > 0.01;
@@ -237,14 +262,10 @@ export const usePredictedMovement = ({ connection, localPlayer, inputState, isUI
         // Apply knocked out movement restriction (must match server)
         if (localPlayer.isKnockedOut) {
           speedMultiplier *= 0.05; // Extremely slow crawling movement (5% of normal speed)
-        } else {
-          if (isDodgeRolling) {
-            speedMultiplier *= DODGE_ROLL_SPEED_MULTIPLIER; // 3x speed for dodge roll
-            // console.log(`[MOVEMENT] Dodge roll speed boost active: ${speedMultiplier}x`);
-          } else if (sprinting) {
-            speedMultiplier *= SPRINT_MULTIPLIER; // 2x speed for sprinting
-          }
+        } else if (sprinting) {
+          speedMultiplier *= SPRINT_MULTIPLIER; // 2x speed for sprinting
         }
+        // Note: Dodge roll is now handled separately with server-authoritative interpolation above
         
         // Apply crouch speed reduction (must match server)
         if (localPlayer.isCrouching) {

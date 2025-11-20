@@ -204,6 +204,7 @@ interface GameCanvasProps {
   // Add ambient sound volume control
   environmentalVolume?: number; // 0-1 scale for ambient/environmental sounds
   movementDirection: { x: number; y: number };
+  isAutoWalking: boolean; // Auto-walk state for dodge roll detection
   playerDodgeRollStates: Map<string, any>; // PlayerDodgeRollState from generated types
   // ADD: Local facing direction for instant visual feedback (client-authoritative)
   localFacingDirection?: string;
@@ -282,6 +283,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   setMusicPanelVisible,
   environmentalVolume,
   movementDirection,
+  isAutoWalking, // Auto-walk state for dodge roll detection
   playerDodgeRollStates,
   localFacingDirection, // ADD: Destructure local facing direction for client-authoritative direction changes
   treeShadowsEnabled, // NEW: Destructure treeShadowsEnabled for visual cortex module setting
@@ -854,6 +856,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     isFishing,
     setMusicPanelVisible,
     movementDirection,
+    isAutoWalking, // Pass auto-walk state for dodge roll detection
     targetedFoundation, // ADDED: Pass targeted foundation to input handler
     targetedWall, // ADDED: Pass targeted wall to input handler
     // Individual entity IDs for consistency and backward compatibility
