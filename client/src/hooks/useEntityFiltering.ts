@@ -586,7 +586,7 @@ export function useEntityFiltering(
   frameCounter++;
   
   // Get player position for distance calculations
-  const playerPos = getPlayerPosition(players, localPlayerId);
+  const playerPos = getPlayerPosition(players, localPlayerId);  
   
   // Emergency mode removed
 

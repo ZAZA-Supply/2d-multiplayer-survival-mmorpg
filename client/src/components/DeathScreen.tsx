@@ -98,6 +98,9 @@ const DeathScreen: React.FC<DeathScreenProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: MINIMAP_DIMENSIONS.width, height: MINIMAP_DIMENSIONS.height });
   const [hoveredBagId, setHoveredBagId] = useState<number | null>(null);
+  
+  // Add state to track if respawn is in progress
+  const [isRespawning, setIsRespawning] = useState(false);
 
   // --- Minimap State (Simplified for static view) ---
   // Fixed zoom level for death screen minimap
@@ -361,16 +364,34 @@ const DeathScreen: React.FC<DeathScreenProps> = ({
      setHoveredBagId(null);
   }, []);
 
-  // Handler for nearest bag respawn
+  // Handler for random respawn with loading state
+  const handleRandomRespawn = useCallback(() => {
+    console.log('[DeathScreen] Random respawn clicked - setting loading state');
+    setIsRespawning(true);
+    onRespawnRandomly();
+  }, [onRespawnRandomly]);
+
+  // Handler for nearest bag respawn with loading state
   const handleNearestBagRespawn = useCallback(() => {
     if (nearestBag) {
+      console.log('[DeathScreen] Bag respawn clicked - setting loading state');
+      setIsRespawning(true);
       onRespawnAtBag((nearestBag as SleepingBag).id);
     }
   }, [nearestBag, onRespawnAtBag]);
 
   return (
-    <div style={styles.overlay}>
-      <div style={styles.container}>
+    <>
+      <style>
+        {`
+          @keyframes pulse {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+          }
+        `}
+      </style>
+      <div style={styles.overlay}>
+        <div style={styles.container}>
       
         
         {/* Death Cause Information */}
@@ -413,19 +434,21 @@ const DeathScreen: React.FC<DeathScreenProps> = ({
         <div style={styles.buttonContainer}>
           {/* Random Respawn Button */} 
           <button
-            onClick={onRespawnRandomly}
-            style={styles.buttonEnabled} // Always enabled
+            onClick={handleRandomRespawn}
+            disabled={isRespawning}
+            style={isRespawning ? styles.buttonLoading : styles.buttonEnabled}
           >
-            Respawn Randomly
+            {isRespawning ? 'Respawning...' : 'Respawn Randomly'}
           </button>
 
           {/* Nearest Sleeping Bag Respawn Button */}
           {nearestBag ? (
             <button
               onClick={handleNearestBagRespawn}
-              style={styles.buttonYellow}
+              disabled={isRespawning}
+              style={isRespawning ? styles.buttonLoading : styles.buttonYellow}
             >
-              Respawn at Nearest Sleeping Bag
+              {isRespawning ? 'Respawning...' : 'Respawn at Nearest Sleeping Bag'}
             </button>
           ) : (
             <button
@@ -441,7 +464,8 @@ const DeathScreen: React.FC<DeathScreenProps> = ({
             <p style={styles.noBagsText}>No sleeping bags placed.</p>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 
@@ -512,6 +536,21 @@ const styles: { [key: string]: React.CSSProperties } = {
     textTransform: 'uppercase',
     letterSpacing: '1px',
     fontWeight: 'bold',
+  },
+  buttonLoading: {
+    padding: '15px 30px',
+    fontSize: '1.1em',
+    fontFamily: '"Courier New", monospace',
+    background: 'linear-gradient(135deg, #475569 0%, #64748b 100%)', // Muted gradient
+    color: '#cbd5e1', // Light slate
+    border: '2px solid #64748b',
+    borderRadius: '6px',
+    cursor: 'wait',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    fontWeight: 'bold',
+    opacity: 0.7,
+    animation: 'pulse 1.5s ease-in-out infinite',
   },
   buttonContainer: {
     display: 'flex',

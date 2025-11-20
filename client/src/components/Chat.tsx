@@ -53,6 +53,7 @@ const Chat: React.FC<ChatProps> = ({ connection, messages, players, isChatting, 
   const [sovaMessages, setSovaMessages] = useState<Array<{id: string, text: string, isUser: boolean, timestamp: Date}>>([]);
   const [sovaInputValue, setSovaInputValue] = useState('');
   const [showPerformanceReport, setShowPerformanceReport] = useState(false);
+  const [isSOVALoading, setIsSOVALoading] = useState(false);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const sovaInputRef = useRef<HTMLInputElement>(null);
   const messageEndRef = useRef<HTMLDivElement>(null);
@@ -153,6 +154,12 @@ const Chat: React.FC<ChatProps> = ({ connection, messages, players, isChatting, 
     
     setSovaMessages(prev => [...prev, userMessage]);
     setSovaInputValue('');
+    
+    // CRITICAL FIX: Close chat immediately to unblock game controls
+    setIsChatting(false);
+    
+    // Show loading state
+    setIsSOVALoading(true);
 
     try {
       // Build game context for SOVA AI
@@ -185,6 +192,9 @@ const Chat: React.FC<ChatProps> = ({ connection, messages, players, isChatting, 
           timestamp: new Date()
         };
         setSovaMessages(prev => [...prev, botResponse]);
+        
+        // Hide loading state after response received
+        setIsSOVALoading(false);
 
         // Try to synthesize and play voice response using Kokoro TTS
         try {
@@ -212,6 +222,7 @@ const Chat: React.FC<ChatProps> = ({ connection, messages, players, isChatting, 
           timestamp: new Date()
         };
         setSovaMessages(prev => [...prev, fallbackResponse]);
+        setIsSOVALoading(false);
         console.error('[Chat] SOVA AI response failed:', aiResponse.error);
       }
     } catch (error) {
@@ -223,13 +234,12 @@ const Chat: React.FC<ChatProps> = ({ connection, messages, players, isChatting, 
         timestamp: new Date()
       };
       setSovaMessages(prev => [...prev, errorResponse]);
+      setIsSOVALoading(false);
       console.error('[Chat] SOVA API error:', error);
     }
 
-    // Clear input and maintain chat focus
-    if (sovaInputRef.current) {
-      sovaInputRef.current.focus();
-    }
+    // Don't refocus - let player continue playing
+    // Chat is already closed via setIsChatting(false) above
   }, [sovaInputValue, setIsChatting, worldState, localPlayer, itemDefinitions, activeEquipments, inventoryItems, localPlayerIdentity]);
 
   // Handle performance report generation
@@ -519,22 +529,44 @@ const Chat: React.FC<ChatProps> = ({ connection, messages, players, isChatting, 
                 Ask me anything about the game!
               </div>
             ) : (
-              sovaMessages.filter(message => message && message.id).map(message => (
-                <SOVAMessage key={message.id} message={message} />
-              ))
+              <>
+                {sovaMessages.filter(message => message && message.id).map(message => (
+                  <SOVAMessage key={message.id} message={message} />
+                ))}
+                
+                {/* Loading Animation */}
+                {isSOVALoading && (
+                  <div className={`${styles.message} ${styles.sovaMessageBot}`}>
+                    <div className={styles.messageHeader}>
+                      <span className={`${styles.playerName} ${styles.sovaPlayerNameBot}`}>
+                        SOVA
+                      </span>
+                    </div>
+                    <div className={styles.messageContent}>
+                      <div className={styles.sovaLoadingDots}>
+                        <span className={styles.dot}>●</span>
+                        <span className={styles.dot}>●</span>
+                        <span className={styles.dot}>●</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
             <div ref={sovaMessageEndRef} />
           </div>
           
-          {/* SOVA Performance Report Button */}
-          <div className={styles.performanceReportContainer}>
-            <button
-              onClick={handleGenerateReport}
-              className={styles.performanceReportButton}
-            >
-              API PERFORMANCE REPORT
-            </button>
-          </div>
+          {/* SOVA Performance Report Button - Only show in development */}
+          {import.meta.env.MODE !== 'production' && (
+            <div className={styles.performanceReportContainer}>
+              <button
+                onClick={handleGenerateReport}
+                className={styles.performanceReportButton}
+              >
+                API PERFORMANCE REPORT
+              </button>
+            </div>
+          )}
           
           {/* SOVA Input */}
           {isChatting ? (
@@ -557,8 +589,8 @@ const Chat: React.FC<ChatProps> = ({ connection, messages, players, isChatting, 
         </>
       )}
 
-      {/* Performance Report Modal */}
-      {showPerformanceReport && (
+      {/* Performance Report Modal - Only show in development */}
+      {import.meta.env.MODE !== 'production' && showPerformanceReport && (
         <div className={styles.performanceReportModal}>
           <div className={styles.performanceReportContent}>
             <div className={styles.performanceReportTitle}>
