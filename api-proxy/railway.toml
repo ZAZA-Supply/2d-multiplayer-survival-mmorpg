@@ -1,13 +1,10 @@
 [build]
 builder = "nixpacks"
+nixpacksConfigPath = "nixpacks.toml"
 
 [deploy]
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 healthcheckPath = "/health"
 healthcheckTimeout = 300
-
-[environments.production.build]
-buildCommand = "npm install"
-startCommand = "npm start"
 
