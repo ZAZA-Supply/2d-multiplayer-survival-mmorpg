@@ -66,10 +66,9 @@ app.use(express.raw({ type: 'audio/*', limit: '50mb' }));
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 if (!OPENAI_API_KEY) {
-  console.error('❌ OPENAI_API_KEY not found in environment variables');
-  console.error(`   Checked path: ${envPath}`);
+  console.error('❌ OpenAI API key not found in environment variables');
   console.error(`   Current working directory: ${process.cwd()}`);
-  console.error(`   Available env vars: ${Object.keys(process.env).filter(k => k.includes('OPENAI')).join(', ') || 'none'}`);
+  console.error(`   Please ensure OPENAI_API_KEY is set in Railway environment variables`);
   process.exit(1);
 }
 
