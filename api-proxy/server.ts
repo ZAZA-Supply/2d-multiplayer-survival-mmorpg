@@ -74,7 +74,7 @@ if (!OPENAI_API_KEY) {
 }
 
 console.log('✅ API Proxy Server starting...');
-console.log(`   OpenAI API Key: ${OPENAI_API_KEY ? 'Configured' : 'Missing'}`);
+console.log(`   OpenAI API: ${OPENAI_API_KEY ? 'Ready' : 'Not configured'}`);
 console.log(`   Note: Kokoro TTS runs locally (no proxy needed)`);
 
 // Health check
