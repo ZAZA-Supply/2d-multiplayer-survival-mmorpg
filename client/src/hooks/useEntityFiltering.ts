@@ -579,7 +579,8 @@ export function useEntityFiltering(
   foundationCells: Map<string, SpacetimeDBFoundationCell>, // ADDED: Building foundations
   wallCells: Map<string, SpacetimeDBWallCell>, // ADDED: Building walls
   localPlayerId: string | undefined, // ADDED: Local player ID for building visibility
-  isTreeFalling?: (treeId: string) => boolean // NEW: Check if tree is falling
+  isTreeFalling?: (treeId: string) => boolean, // NEW: Check if tree is falling
+  worldChunkData?: Map<string, any> // ADDED: World chunk data for tile type lookups
 ): EntityFilteringResult {
   // Increment frame counter for throttling
   frameCounter++;
@@ -934,13 +935,47 @@ export function useEntityFiltering(
   }, [projectiles, viewBounds]);
 
   // PERFORMANCE: More aggressive grass culling
+  // ALSO: Filter out grass on water tiles (Sea, HotSpringWater)
   let visibleGrass = useMemo(() => {
     if (!grass || !playerPos) return [];
     
-    return Array.from(grass.values()).filter(e => 
-      e.health > 0 && isEntityInView(e, viewBounds, stableTimestamp)
-    );
-  }, [grass, playerPos, viewBounds, stableTimestamp, frameCounter]);
+    return Array.from(grass.values()).filter(e => {
+      if (e.health <= 0 || !isEntityInView(e, viewBounds, stableTimestamp)) {
+        return false;
+      }
+      
+      // Filter out grass on water tiles
+      const tileX = Math.floor(e.serverPosX / 48); // TILE_SIZE is 48
+      const tileY = Math.floor(e.serverPosY / 48);
+      
+      // Check tile type using compressed chunk data
+      const chunkSize = 16;
+      const chunkX = Math.floor(tileX / chunkSize);
+      const chunkY = Math.floor(tileY / chunkSize);
+      
+      // Find the chunk
+      for (const chunk of worldChunkData?.values() || []) {
+        if (chunk.chunkX === chunkX && chunk.chunkY === chunkY) {
+          const localX = tileX % chunkSize;
+          const localY = tileY % chunkSize;
+          const localTileX = localX < 0 ? localX + chunkSize : localX;
+          const localTileY = localY < 0 ? localY + chunkSize : localY;
+          const tileIndex = localTileY * chunkSize + localTileX;
+          
+          if (tileIndex >= 0 && tileIndex < chunk.tileTypes.length) {
+            const tileTypeU8 = chunk.tileTypes[tileIndex];
+            // Filter out grass on Sea (3) and HotSpringWater (6) tiles
+            if (tileTypeU8 === 3 || tileTypeU8 === 6) {
+              return false;
+            }
+          }
+          break;
+        }
+      }
+      
+      return true;
+    });
+  }, [grass, playerPos, viewBounds, stableTimestamp, frameCounter, worldChunkData]);
 
   // ADDED: Filter visible shelters
   const visibleShelters = useMemo(() => {

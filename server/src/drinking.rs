@@ -76,7 +76,7 @@ fn validate_water_drinking(ctx: &ReducerContext, player_id: Identity) -> Result<
             // If within drinking distance and it's a water tile
             if distance_sq <= DRINKING_INTERACTION_DISTANCE_SQUARED {
                 if let Some(tile_type) = get_tile_type_at_position(ctx, check_tile_x, check_tile_y) {
-                    if tile_type == TileType::Sea {
+                    if tile_type.is_water() { // Includes both Sea and HotSpringWater
                         found_water = true;
                         // Check if this water tile is inland (river/lake) or ocean
                         if is_tile_inland_water(ctx, check_tile_x, check_tile_y) {

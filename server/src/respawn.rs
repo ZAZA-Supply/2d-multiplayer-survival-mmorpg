@@ -152,9 +152,9 @@ pub fn respawn_randomly(ctx: &ReducerContext) -> Result<(), String> { // Renamed
                     let adjacent_x = tile.world_x + dx;
                     let adjacent_y = tile.world_y + dy;
                     
-                    // Check if adjacent tile exists and is sea
+                    // Check if adjacent tile exists and is water
                     if let Some(adjacent_tile) = tile_map.get(&(adjacent_x, adjacent_y)) {
-                        if adjacent_tile.tile_type == crate::TileType::Sea {
+                        if adjacent_tile.tile_type.is_water() { // Includes both Sea and HotSpringWater
                             is_coastal = true;
                             break;
                         }

@@ -28,41 +28,40 @@ import {
   type TableHandle as __TableHandle,
 } from "spacetimedb";
 
-import { RuneStonePlantSpawnSchedule } from "./rune_stone_plant_spawn_schedule_type";
-// Mark import as potentially unused
-declare type __keep_RuneStonePlantSpawnSchedule = RuneStonePlantSpawnSchedule;
-
-export type SpawnPlantsAtNight = {
-  schedule: RuneStonePlantSpawnSchedule,
+export type RuneStoneSeedSpawnSchedule = {
+  id: bigint,
+  scheduledAt: { tag: "Interval", value: __TimeDuration } | { tag: "Time", value: __Timestamp },
 };
-let _cached_SpawnPlantsAtNight_type_value: __AlgebraicTypeType | null = null;
+let _cached_RuneStoneSeedSpawnSchedule_type_value: __AlgebraicTypeType | null = null;
 
 /**
  * An object for generated helper functions.
  */
-export const SpawnPlantsAtNight = {
+export const RuneStoneSeedSpawnSchedule = {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
   getTypeScriptAlgebraicType(): __AlgebraicTypeType {
-    if (_cached_SpawnPlantsAtNight_type_value) return _cached_SpawnPlantsAtNight_type_value;
-    _cached_SpawnPlantsAtNight_type_value = __AlgebraicTypeValue.Product({ elements: [] });
-    _cached_SpawnPlantsAtNight_type_value.value.elements.push(
-      { name: "schedule", algebraicType: RuneStonePlantSpawnSchedule.getTypeScriptAlgebraicType() },
+    if (_cached_RuneStoneSeedSpawnSchedule_type_value) return _cached_RuneStoneSeedSpawnSchedule_type_value;
+    _cached_RuneStoneSeedSpawnSchedule_type_value = __AlgebraicTypeValue.Product({ elements: [] });
+    _cached_RuneStoneSeedSpawnSchedule_type_value.value.elements.push(
+      { name: "id", algebraicType: __AlgebraicTypeValue.U64 },
+      { name: "scheduledAt", algebraicType: __AlgebraicTypeValue.createScheduleAtType() },
     );
-    return _cached_SpawnPlantsAtNight_type_value;
+    return _cached_RuneStoneSeedSpawnSchedule_type_value;
   },
 
-  serialize(writer: __BinaryWriter, value: SpawnPlantsAtNight): void {
-    __AlgebraicTypeValue.serializeValue(writer, SpawnPlantsAtNight.getTypeScriptAlgebraicType(), value);
+  serialize(writer: __BinaryWriter, value: RuneStoneSeedSpawnSchedule): void {
+    __AlgebraicTypeValue.serializeValue(writer, RuneStoneSeedSpawnSchedule.getTypeScriptAlgebraicType(), value);
   },
 
-  deserialize(reader: __BinaryReader): SpawnPlantsAtNight {
-    return __AlgebraicTypeValue.deserializeValue(reader, SpawnPlantsAtNight.getTypeScriptAlgebraicType());
+  deserialize(reader: __BinaryReader): RuneStoneSeedSpawnSchedule {
+    return __AlgebraicTypeValue.deserializeValue(reader, RuneStoneSeedSpawnSchedule.getTypeScriptAlgebraicType());
   },
 
 }
 
-export default SpawnPlantsAtNight;
+export default RuneStoneSeedSpawnSchedule;
+
 

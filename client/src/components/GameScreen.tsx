@@ -31,7 +31,7 @@ import GameVisualSettingsMenu from './GameVisualSettingsMenu';
 import type { MenuType } from './GameMenu';
 
 // Import types used by props
-import { 
+import {
     Player as SpacetimeDBPlayer,
     Tree as SpacetimeDBTree,
     Stone as SpacetimeDBStone,
@@ -92,7 +92,7 @@ import { useVoiceInterface } from '../hooks/useVoiceInterface';
 
 // Import other necessary imports
 import { useInteractionManager } from '../hooks/useInteractionManager';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useMusicSystem } from '../hooks/useMusicSystem';
 
 // Import debug context
@@ -140,30 +140,33 @@ interface GameScreenProps {
     grass: Map<string, SpacetimeDBGrass>;
     knockedOutStatus: Map<string, SpacetimeDBKnockedOutStatus>;
     rangedWeaponStats: Map<string, RangedWeaponStats>;
-    
+
     // Add player drinking cooldowns for water interaction
     playerDrinkingCooldowns: Map<string, SpacetimeDBPlayerDrinkingCooldown>;
-    
+
     // Player dodge roll states for animation
     playerDodgeRollStates: Map<string, any>; // PlayerDodgeRollState from generated types
-    
+
     // Rain collectors
     rainCollectors: Map<string, SpacetimeDBRainCollector>;
-    
+
     // Broth pots
     brothPots: Map<string, SpacetimeDBBrothPot>;
-    
+
     // Water patches
     waterPatches: Map<string, SpacetimeDBWaterPatch>;
-    
+
     // Fire patches
     firePatches: Map<string, SpacetimeDBFirePatch>;
-    
+
+    // Hot springs
+    hotSprings: Map<string, any>; // HotSpring from generated types
+
     // Connection & Player Info
     localPlayerId?: string;
     playerIdentity: Identity | null;
     connection: DbConnection | null;
-    
+
     // Predicted Position
     predictedPosition: { x: number; y: number } | null;
     canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -198,13 +201,13 @@ interface GameScreenProps {
 
     // 🎣 FISHING INPUT FIX: Add callback to notify parent of fishing state changes
     onFishingStateChange?: (isFishing: boolean) => void;
-    
+
     // Add fishing sessions for rendering other players' fishing
     fishingSessions: Map<string, FishingSession>;
-    
+
     // Music system for debug controls
     musicSystem: ReturnType<typeof useMusicSystem>;
-    
+
     // Volume settings for menu controls
     musicVolume: number;
     soundVolume: number;
@@ -212,24 +215,24 @@ interface GameScreenProps {
     onMusicVolumeChange: (volume: number) => void;
     onSoundVolumeChange: (volume: number) => void;
     onEnvironmentalVolumeChange: (volume: number) => void;
-    
+
     // Visual settings for menu controls
     treeShadowsEnabled: boolean;
     onTreeShadowsChange: (enabled: boolean) => void;
-    
+
     // Sound system for immediate sound effects
     soundSystem: ReturnType<typeof import('../hooks/useSoundSystem').useSoundSystem>;
 
     // Music panel state
     isMusicPanelVisible: boolean;
     setIsMusicPanelVisible: React.Dispatch<React.SetStateAction<boolean>>;
-    
+
     // Movement direction for dodge roll system
     movementDirection: { x: number; y: number };
-    
+
     // ADD: Local facing direction for instant visual feedback (client-authoritative)
     facingDirection?: string;
-    
+
     // Chunk-based weather
     chunkWeather: Map<string, any>;
 }
@@ -238,22 +241,22 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
     // ADD THIS LOG AT THE VERY BEGINNING OF THE COMPONENT
     // console.log("[GameScreen.tsx] Received props including activeConsumableEffects:", props.activeConsumableEffects);
     const [showInventoryState, setShowInventoryState] = useState(false);
-    
+
     // Add menu state management
     const [currentMenu, setCurrentMenu] = useState<MenuType>(null);
-    
+
     // Add auto-action state management
     const [autoActionStates, setAutoActionStates] = useState({ isAutoAttacking: false });
-    
+
     // Add refresh confirmation dialog state
     const [showRefreshDialog, setShowRefreshDialog] = useState(false);
-    
+
     // SOVA message adder function from Chat component
     const [sovaMessageAdder, setSOVAMessageAdder] = useState<((message: { id: string; text: string; isUser: boolean; timestamp: Date }) => void) | null>(null);
-    
+
     // 🎣 FISHING INPUT FIX: Track fishing state to disable input
     const [isFishing, setIsFishing] = useState(false);
-    
+
     // Debug logging for SOVA message adder
     useEffect(() => {
         console.log('[GameScreen] SOVA message adder changed:', sovaMessageAdder ? 'Available' : 'Not available');
@@ -261,25 +264,25 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
             console.log('[GameScreen] SOVA message adder function is now ready for VoiceInterface');
         }
     }, [sovaMessageAdder]);
-    
+
     // Callback to receive SOVA message adder from Chat
     const handleSOVAMessageAdderReady = useCallback((addMessage: (message: { id: string; text: string; isUser: boolean; timestamp: Date }) => void) => {
         console.log('[GameScreen] Received SOVA message adder from Chat component');
         setSOVAMessageAdder(() => addMessage); // Use function form to avoid stale closure
     }, []);
-    
+
     // Debug context
     const { showAutotileDebug, toggleAutotileDebug, showMusicDebug, toggleMusicDebug } = useDebug();
-    
 
-    
+
+
     // Destructure props for cleaner usage
     const {
         players, trees, stones, runeStones, campfires, furnaces, lanterns, harvestableResources, droppedItems, woodenStorageBoxes, sleepingBags, // ADDED: furnaces, runeStones
         playerPins, playerCorpses, stashes,
         shelters,
         plantedSeeds,
-        
+
         minimapCache,
         wildAnimals,
         viperSpittles,
@@ -367,7 +370,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
 
     // Find local player for viewport calculations
     const localPlayer = localPlayerId ? players.get(localPlayerId) : undefined;
-    
+
     // Use our custom hook to get camera offsets
     const { cameraOffsetX, cameraOffsetY } = useSpeechBubbleManager(localPlayer);
 
@@ -433,7 +436,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 const timeOrder = ['Night', 'Midnight', 'TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening'];
                 const currentTimeOfDay = worldState?.timeOfDay?.tag || 'Noon';
                 const currentIndex = timeOrder.indexOf(currentTimeOfDay);
-                
+
                 let newIndex: number;
                 if (event.key === 'ArrowRight') {
                     // Move forward
@@ -442,9 +445,9 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                     // Move backward
                     newIndex = (currentIndex - 1 + timeOrder.length) % timeOrder.length;
                 }
-                
+
                 const newTime = timeOrder[newIndex];
-                
+
                 if (connection) {
                     try {
                         (connection.reducers as any).debugSetTime(newTime);
@@ -480,10 +483,10 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                     100% { opacity: 1; transform: scale(1); }
                 }
             `}</style>
-            
+
             {/* Game Menu Button */}
             <GameMenuButton onClick={handleMenuOpen} />
-            
+
             {/* Auto-Action Status Indicators */}
             {/* Debug: {JSON.stringify(autoActionStates)} */}
             {autoActionStates.isAutoAttacking && (
@@ -517,13 +520,13 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                     )}
                 </div>
             )}
-            
+
             {/* Debug Controls - positioned beneath menu button in dev mode */}
             {process.env.NODE_ENV === 'development' && (
-                <div style={{ 
-                    position: 'absolute', 
+                <div style={{
+                    position: 'absolute',
                     top: '70px', // Positioned below the menu button
-                    left: '15px', 
+                    left: '15px',
                     zIndex: 998, // Below menu button but above other elements
                     backgroundColor: 'rgba(0, 0, 0, 0.7)',
                     color: 'white',
@@ -534,7 +537,8 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                     flexDirection: 'column',
                     gap: '6px'
                 }}>
-                    <button 
+
+                    <button
                         onClick={(e) => {
                             toggleAutotileDebug();
                             e.currentTarget.blur(); // Remove focus immediately after clicking
@@ -548,14 +552,31 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                             border: 'none',
                             padding: '4px 8px',
                             borderRadius: '2px',
-                            fontSize: '10px',
+                            fontSize: '12px',
                             cursor: 'pointer'
                         }}
                     >
                         Tileset Overlay: {showAutotileDebug ? 'ON' : 'OFF'}
                     </button>
-                    
-                    <button 
+
+                    {/* Player World Coordinates */}
+                    {localPlayer && (
+                        <div style={{
+                            fontSize: '12px',
+                            opacity: 0.85,
+                            color: '#00ff88',
+                            textShadow: '0 0 6px rgba(0, 255, 136, 0.6)'
+                        }}>
+                            <div>📍 Position:</div>
+                            <div style={{ paddingLeft: '12px', marginTop: '2px' }}>
+                                <span>X: {Math.round(localPlayer.positionX)}</span>
+                                <span style={{ margin: '0 6px' }}>•</span>
+                                <span>Y: {Math.round(localPlayer.positionY)}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    <button
                         onClick={(e) => {
                             // Cycle through all weather types
                             const currentWeather = worldState?.currentWeather?.tag;
@@ -563,7 +584,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                             const currentIndex = weatherTypes.indexOf(currentWeather || 'Clear');
                             const nextIndex = (currentIndex + 1) % weatherTypes.length;
                             const nextWeather = weatherTypes[nextIndex];
-                            
+
                             if (connection) {
                                 try {
                                     // Call reducer to set next weather type (only available in debug builds)
@@ -593,7 +614,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                             border: 'none',
                             padding: '4px 8px',
                             borderRadius: '2px',
-                            fontSize: '10px',
+                            fontSize: '12px',
                             cursor: 'pointer'
                         }}
                     >
@@ -609,18 +630,18 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                             }
                         })()}
                     </button>
-                    
+
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                        <button 
+                        <button
                             onClick={(e) => {
                                 // Cycle forward through times
                                 // Correct cycle order: Night -> Midnight -> TwilightMorning -> Dawn -> Morning -> Noon -> Afternoon -> Dusk -> TwilightEvening -> Night
-                const timeOrder = ['Night', 'Midnight', 'TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening'];
+                                const timeOrder = ['Night', 'Midnight', 'TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening'];
                                 const currentTimeOfDay = worldState?.timeOfDay?.tag || 'Noon';
                                 const currentIndex = timeOrder.indexOf(currentTimeOfDay);
                                 const nextIndex = (currentIndex + 1) % timeOrder.length;
                                 const nextTime = timeOrder[nextIndex];
-                                
+
                                 if (connection) {
                                     try {
                                         (connection.reducers as any).debugSetTime(nextTime);
@@ -637,29 +658,29 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                                     if (timeOfDay === 'Night' || timeOfDay === 'Midnight') return '#3F51B5';
                                     if (timeOfDay === 'Dawn' || timeOfDay === 'Dusk') return '#FF9800';
                                     if (timeOfDay === 'TwilightMorning' || timeOfDay === 'TwilightEvening') return '#9C27B0';
-                                    return '#FFC107';
+                                    return '#9C27B0';
                                 })(),
                                 color: 'white',
                                 border: 'none',
                                 padding: '4px 8px',
                                 borderRadius: '2px',
-                                fontSize: '10px',
+                                fontSize: '12px',
                                 cursor: 'pointer'
                             }}
                         >
                             Time: {worldState?.timeOfDay?.tag || 'UNKNOWN'}
                         </button>
                         <div style={{ display: 'flex', gap: '4px' }}>
-                            <button 
+                            <button
                                 onClick={(e) => {
                                     // Cycle backward through times
                                     // Correct cycle order: Night -> Midnight -> TwilightMorning -> Dawn -> Morning -> Noon -> Afternoon -> Dusk -> TwilightEvening -> Night
-                const timeOrder = ['Night', 'Midnight', 'TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening'];
+                                    const timeOrder = ['Night', 'Midnight', 'TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening'];
                                     const currentTimeOfDay = worldState?.timeOfDay?.tag || 'Noon';
                                     const currentIndex = timeOrder.indexOf(currentTimeOfDay);
                                     const prevIndex = (currentIndex - 1 + timeOrder.length) % timeOrder.length;
                                     const prevTime = timeOrder[prevIndex];
-                                    
+
                                     if (connection) {
                                         try {
                                             (connection.reducers as any).debugSetTime(prevTime);
@@ -683,16 +704,16 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                             >
                                 ←
                             </button>
-                            <button 
+                            <button
                                 onClick={(e) => {
                                     // Cycle forward through times
                                     // Correct cycle order: Night -> Midnight -> TwilightMorning -> Dawn -> Morning -> Noon -> Afternoon -> Dusk -> TwilightEvening -> Night
-                const timeOrder = ['Night', 'Midnight', 'TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening'];
+                                    const timeOrder = ['Night', 'Midnight', 'TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening'];
                                     const currentTimeOfDay = worldState?.timeOfDay?.tag || 'Noon';
                                     const currentIndex = timeOrder.indexOf(currentTimeOfDay);
                                     const nextIndex = (currentIndex + 1) % timeOrder.length;
                                     const nextTime = timeOrder[nextIndex];
-                                    
+
                                     if (connection) {
                                         try {
                                             (connection.reducers as any).debugSetTime(nextTime);
@@ -723,8 +744,8 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
 
             {/* Game Menu Overlays */}
             {currentMenu === 'main' && (
-                <GameMenu 
-                    onClose={handleMenuClose} 
+                <GameMenu
+                    onClose={handleMenuClose}
                     onNavigate={handleMenuNavigate}
                     musicVolume={musicVolume}
                     soundVolume={soundVolume}
@@ -733,15 +754,15 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 />
             )}
             {currentMenu === 'controls' && (
-                <ControlsMenu 
-                    onBack={handleMenuBack} 
-                    onClose={handleMenuClose} 
+                <ControlsMenu
+                    onBack={handleMenuBack}
+                    onClose={handleMenuClose}
                 />
             )}
             {currentMenu === 'tips' && (
-                <GameTipsMenu 
-                    onBack={handleMenuBack} 
-                    onClose={handleMenuClose} 
+                <GameTipsMenu
+                    onBack={handleMenuBack}
+                    onClose={handleMenuClose}
                 />
             )}
             {currentMenu === 'settings' && (
@@ -764,10 +785,10 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                     onTreeShadowsChange={onTreeShadowsChange}
                 />
             )}
-            
+
             {/* Refresh Confirmation Dialog */}
             {showRefreshDialog && (
-                <div 
+                <div
                     style={{
                         position: 'fixed',
                         top: 0,
@@ -783,7 +804,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                     }}
                     onClick={handleRefreshCancel} // Click outside to close
                 >
-                    <div 
+                    <div
                         style={{
                             backgroundColor: 'rgba(20, 20, 40, 0.95)',
                             border: '2px solid #00aaff',
@@ -804,7 +825,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                         }}>
                             NEUROVEIL™ REFRESH REQUEST
                         </div>
-                        
+
                         <div style={{
                             color: '#e0e0e0',
                             fontSize: '14px',
@@ -855,7 +876,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                             >
                                 REFRESH NEUROVEIL™
                             </button>
-                            
+
                             <button
                                 onClick={handleRefreshCancel}
                                 style={{
@@ -958,7 +979,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 treeShadowsEnabled={treeShadowsEnabled}
                 chunkWeather={chunkWeather}
             />
-            
+
             {/* Use our camera offsets for SpeechBubbleManager */}
             <SpeechBubbleManager
                 messages={messages}
@@ -967,7 +988,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 cameraOffsetY={cameraOffsetY}
                 localPlayerId={localPlayerId}
             />
-            
+
             <PlayerUI
                 identity={playerIdentity}
                 players={players}
@@ -1009,20 +1030,20 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 worldState={worldState}
                 isGameMenuOpen={currentMenu !== null}
             />
-            <DayNightCycleTracker 
-                worldState={worldState} 
+            <DayNightCycleTracker
+                worldState={worldState}
                 chunkWeather={chunkWeather}
                 localPlayer={localPlayer}
             />
-            <MusicControlPanel 
+            <MusicControlPanel
                 musicSystem={musicSystem}
                 musicVolume={musicVolume}
                 onMusicVolumeChange={onMusicVolumeChange}
                 isVisible={isMusicPanelVisible}
             />
-            <Chat 
+            <Chat
                 connection={connection}
-                messages={messages} 
+                messages={messages}
                 players={players}
                 isChatting={isChatting}
                 setIsChatting={setIsChatting}
@@ -1064,13 +1085,13 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 worldState={worldState}
                 isWaterTile={(worldX: number, worldY: number) => {
                     if (!connection) return false;
-                    
+
                     // Debug database once
                     if (!(window as any).dbDebugged) {
                         (window as any).dbDebugged = true;
                         console.log('[WATER DEBUG] Database tables:', Object.keys(connection.db));
                         console.log('[WATER DEBUG] WorldTile exists:', !!connection.db.worldTile);
-                        
+
                         if (connection.db.worldTile) {
                             const allTiles = Array.from(connection.db.worldTile.iter());
                             console.log('[WATER DEBUG] Total tiles in DB:', allTiles.length);
@@ -1078,14 +1099,14 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                                 console.log('[WATER DEBUG] Sample tiles:', allTiles.slice(0, 3));
                             }
                         }
-                        
-                        
+
+
                     }
-                    
+
                     // Use the exact same algorithm as placementRenderingUtils.ts
                     const tileX = Math.floor(worldX / 48); // TILE_SIZE is 48, not 32!
                     const tileY = Math.floor(worldY / 48);
-                    
+
                     // Check all world tiles to find the one at this position
                     for (const tile of connection.db.worldTile.iter()) {
                         if (tile.worldX === tileX && tile.worldY === tileY) {
@@ -1093,7 +1114,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                             return tile.tileType.tag === 'Sea';
                         }
                     }
-                    
+
                     // No tile found at this position, assume it's not water
                     return false;
                 }}

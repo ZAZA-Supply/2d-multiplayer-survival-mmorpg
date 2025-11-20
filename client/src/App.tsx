@@ -223,6 +223,7 @@ function AppContent() {
       rainCollectors, // <<< ADD rainCollectors destructuring
       waterPatches, // <<< ADD waterPatches destructuring
       firePatches, // <<< ADD firePatches destructuring
+      hotSprings, // <<< ADD hotSprings destructuring
       activeConsumableEffects, // <<< ADD activeConsumableEffects destructuring
       grass, // <<< ADD grass destructuring
       knockedOutStatus, // <<< ADD knockedOutStatus destructuring
@@ -948,6 +949,7 @@ function AppContent() {
                             rainCollectors={rainCollectors}
                             waterPatches={waterPatches}
                             firePatches={firePatches}
+                            hotSprings={hotSprings}
                             isMusicPanelVisible={isMusicPanelVisible}
                             setIsMusicPanelVisible={setIsMusicPanelVisible}
                             playerDodgeRollStates={playerDodgeRollStates}

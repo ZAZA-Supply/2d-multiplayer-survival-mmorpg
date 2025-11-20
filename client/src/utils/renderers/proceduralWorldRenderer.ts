@@ -417,7 +417,8 @@ export class ProceduralWorldRenderer {
             'Grass': 'G',
             'Sea': 'S',
             'Beach': 'B',
-            'Sand': 'Sa'
+            'Sand': 'Sa',
+            'HotSpringWater': 'HS'
         };
         return abbreviations[tileType] || tileType.substring(0, 2).toUpperCase();
     }
@@ -451,6 +452,9 @@ export class ProceduralWorldRenderer {
             case 'Sand':
                 ctx.fillStyle = '#F4A460';
                 break;
+            case 'HotSpringWater':
+                ctx.fillStyle = '#64D4FF'; // Bright cyan for hot spring water (highly visible!)
+                break;
             default:
                 ctx.fillStyle = '#808080'; // Gray fallback
         }
@@ -466,4 +470,4 @@ export class ProceduralWorldRenderer {
             initialized: this.isInitialized
         };
     }
-} 
+}

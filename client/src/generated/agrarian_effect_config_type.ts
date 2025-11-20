@@ -29,9 +29,10 @@ import {
 } from "spacetimedb";
 
 export type AgrarianEffectConfig = {
-  plantsSpawnedThisNight: number,
-  lastPlantSpawnTime: __Timestamp | undefined,
+  seedsSpawnedThisNight: number,
+  lastSeedSpawnTime: __Timestamp | undefined,
   nightStartTime: __Timestamp | undefined,
+  seedLootTable: string[],
 };
 let _cached_AgrarianEffectConfig_type_value: __AlgebraicTypeType | null = null;
 
@@ -47,9 +48,10 @@ export const AgrarianEffectConfig = {
     if (_cached_AgrarianEffectConfig_type_value) return _cached_AgrarianEffectConfig_type_value;
     _cached_AgrarianEffectConfig_type_value = __AlgebraicTypeValue.Product({ elements: [] });
     _cached_AgrarianEffectConfig_type_value.value.elements.push(
-      { name: "plantsSpawnedThisNight", algebraicType: __AlgebraicTypeValue.U32 },
-      { name: "lastPlantSpawnTime", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.createTimestampType()) },
+      { name: "seedsSpawnedThisNight", algebraicType: __AlgebraicTypeValue.U32 },
+      { name: "lastSeedSpawnTime", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.createTimestampType()) },
       { name: "nightStartTime", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.createTimestampType()) },
+      { name: "seedLootTable", algebraicType: __AlgebraicTypeValue.Array(__AlgebraicTypeValue.String) },
     );
     return _cached_AgrarianEffectConfig_type_value;
   },

@@ -999,6 +999,11 @@ pub fn place_homestead_hearth(
         return Err("Too far away to place Matron's Chest.".to_string());
     }
 
+    // Check if placement position is on water (including hot springs)
+    if crate::environment::is_position_on_water(ctx, world_x, world_y) {
+        return Err("Cannot place Matron's Chest on water.".to_string());
+    }
+
     // 2.5. Check that hearth is being placed on a foundation (full or triangle)
     use crate::building::FOUNDATION_TILE_SIZE_PX; // Keep local import for constant
     let foundations = ctx.db.foundation_cell();

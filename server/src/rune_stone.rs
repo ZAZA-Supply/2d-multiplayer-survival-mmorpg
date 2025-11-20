@@ -45,18 +45,22 @@ pub(crate) const RUNE_STONE_EFFECT_RADIUS_SQUARED: f32 = RUNE_STONE_EFFECT_RADIU
 pub(crate) const GREEN_RUNE_GROWTH_BOOST_MULTIPLIER: f32 = 1.5; // 1.5x growth rate for ALL plants
 pub(crate) const GREEN_RUNE_MAX_EFFECT_DISTANCE: f32 = RUNE_STONE_EFFECT_RADIUS;
 
-// Red (Production) Effect Constants - ALL crafting is faster
+// Red (Production) Effect Constants - ALL crafting is faster + MASSIVE item spawning
 pub(crate) const RED_RUNE_CRAFTING_TIME_REDUCTION: f32 = 0.667; // 1.5x crafting speed (0.667x time = 1.5x speed)
-pub(crate) const RED_RUNE_ITEMS_PER_NIGHT: u32 = 8; // Max items per night
-pub(crate) const RED_RUNE_ITEM_SPAWN_INTERVAL_SECS: u64 = 180; // One item every 3 minutes during night
+pub(crate) const RED_RUNE_ITEMS_PER_NIGHT: u32 = 60; // Max items per night (7.5x increase!)
+pub(crate) const RED_RUNE_ITEM_SPAWN_INTERVAL_SECS: u64 = 50; // Check every 50 seconds (was 180)
+pub(crate) const RED_RUNE_MIN_ITEMS_PER_BURST: u32 = 1; // Minimum items per spawn burst
+pub(crate) const RED_RUNE_MAX_ITEMS_PER_BURST: u32 = 3; // Maximum items per spawn burst (randomized)
 pub(crate) const RED_RUNE_ITEM_SPAWN_RADIUS: f32 = RUNE_STONE_EFFECT_RADIUS;
 pub(crate) const RED_RUNE_ITEM_MIN_DISTANCE: f32 = 150.0;
 
-// Green (Agrarian) Effect Constants
-pub(crate) const GREEN_RUNE_PLANTS_PER_NIGHT: u32 = 10; // Max plants per night
-pub(crate) const GREEN_RUNE_PLANT_SPAWN_INTERVAL_SECS: u64 = 150; // One plant every 2.5 minutes during night
-pub(crate) const GREEN_RUNE_PLANT_SPAWN_RADIUS: f32 = RUNE_STONE_EFFECT_RADIUS;
-pub(crate) const GREEN_RUNE_PLANT_MIN_DISTANCE: f32 = 150.0;
+// Green (Agrarian) Effect Constants - Moderate seed spawning
+pub(crate) const GREEN_RUNE_SEEDS_PER_NIGHT: u32 = 12; // Max seeds per night (reasonable amount)
+pub(crate) const GREEN_RUNE_SEED_SPAWN_INTERVAL_SECS: u64 = 120; // Check every 2 minutes
+pub(crate) const GREEN_RUNE_MIN_SEEDS_PER_BURST: u32 = 1; // Minimum seeds per spawn burst
+pub(crate) const GREEN_RUNE_MAX_SEEDS_PER_BURST: u32 = 2; // Maximum seeds per spawn burst (randomized)
+pub(crate) const GREEN_RUNE_SEED_SPAWN_RADIUS: f32 = RUNE_STONE_EFFECT_RADIUS;
+pub(crate) const GREEN_RUNE_SEED_MIN_DISTANCE: f32 = 150.0;
 
 // Blue (Memory Shard) Effect Constants - Increased for PvP hotspots
 pub(crate) const BLUE_RUNE_SHARDS_PER_NIGHT: u32 = 15; // Max shards per night (increased from 5)
@@ -81,9 +85,10 @@ pub enum RuneStoneType {
 
 #[derive(Clone, Debug, SpacetimeType)]
 pub struct AgrarianEffectConfig {
-    pub plants_spawned_this_night: u32, // Track plants spawned in current night cycle
-    pub last_plant_spawn_time: Option<Timestamp>, // When last plant was spawned
+    pub seeds_spawned_this_night: u32, // Track seeds spawned in current night cycle
+    pub last_seed_spawn_time: Option<Timestamp>, // When last seed was spawned
     pub night_start_time: Option<Timestamp>, // When current night started
+    pub seed_loot_table: Vec<String>, // List of seed item names this rune stone can spawn (randomized at world gen)
 }
 
 #[derive(Clone, Debug, SpacetimeType)]
@@ -138,9 +143,9 @@ pub struct RuneStoneItemSpawnSchedule {
     pub scheduled_at: spacetimedb::spacetimedb_lib::ScheduleAt,
 }
 
-#[spacetimedb::table(name = rune_stone_plant_spawn_schedule, scheduled(spawn_plants_at_night))]
+#[spacetimedb::table(name = rune_stone_seed_spawn_schedule, scheduled(spawn_seeds_at_night))]
 #[derive(Clone)]
-pub struct RuneStonePlantSpawnSchedule {
+pub struct RuneStoneSeedSpawnSchedule {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
@@ -148,6 +153,68 @@ pub struct RuneStonePlantSpawnSchedule {
 }
 
 // --- Helper Functions ---
+
+/// Generate a random seed loot table for a green rune stone
+/// Each rune stone gets 2-4 random seed types from all available plantable seeds
+/// This creates variety and permanence across server wipes
+pub fn generate_random_seed_loot_table(rng: &mut impl rand::Rng) -> Vec<String> {
+    // All plantable seed types (excluding burnt/toasted variants)
+    let all_seeds = vec![
+        // Large nutritious seeds
+        "Pumpkin Seeds",
+        "Sunflower Seeds",
+        "Flax Seeds",
+        // Vegetable seeds
+        "Carrot Seeds",
+        "Beet Seeds",
+        "Chicory Seeds",
+        "Salsify Seeds",
+        // Medicinal herb seeds
+        "Yarrow Seeds",
+        "Chamomile Seeds",
+        "Valerian Seeds",
+        "Mugwort Seeds",
+        "Ginseng Seeds",
+        // Fiber plant seeds
+        "Dogbane Seeds",
+        "Bog Cotton Seeds",
+        // Berry seeds
+        "Lingonberry Seeds",
+        "Cloudberry Seeds",
+        "Bilberry Seeds",
+        "Wild Strawberry Seeds",
+        "Rowan Seeds",
+        "Cranberry Seeds",
+        // Toxic plant seeds (rare but valuable for alchemy)
+        "Mandrake Seeds",
+        "Belladonna Seeds",
+        "Henbane Seeds",
+        "Datura Seeds",
+        "Wolfsbane Seeds",
+        // Grain seeds
+        "Corn Seeds",
+        // Coastal/Arctic seeds
+        "Nettle Seeds",
+        "Scurvy Grass Seeds",
+        "Crowberry Seeds",
+        "Sea Plantain Seeds",
+        "Glasswort Seeds",
+        "Beach Lyme Grass Seeds",
+    ];
+    
+    // Each rune stone gets 2-4 random seed types
+    let num_seeds = rng.gen_range(2..=4);
+    
+    // Shuffle and take first N seeds
+    let mut shuffled = all_seeds.clone();
+    use rand::seq::SliceRandom;
+    shuffled.shuffle(rng);
+    
+    shuffled.into_iter()
+        .take(num_seeds)
+        .map(|s| s.to_string())
+        .collect()
+}
 
 /// Check if a position is within range of a green rune stone
 /// Returns true if the position is within 2000px of any green rune stone
@@ -502,7 +569,7 @@ pub fn spawn_items_at_night(
         };
         
         if can_spawn {
-            // Pick a random craftable item from ALL craftable items (items with crafting_cost)
+            // Get all craftable items once
             let craftable_items: Vec<_> = ctx.db.item_definition().iter()
                 .filter(|item| item.crafting_cost.is_some())
                 .collect();
@@ -512,36 +579,52 @@ pub fn spawn_items_at_night(
                 continue;
             }
             
-            let item_def_id = craftable_items[rng.gen_range(0..craftable_items.len())].id;
+            // Spawn a BURST of items (randomized 1-3 items per spawn)
+            let items_to_spawn = rng.gen_range(RED_RUNE_MIN_ITEMS_PER_BURST..=RED_RUNE_MAX_ITEMS_PER_BURST);
+            let mut spawned_this_burst = 0;
             
-            // Spawn item away from rune stone center
-            let angle = rng.gen_range(0.0..std::f32::consts::TAU);
-            let distance = rng.gen_range(RED_RUNE_ITEM_MIN_DISTANCE..RED_RUNE_ITEM_SPAWN_RADIUS);
-            let item_x = rune_stone.pos_x + angle.cos() * distance;
-            let item_y = rune_stone.pos_y + angle.sin() * distance;
+            for _ in 0..items_to_spawn {
+                // Check if we've hit the night cap
+                if config.items_spawned_this_night >= RED_RUNE_ITEMS_PER_NIGHT {
+                    break;
+                }
+                
+                // Pick a random craftable item
+                let item_def_id = craftable_items[rng.gen_range(0..craftable_items.len())].id;
+                
+                // Spawn item away from rune stone center in random location
+                let angle = rng.gen_range(0.0..std::f32::consts::TAU);
+                let distance = rng.gen_range(RED_RUNE_ITEM_MIN_DISTANCE..RED_RUNE_ITEM_SPAWN_RADIUS);
+                let item_x = rune_stone.pos_x + angle.cos() * distance;
+                let item_y = rune_stone.pos_y + angle.sin() * distance;
+                
+                // Check if position is valid
+                if !crate::environment::is_position_on_water(ctx, item_x, item_y) {
+                    let chunk_idx = crate::environment::calculate_chunk_index(item_x, item_y);
+                    
+                    // Create dropped item
+                    ctx.db.dropped_item().insert(crate::dropped_item::DroppedItem {
+                        id: 0,
+                        item_def_id,
+                        quantity: 1,
+                        pos_x: item_x,
+                        pos_y: item_y,
+                        chunk_index: chunk_idx,
+                        created_at: current_time,
+                        item_data: None,
+                    });
+                    
+                    config.items_spawned_this_night += 1;
+                    spawned_this_burst += 1;
+                }
+            }
             
-            // Check if position is valid
-            if !crate::environment::is_position_on_water(ctx, item_x, item_y) {
-                let chunk_idx = crate::environment::calculate_chunk_index(item_x, item_y);
-                
-                // Create dropped item
-                ctx.db.dropped_item().insert(crate::dropped_item::DroppedItem {
-                    id: 0,
-                    item_def_id,
-                    quantity: 1,
-                    pos_x: item_x,
-                    pos_y: item_y,
-                    chunk_index: chunk_idx,
-                    created_at: current_time,
-                    item_data: None,
-                });
-                
-                config.items_spawned_this_night += 1;
-                config.last_item_spawn_time = Some(current_time);
-                
+            config.last_item_spawn_time = Some(current_time);
+            
+            if spawned_this_burst > 0 {
                 log::info!(
-                    "Red rune stone {} spawned item (def_id: {}) {} at ({:.1}, {:.1})",
-                    rune_stone.id, item_def_id, config.items_spawned_this_night, item_x, item_y
+                    "Red rune stone {} spawned {} items (total: {})",
+                    rune_stone.id, spawned_this_burst, config.items_spawned_this_night
                 );
             }
         }
@@ -567,11 +650,11 @@ pub fn spawn_items_at_night(
     Ok(())
 }
 
-/// Scheduled reducer to spawn plants from green rune stones at night
+/// Scheduled reducer to spawn seeds from green rune stones at night
 #[spacetimedb::reducer]
-pub fn spawn_plants_at_night(
+pub fn spawn_seeds_at_night(
     ctx: &spacetimedb::ReducerContext,
-    _schedule: RuneStonePlantSpawnSchedule,
+    _schedule: RuneStoneSeedSpawnSchedule,
 ) -> Result<(), String> {
     use spacetimedb::TimeDuration;
     use std::time::Duration;
@@ -594,8 +677,8 @@ pub fn spawn_plants_at_night(
     );
     
     if !is_night_period {
-        let check_interval = TimeDuration::from(Duration::from_secs(GREEN_RUNE_PLANT_SPAWN_INTERVAL_SECS));
-        ctx.db.rune_stone_plant_spawn_schedule().insert(RuneStonePlantSpawnSchedule {
+        let check_interval = TimeDuration::from(Duration::from_secs(GREEN_RUNE_SEED_SPAWN_INTERVAL_SECS));
+        ctx.db.rune_stone_seed_spawn_schedule().insert(RuneStoneSeedSpawnSchedule {
             id: 0,
             scheduled_at: check_interval.into(),
         });
@@ -618,14 +701,6 @@ pub fn spawn_plants_at_night(
             None => continue,
         };
         
-        // Get the plant type for current season
-        let plant_type = match current_season {
-            crate::world_state::Season::Spring => crate::plants_database::PlantType::Carrot,
-            crate::world_state::Season::Summer => crate::plants_database::PlantType::Potato,
-            crate::world_state::Season::Autumn => crate::plants_database::PlantType::Pumpkin,
-            crate::world_state::Season::Winter => crate::plants_database::PlantType::Beets,
-        };
-        
         // Check if this is a new night cycle
         let is_new_night = match config.night_start_time {
             Some(night_start) => {
@@ -637,54 +712,95 @@ pub fn spawn_plants_at_night(
         };
         
         if is_new_night {
-            config.plants_spawned_this_night = 0;
+            config.seeds_spawned_this_night = 0;
             config.night_start_time = Some(current_time);
         }
         
-        // Check if we can spawn more plants this night
-        if config.plants_spawned_this_night >= GREEN_RUNE_PLANTS_PER_NIGHT {
+        // Check if we can spawn more seeds this night
+        if config.seeds_spawned_this_night >= GREEN_RUNE_SEEDS_PER_NIGHT {
             rune_stones_to_update.push((rune_stone.id, config));
             continue;
         }
         
         // Check if enough time has passed since last spawn
-        let can_spawn = match config.last_plant_spawn_time {
+        let can_spawn = match config.last_seed_spawn_time {
             Some(last_spawn) => {
                 let time_since_last = current_time.to_micros_since_unix_epoch()
                     .saturating_sub(last_spawn.to_micros_since_unix_epoch());
-                time_since_last >= (GREEN_RUNE_PLANT_SPAWN_INTERVAL_SECS * 1_000_000) as i64
+                time_since_last >= (GREEN_RUNE_SEED_SPAWN_INTERVAL_SECS * 1_000_000) as i64
             }
             None => true,
         };
         
         if can_spawn {
-            // Spawn plant away from rune stone center
-            let angle = rng.gen_range(0.0..std::f32::consts::TAU);
-            let distance = rng.gen_range(GREEN_RUNE_PLANT_MIN_DISTANCE..GREEN_RUNE_PLANT_SPAWN_RADIUS);
-            let plant_x = rune_stone.pos_x + angle.cos() * distance;
-            let plant_y = rune_stone.pos_y + angle.sin() * distance;
+            // Check if this rune stone has a loot table
+            if config.seed_loot_table.is_empty() {
+                log::warn!("Green rune stone {} has empty loot table, skipping spawn", rune_stone.id);
+                rune_stones_to_update.push((rune_stone.id, config));
+                continue;
+            }
             
-            // Check if position is valid
-            if !crate::environment::is_position_on_water(ctx, plant_x, plant_y) {
-                let chunk_idx = crate::environment::calculate_chunk_index(plant_x, plant_y);
+            // Spawn a BURST of seeds (randomized 1-2 seeds per spawn)
+            let seeds_to_spawn = rng.gen_range(GREEN_RUNE_MIN_SEEDS_PER_BURST..=GREEN_RUNE_MAX_SEEDS_PER_BURST);
+            let mut spawned_this_burst = 0;
+            let mut spawned_seed_names = Vec::new();
+            
+            for _ in 0..seeds_to_spawn {
+                // Check if we've hit the night cap
+                if config.seeds_spawned_this_night >= GREEN_RUNE_SEEDS_PER_NIGHT {
+                    break;
+                }
                 
-                // Create harvestable resource (spawns fully grown, ready to harvest)
-                ctx.db.harvestable_resource().insert(crate::harvestable_resource::HarvestableResource {
-                    id: 0,
-                    plant_type,
-                    pos_x: plant_x,
-                    pos_y: plant_y,
-                    chunk_index: chunk_idx,
-                    respawn_at: None, // Not a respawning wild plant
-                    is_player_planted: false, // Spawned by rune stone, not player
-                });
+                // Pick a random seed from this rune stone's loot table
+                let seed_name = &config.seed_loot_table[rng.gen_range(0..config.seed_loot_table.len())];
                 
-                config.plants_spawned_this_night += 1;
-                config.last_plant_spawn_time = Some(current_time);
+                // Find the seed item definition
+                let seed_def_id = ctx.db.item_definition().iter()
+                    .find(|def| &def.name == seed_name)
+                    .map(|def| def.id);
                 
+                let seed_def_id = match seed_def_id {
+                    Some(id) => id,
+                    None => {
+                        log::warn!("Seed '{}' not found in item definitions", seed_name);
+                        continue;
+                    }
+                };
+                
+                // Spawn seed away from rune stone center in random location
+                let angle = rng.gen_range(0.0..std::f32::consts::TAU);
+                let distance = rng.gen_range(GREEN_RUNE_SEED_MIN_DISTANCE..GREEN_RUNE_SEED_SPAWN_RADIUS);
+                let seed_x = rune_stone.pos_x + angle.cos() * distance;
+                let seed_y = rune_stone.pos_y + angle.sin() * distance;
+                
+                // Check if position is valid
+                if !crate::environment::is_position_on_water(ctx, seed_x, seed_y) {
+                    let chunk_idx = crate::environment::calculate_chunk_index(seed_x, seed_y);
+                    
+                    // Create dropped seed item
+                    ctx.db.dropped_item().insert(crate::dropped_item::DroppedItem {
+                        id: 0,
+                        item_def_id: seed_def_id,
+                        quantity: 1,
+                        pos_x: seed_x,
+                        pos_y: seed_y,
+                        chunk_index: chunk_idx,
+                        created_at: current_time,
+                        item_data: None,
+                    });
+                    
+                    config.seeds_spawned_this_night += 1;
+                    spawned_this_burst += 1;
+                    spawned_seed_names.push(seed_name.clone());
+                }
+            }
+            
+            config.last_seed_spawn_time = Some(current_time);
+            
+            if spawned_this_burst > 0 {
                 log::info!(
-                    "Green rune stone {} spawned {:?} plant {} at ({:.1}, {:.1})",
-                    rune_stone.id, plant_type, config.plants_spawned_this_night, plant_x, plant_y
+                    "Green rune stone {} spawned {} seeds: {:?} (total: {})",
+                    rune_stone.id, spawned_this_burst, spawned_seed_names, config.seeds_spawned_this_night
                 );
             }
         }
@@ -701,8 +817,8 @@ pub fn spawn_plants_at_night(
     }
     
     // Reschedule
-    let check_interval = TimeDuration::from(Duration::from_secs(GREEN_RUNE_PLANT_SPAWN_INTERVAL_SECS));
-    ctx.db.rune_stone_plant_spawn_schedule().insert(RuneStonePlantSpawnSchedule {
+    let check_interval = TimeDuration::from(Duration::from_secs(GREEN_RUNE_SEED_SPAWN_INTERVAL_SECS));
+    ctx.db.rune_stone_seed_spawn_schedule().insert(RuneStoneSeedSpawnSchedule {
         id: 0,
         scheduled_at: check_interval.into(),
     });
@@ -749,20 +865,20 @@ pub fn init_rune_stone_item_spawning(ctx: &spacetimedb::ReducerContext) -> Resul
     Ok(())
 }
 
-/// Initialize the rune stone plant spawning system
-pub fn init_rune_stone_plant_spawning(ctx: &spacetimedb::ReducerContext) -> Result<(), String> {
+/// Initialize the rune stone seed spawning system
+pub fn init_rune_stone_seed_spawning(ctx: &spacetimedb::ReducerContext) -> Result<(), String> {
     use spacetimedb::TimeDuration;
     use std::time::Duration;
     
-    if ctx.db.rune_stone_plant_spawn_schedule().count() == 0 {
-        let check_interval = TimeDuration::from(Duration::from_secs(GREEN_RUNE_PLANT_SPAWN_INTERVAL_SECS));
+    if ctx.db.rune_stone_seed_spawn_schedule().count() == 0 {
+        let check_interval = TimeDuration::from(Duration::from_secs(GREEN_RUNE_SEED_SPAWN_INTERVAL_SECS));
         
-        ctx.db.rune_stone_plant_spawn_schedule().insert(RuneStonePlantSpawnSchedule {
+        ctx.db.rune_stone_seed_spawn_schedule().insert(RuneStoneSeedSpawnSchedule {
             id: 0,
             scheduled_at: check_interval.into(),
         });
         
-        log::info!("Initialized rune stone plant spawning system");
+        log::info!("Initialized rune stone seed spawning system");
     }
     
     Ok(())

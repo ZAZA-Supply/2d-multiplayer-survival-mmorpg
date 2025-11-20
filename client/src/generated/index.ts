@@ -377,8 +377,8 @@ import { SpawnItemsAtNight } from "./spawn_items_at_night_reducer.ts";
 export { SpawnItemsAtNight };
 import { SpawnMemoryShardsAtNight } from "./spawn_memory_shards_at_night_reducer.ts";
 export { SpawnMemoryShardsAtNight };
-import { SpawnPlantsAtNight } from "./spawn_plants_at_night_reducer.ts";
-export { SpawnPlantsAtNight };
+import { SpawnSeedsAtNight } from "./spawn_seeds_at_night_reducer.ts";
+export { SpawnSeedsAtNight };
 import { SpawnWildAnimal } from "./spawn_wild_animal_reducer.ts";
 export { SpawnWildAnimal };
 import { SplitAndDropItemFromBoxSlotToWorld } from "./split_and_drop_item_from_box_slot_to_world_reducer.ts";
@@ -647,8 +647,8 @@ import { RuneStoneTableHandle } from "./rune_stone_table.ts";
 export { RuneStoneTableHandle };
 import { RuneStoneItemSpawnScheduleTableHandle } from "./rune_stone_item_spawn_schedule_table.ts";
 export { RuneStoneItemSpawnScheduleTableHandle };
-import { RuneStonePlantSpawnScheduleTableHandle } from "./rune_stone_plant_spawn_schedule_table.ts";
-export { RuneStonePlantSpawnScheduleTableHandle };
+import { RuneStoneSeedSpawnScheduleTableHandle } from "./rune_stone_seed_spawn_schedule_table.ts";
+export { RuneStoneSeedSpawnScheduleTableHandle };
 import { RuneStoneShardSpawnScheduleTableHandle } from "./rune_stone_shard_spawn_schedule_table.ts";
 export { RuneStoneShardSpawnScheduleTableHandle };
 import { SeaStackTableHandle } from "./sea_stack_table.ts";
@@ -895,8 +895,8 @@ import { RuneStone } from "./rune_stone_type.ts";
 export { RuneStone };
 import { RuneStoneItemSpawnSchedule } from "./rune_stone_item_spawn_schedule_type.ts";
 export { RuneStoneItemSpawnSchedule };
-import { RuneStonePlantSpawnSchedule } from "./rune_stone_plant_spawn_schedule_type.ts";
-export { RuneStonePlantSpawnSchedule };
+import { RuneStoneSeedSpawnSchedule } from "./rune_stone_seed_spawn_schedule_type.ts";
+export { RuneStoneSeedSpawnSchedule };
 import { RuneStoneShardSpawnSchedule } from "./rune_stone_shard_spawn_schedule_type.ts";
 export { RuneStoneShardSpawnSchedule };
 import { RuneStoneType } from "./rune_stone_type_type.ts";
@@ -1609,13 +1609,13 @@ const REMOTE_MODULE = {
         colType: (RuneStoneItemSpawnSchedule.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
       },
     },
-    rune_stone_plant_spawn_schedule: {
-      tableName: "rune_stone_plant_spawn_schedule" as const,
-      rowType: RuneStonePlantSpawnSchedule.getTypeScriptAlgebraicType(),
+    rune_stone_seed_spawn_schedule: {
+      tableName: "rune_stone_seed_spawn_schedule" as const,
+      rowType: RuneStoneSeedSpawnSchedule.getTypeScriptAlgebraicType(),
       primaryKey: "id",
       primaryKeyInfo: {
         colName: "id",
-        colType: (RuneStonePlantSpawnSchedule.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
+        colType: (RuneStoneSeedSpawnSchedule.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
       },
     },
     rune_stone_shard_spawn_schedule: {
@@ -2537,9 +2537,9 @@ const REMOTE_MODULE = {
       reducerName: "spawn_memory_shards_at_night",
       argsType: SpawnMemoryShardsAtNight.getTypeScriptAlgebraicType(),
     },
-    spawn_plants_at_night: {
-      reducerName: "spawn_plants_at_night",
-      argsType: SpawnPlantsAtNight.getTypeScriptAlgebraicType(),
+    spawn_seeds_at_night: {
+      reducerName: "spawn_seeds_at_night",
+      argsType: SpawnSeedsAtNight.getTypeScriptAlgebraicType(),
     },
     spawn_wild_animal: {
       reducerName: "spawn_wild_animal",
@@ -2992,7 +2992,7 @@ export type Reducer = never
 | { name: "SetSprinting", args: SetSprinting }
 | { name: "SpawnItemsAtNight", args: SpawnItemsAtNight }
 | { name: "SpawnMemoryShardsAtNight", args: SpawnMemoryShardsAtNight }
-| { name: "SpawnPlantsAtNight", args: SpawnPlantsAtNight }
+| { name: "SpawnSeedsAtNight", args: SpawnSeedsAtNight }
 | { name: "SpawnWildAnimal", args: SpawnWildAnimal }
 | { name: "SplitAndDropItemFromBoxSlotToWorld", args: SplitAndDropItemFromBoxSlotToWorld }
 | { name: "SplitAndDropItemFromCampfireSlotToWorld", args: SplitAndDropItemFromCampfireSlotToWorld }
@@ -5724,20 +5724,20 @@ export class RemoteReducers {
     this.connection.offReducer("spawn_memory_shards_at_night", callback);
   }
 
-  spawnPlantsAtNight(schedule: RuneStonePlantSpawnSchedule) {
+  spawnSeedsAtNight(schedule: RuneStoneSeedSpawnSchedule) {
     const __args = { schedule };
     let __writer = new __BinaryWriter(1024);
-    SpawnPlantsAtNight.serialize(__writer, __args);
+    SpawnSeedsAtNight.serialize(__writer, __args);
     let __argsBuffer = __writer.getBuffer();
-    this.connection.callReducer("spawn_plants_at_night", __argsBuffer, this.setCallReducerFlags.spawnPlantsAtNightFlags);
+    this.connection.callReducer("spawn_seeds_at_night", __argsBuffer, this.setCallReducerFlags.spawnSeedsAtNightFlags);
   }
 
-  onSpawnPlantsAtNight(callback: (ctx: ReducerEventContext, schedule: RuneStonePlantSpawnSchedule) => void) {
-    this.connection.onReducer("spawn_plants_at_night", callback);
+  onSpawnSeedsAtNight(callback: (ctx: ReducerEventContext, schedule: RuneStoneSeedSpawnSchedule) => void) {
+    this.connection.onReducer("spawn_seeds_at_night", callback);
   }
 
-  removeOnSpawnPlantsAtNight(callback: (ctx: ReducerEventContext, schedule: RuneStonePlantSpawnSchedule) => void) {
-    this.connection.offReducer("spawn_plants_at_night", callback);
+  removeOnSpawnSeedsAtNight(callback: (ctx: ReducerEventContext, schedule: RuneStoneSeedSpawnSchedule) => void) {
+    this.connection.offReducer("spawn_seeds_at_night", callback);
   }
 
   spawnWildAnimal(species: AnimalSpecies, posX: number, posY: number) {
@@ -7562,9 +7562,9 @@ export class SetReducerFlags {
     this.spawnMemoryShardsAtNightFlags = flags;
   }
 
-  spawnPlantsAtNightFlags: __CallReducerFlags = 'FullUpdate';
-  spawnPlantsAtNight(flags: __CallReducerFlags) {
-    this.spawnPlantsAtNightFlags = flags;
+  spawnSeedsAtNightFlags: __CallReducerFlags = 'FullUpdate';
+  spawnSeedsAtNight(flags: __CallReducerFlags) {
+    this.spawnSeedsAtNightFlags = flags;
   }
 
   spawnWildAnimalFlags: __CallReducerFlags = 'FullUpdate';
@@ -8237,9 +8237,9 @@ export class RemoteTables {
     return new RuneStoneItemSpawnScheduleTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<RuneStoneItemSpawnSchedule>(REMOTE_MODULE.tables.rune_stone_item_spawn_schedule));
   }
 
-  get runeStonePlantSpawnSchedule(): RuneStonePlantSpawnScheduleTableHandle<'rune_stone_plant_spawn_schedule'> {
+  get runeStoneSeedSpawnSchedule(): RuneStoneSeedSpawnScheduleTableHandle<'rune_stone_seed_spawn_schedule'> {
     // clientCache is a private property
-    return new RuneStonePlantSpawnScheduleTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<RuneStonePlantSpawnSchedule>(REMOTE_MODULE.tables.rune_stone_plant_spawn_schedule));
+    return new RuneStoneSeedSpawnScheduleTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<RuneStoneSeedSpawnSchedule>(REMOTE_MODULE.tables.rune_stone_seed_spawn_schedule));
   }
 
   get runeStoneShardSpawnSchedule(): RuneStoneShardSpawnScheduleTableHandle<'rune_stone_shard_spawn_schedule'> {

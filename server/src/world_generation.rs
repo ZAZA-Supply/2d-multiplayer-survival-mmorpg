@@ -12,6 +12,11 @@ use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
 use std::collections::HashMap;
 
+// --- Hot Spring Constants (moved from hot_spring.rs) ---
+/// Base density for 400x400 map (160k tiles²) = 4 hot springs (increased for better visibility)
+const HOT_SPRING_BASE_COUNT: u32 = 4;
+const HOT_SPRING_BASE_AREA_TILES: f32 = 160000.0; // 400x400 tiles
+
 #[spacetimedb::reducer]
 pub fn generate_world(ctx: &ReducerContext, config: WorldGenConfig) -> Result<(), String> {
     log::info!(
@@ -78,6 +83,8 @@ struct WorldFeatures {
     lake_map: Vec<Vec<bool>>,
     road_network: Vec<Vec<bool>>,
     dirt_paths: Vec<Vec<bool>>,
+    hot_spring_water: Vec<Vec<bool>>, // Hot spring water (inner pool)
+    hot_spring_beach: Vec<Vec<bool>>, // Hot spring beach (shore)
     width: usize,
     height: usize,
 }
@@ -119,6 +126,10 @@ fn generate_world_features(config: &WorldGenConfig, noise: &Perlin) -> WorldFeat
     // Generate additional dirt paths
     let dirt_paths = generate_dirt_paths(config, noise, &road_network, width, height);
     
+    // Generate hot spring locations (large water pools with beach shores)
+    // Pass river and lake data to ensure hot springs don't spawn near ANY water
+    let (hot_spring_water, hot_spring_beach) = generate_hot_springs(config, noise, &shore_distance, &river_network, &lake_map, width, height);
+    
     WorldFeatures {
         heightmap,
         shore_distance,
@@ -126,6 +137,8 @@ fn generate_world_features(config: &WorldGenConfig, noise: &Perlin) -> WorldFeat
         lake_map,
         road_network,
         dirt_paths,
+        hot_spring_water,
+        hot_spring_beach,
         width,
         height,
     }
@@ -806,6 +819,262 @@ fn generate_dirt_paths(config: &WorldGenConfig, noise: &Perlin, road_network: &[
     vec![vec![false; width]; height]
 }
 
+fn generate_hot_springs(
+    config: &WorldGenConfig, 
+    noise: &Perlin, 
+    shore_distance: &[Vec<f64>], 
+    river_network: &[Vec<bool>],
+    lake_map: &[Vec<bool>],
+    width: usize, 
+    height: usize
+) -> (Vec<Vec<bool>>, Vec<Vec<bool>>) {
+    let mut hot_spring_water = vec![vec![false; width]; height];
+    let mut hot_spring_beach = vec![vec![false; width]; height];
+    
+    log::info!("🌊 GENERATING HOT SPRING WATER POOLS (960-1920px diameter = LARGE FEATURES!)...");
+    log::info!("🌊 Map size: {}x{} tiles = {}x{}px (1 tile = 48px)", width, height, width * 48, height * 48);
+    
+    // Calculate how many hot springs to generate based on map size
+    let map_area_tiles = (width * height) as f32;
+    let scale_factor = (map_area_tiles / HOT_SPRING_BASE_AREA_TILES).sqrt();
+    let target_hot_spring_count = ((HOT_SPRING_BASE_COUNT as f32) * scale_factor).round().max(2.0) as usize;
+    
+    log::info!("🌊 Target hot springs: {} (map: {}x{} tiles, scale factor: {:.2}x)", target_hot_spring_count, width, height, scale_factor);
+    
+    // Step 1: Collect candidate positions in TWO categories:
+    // Category A: DEEP inland (for dense forest hot springs)
+    // Category B: Moderately inland (for regular hot springs)
+    let min_distance_from_edge = 25; // Increased from 15 - stay well away from edges
+    let deep_inland_min_distance = 40.0; // DEEP inland for forest hot springs
+    let moderate_inland_min_distance = 25.0; // Moderately inland for regular hot springs
+    
+    let mut deep_inland_positions = Vec::new();
+    let mut moderate_inland_positions = Vec::new();
+    
+    for y in min_distance_from_edge..(height - min_distance_from_edge) {
+        for x in min_distance_from_edge..(width - min_distance_from_edge) {
+            let shore_dist = shore_distance[y][x];
+            
+            // Check if position is NOT adjacent to any water tiles (rivers, lakes, ocean)
+            let is_adjacent_to_water = check_adjacent_water_with_features(
+                shore_distance, 
+                river_network, 
+                lake_map, 
+                x, 
+                y, 
+                width, 
+                height
+            );
+            
+            if !is_adjacent_to_water {
+                // Deep inland - perfect for dense forest hot springs
+                if shore_dist > deep_inland_min_distance {
+                    deep_inland_positions.push((x, y));
+                }
+                // Moderately inland - for regular hot springs
+                else if shore_dist > moderate_inland_min_distance {
+                    moderate_inland_positions.push((x, y));
+                }
+            }
+        }
+    }
+    
+    log::info!("🌊 Found {} deep inland positions (forest hot springs)", deep_inland_positions.len());
+    log::info!("🌊 Found {} moderate inland positions (regular hot springs)", moderate_inland_positions.len());
+    
+    if deep_inland_positions.is_empty() && moderate_inland_positions.is_empty() {
+        log::error!("⚠️⚠️⚠️ NO VALID POSITIONS FOUND FOR HOT SPRINGS! ⚠️⚠️⚠️");
+        log::error!("Map size: {}x{} tiles, min_distance_from_edge: {}", 
+                   width, height, min_distance_from_edge);
+        return (hot_spring_water, hot_spring_beach);
+    }
+    
+    // Step 2: Select hot spring positions with GUARANTEED deep inland placement
+    let mut hot_spring_centers = Vec::new();
+    let min_distance_between = 100.0; // Good spacing between hot springs
+    
+    // PRIORITY 1: Place at least ONE hot spring in deep inland (dense forest area)
+    if !deep_inland_positions.is_empty() {
+        log::info!("🌊 Placing FOREST hot spring (deep inland)...");
+        
+        // Score deep inland positions by noise
+        let mut deep_scores: Vec<(usize, f64)> = deep_inland_positions.iter()
+            .enumerate()
+            .map(|(idx, &(x, y))| {
+                let noise_val = noise.get([x as f64 * 0.01, y as f64 * 0.01, 9000.0]);
+                (idx, noise_val)
+            })
+            .collect();
+        deep_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        
+        // Place the first deep inland hot spring
+        if let Some((idx, _)) = deep_scores.first() {
+            let (x, y) = deep_inland_positions[*idx];
+            
+            // DOUBLE-CHECK: Verify this position is not near water (extra safety)
+            let is_near_water = check_adjacent_water_with_features(
+                shore_distance,
+                river_network,
+                lake_map,
+                x,
+                y,
+                width,
+                height
+            );
+            
+            if !is_near_water {
+                let radius_noise = noise.get([x as f64 * 0.05, y as f64 * 0.05, 9500.0]);
+                let radius_tiles = (15.0 + radius_noise * 5.0) as i32;
+                
+                hot_spring_centers.push((x as f32, y as f32, radius_tiles));
+                let world_x_px = (x as f32 + 0.5) * crate::TILE_SIZE_PX as f32;
+                let world_y_px = (y as f32 + 0.5) * crate::TILE_SIZE_PX as f32;
+                log::info!("🌊✨ PLACED FOREST HOT SPRING #1 at tile ({}, {}) = 📍 World Position: ({:.0}, {:.0}) with radius {} tiles ✨", 
+                           x, y, world_x_px, world_y_px, radius_tiles);
+            } else {
+                log::warn!("🌊 First deep inland position was too close to water, will try others in main loop");
+            }
+        }
+    }
+    
+    // PRIORITY 2: Fill remaining slots from both deep and moderate positions
+    // Combine all remaining candidates
+    let mut all_candidates = Vec::new();
+    all_candidates.extend(deep_inland_positions.iter().map(|&pos| (pos, true))); // true = deep inland
+    all_candidates.extend(moderate_inland_positions.iter().map(|&pos| (pos, false))); // false = moderate
+    
+    // Score all candidates
+    let mut candidate_scores: Vec<(usize, f64, bool)> = all_candidates.iter()
+        .enumerate()
+        .map(|(idx, &((x, y), is_deep))| {
+            let noise_val = noise.get([x as f64 * 0.01, y as f64 * 0.01, 9000.0]);
+            (idx, noise_val, is_deep)
+        })
+        .collect();
+    
+    // Sort by noise score (highest first) for deterministic selection
+    candidate_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    
+    // Select remaining hot spring positions ensuring minimum distance
+    let max_attempts = all_candidates.len().min(1000);
+    let mut attempts = 0;
+    
+    for (candidate_idx, _score, is_deep) in &candidate_scores {
+        if attempts >= max_attempts {
+            log::warn!("🌊 Reached max attempts ({}) for hot spring placement", max_attempts);
+            break;
+        }
+        attempts += 1;
+        
+        // Stop when we have enough hot springs
+        if hot_spring_centers.len() >= target_hot_spring_count {
+            break;
+        }
+        
+        let ((x, y), _) = all_candidates[*candidate_idx];
+        
+        // Check distance from already placed hot springs
+        let mut too_close = false;
+        for (other_x, other_y, _) in &hot_spring_centers {
+            let dx: f32 = x as f32 - *other_x;
+            let dy: f32 = y as f32 - *other_y;
+            let dist: f32 = (dx * dx + dy * dy).sqrt();
+            if dist < min_distance_between {
+                too_close = true;
+                break;
+            }
+        }
+        
+        if !too_close {
+            // DOUBLE-CHECK: Verify this position is still not near water (extra safety)
+            let is_near_water = check_adjacent_water_with_features(
+                shore_distance,
+                river_network,
+                lake_map,
+                x,
+                y,
+                width,
+                height
+            );
+            
+            if is_near_water {
+                // Skip this position - it's too close to water
+                continue;
+            }
+            
+            // Vary radius slightly using noise for organic look
+            let radius_noise = noise.get([x as f64 * 0.05, y as f64 * 0.05, 9500.0]);
+            let radius_tiles = (15.0 + radius_noise * 5.0) as i32; // 10-20 tiles radius
+            
+            hot_spring_centers.push((x as f32, y as f32, radius_tiles));
+            let world_x_px = (x as f32 + 0.5) * crate::TILE_SIZE_PX as f32;
+            let world_y_px = (y as f32 + 0.5) * crate::TILE_SIZE_PX as f32;
+            let location_type = if *is_deep { "DEEP FOREST" } else { "INLAND" };
+            log::info!("🌊✨ PLACED {} HOT SPRING #{} at tile ({}, {}) = 📍 World Position: ({:.0}, {:.0}) with radius {} tiles ✨", 
+                       location_type, hot_spring_centers.len(), x, y, world_x_px, world_y_px, radius_tiles);
+        }
+    }
+    
+    log::info!("🌊 Hot spring placement complete: {} placed out of {} target", 
+               hot_spring_centers.len(), target_hot_spring_count);
+    
+    // Log final summary with all hot spring positions for easy finding
+    if hot_spring_centers.is_empty() {
+        log::error!("⚠️⚠️⚠️ NO HOT SPRINGS WERE PLACED! ⚠️⚠️⚠️");
+        log::error!("Map size: {}x{} tiles, min_distance_from_edge: {}", 
+                   width, height, min_distance_from_edge);
+        log::error!("Found {} deep inland and {} moderate inland positions but none met spacing requirements", 
+                   deep_inland_positions.len(), moderate_inland_positions.len());
+    } else {
+        log::info!("🌊✨ HOT SPRING LOCATIONS SUMMARY ✨🌊");
+        for (idx, (center_x, center_y, radius)) in hot_spring_centers.iter().enumerate() {
+            let world_x_px = (*center_x + 0.5) * crate::TILE_SIZE_PX as f32;
+            let world_y_px = (*center_y + 0.5) * crate::TILE_SIZE_PX as f32;
+            log::info!("  #{}: Position ({:.0}, {:.0}) - Radius {} tiles ({}px diameter) - BRIGHT WHITE on minimap!", 
+                       idx + 1, world_x_px, world_y_px, radius, radius * 2 * crate::TILE_SIZE_PX as i32);
+        }
+        log::info!("🌊 Look for BRIGHT WHITE/CYAN spots on your minimap - those are hot springs!");
+    }
+    
+    // Now mark the hot spring areas in the map (water and beach layers)
+    for (center_x, center_y, radius_tiles) in &hot_spring_centers {
+        let center_x = *center_x as i32;
+        let center_y = *center_y as i32;
+        
+        for dy in -*radius_tiles..=*radius_tiles {
+            for dx in -*radius_tiles..=*radius_tiles {
+                let tile_x = center_x + dx;
+                let tile_y = center_y + dy;
+                
+                // Check bounds
+                if tile_x < 0 || tile_y < 0 || tile_x >= width as i32 || tile_y >= height as i32 {
+                    continue;
+                }
+                
+                // Calculate distance from center
+                let dist = ((dx * dx + dy * dy) as f32).sqrt();
+                let dist_normalized = dist / *radius_tiles as f32;
+                
+                // Add organic noise
+                let noise_val = noise.get([tile_x as f64 * 0.3, tile_y as f64 * 0.3]) as f32;
+                let noise_offset = noise_val * 0.2;
+                
+                // Create concentric layers: inner water, outer beach (2-3 tiles wide)
+                if dist_normalized < 0.7 + noise_offset * 0.5 {
+                    // Inner water pool
+                    hot_spring_water[tile_y as usize][tile_x as usize] = true;
+                } else if dist_normalized < 1.0 + noise_offset {
+                    // Outer beach shore (2-3 tiles wide)
+                    hot_spring_beach[tile_y as usize][tile_x as usize] = true;
+                }
+            }
+        }
+    }
+    
+    log::info!("Generated {} hot spring pools with water and beach layers", hot_spring_centers.len());
+    (hot_spring_water, hot_spring_beach)
+}
+
 fn generate_chunk(
     ctx: &ReducerContext, 
     config: &WorldGenConfig, 
@@ -885,8 +1154,17 @@ fn determine_realistic_tile_type(
         return TileType::Sea;
     }
     
-    // Beach areas around water - CHECK AFTER rivers/lakes
-    // Beaches take priority over roads - roads must end before beach or at beach
+    // Hot spring water (inner pool) - just like rivers and lakes
+    if features.hot_spring_water[y][x] {
+        return TileType::HotSpringWater;
+        }
+        
+    // Hot spring beach (shore) - just like regular beaches
+    if features.hot_spring_beach[y][x] {
+        return TileType::Beach;
+    }
+    
+    // Beach areas around water - CHECK AFTER rivers/lakes/hot springs
     if shore_distance < 10.0 || is_near_water(features, x, y) {
         return TileType::Beach;
     }
@@ -923,6 +1201,53 @@ fn is_near_water(features: &WorldFeatures, x: usize, y: usize) -> bool {
                 if features.river_network[check_y][check_x] || 
                    features.lake_map[check_y][check_x] ||
                    features.shore_distance[check_y][check_x] < -2.0 {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+// Helper function to check if a position is adjacent to water tiles (including rivers and lakes)
+fn check_adjacent_water_with_features(
+    shore_distance: &[Vec<f64>], 
+    river_network: &[Vec<bool>],
+    lake_map: &[Vec<bool>],
+    x: usize, 
+    y: usize, 
+    width: usize, 
+    height: usize
+) -> bool {
+    // Check a LARGE radius (15 tiles) to ensure hot springs are WELL away from ANY water
+    // This prevents hot springs from spawning on the edges of rivers and lakes
+    for dy in -15..=15i32 {
+        for dx in -15..=15i32 {
+            if dx == 0 && dy == 0 {
+                continue; // Skip the center tile
+            }
+            
+            let check_x = x as i32 + dx;
+            let check_y = y as i32 + dy;
+            
+            // Bounds check
+            if check_x >= 0 && check_y >= 0 && (check_x as usize) < width && (check_y as usize) < height {
+                let cx = check_x as usize;
+                let cy = check_y as usize;
+                
+                // Check for ANY type of water:
+                // 1. Rivers
+                if river_network[cy][cx] {
+                    return true;
+                }
+                
+                // 2. Lakes
+                if lake_map[cy][cx] {
+                    return true;
+                }
+                
+                // 3. Ocean/sea (negative shore distance or very close to shore)
+                if shore_distance[cy][cx] < 10.0 {
                     return true;
                 }
             }
@@ -987,6 +1312,7 @@ pub fn generate_minimap_data(ctx: &ReducerContext, minimap_width: u32, minimap_h
                 TileType::Grass => 128,    // Muted forest green
                 TileType::Dirt => 192,     // Dark brown dirt
                 TileType::DirtRoad => 224, // Very dark brown roads
+                TileType::HotSpringWater => 255, // BRIGHT WHITE/CYAN - highly visible hot springs!
             };
             
             // Write directly to buffer (overwriting if multiple tiles map to same pixel is fine/expected)

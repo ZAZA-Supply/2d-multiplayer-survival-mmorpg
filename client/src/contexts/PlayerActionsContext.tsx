@@ -376,7 +376,20 @@ export const PlayerActionsProvider: React.FC<{ children: ReactNode }> = ({ child
 export const usePlayerActions = () => {
     const context = useContext(PlayerActionsContext);
     if (context === undefined) {
-        throw new Error('usePlayerActions must be used within a PlayerActionsProvider');
+        // Fallback to prevent crash - allows app to recover if context is momentarily missing
+        console.error('CRITICAL WARNING: usePlayerActions called outside PlayerActionsProvider. Using fallback to prevent crash.');
+        return {
+            updatePlayerPosition: (_x: number, _y: number) => {},
+            jump: () => {},
+            setSprinting: (_isSprinting: boolean) => {},
+            isAutoWalking: false,
+            toggleAutoWalk: () => {},
+            stopAutoWalk: () => {},
+            isAutoAttacking: false,
+            toggleAutoAttack: () => {},
+            stopAutoAttack: () => {},
+            updateViewport: (_minX: number, _minY: number, _maxX: number, _maxY: number) => {},
+        };
     }
     return context;
 }; 

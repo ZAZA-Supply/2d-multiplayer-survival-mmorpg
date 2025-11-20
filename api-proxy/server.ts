@@ -17,20 +17,46 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables from project root (one level up)
+// Define envPath for error logging (used in both dev and production)
 const envPath = path.resolve(__dirname, '..', '.env');
-dotenv.config({ path: envPath });
 
-// Debug: Log where we're looking for .env
-console.log(`[Proxy] Looking for .env at: ${envPath}`);
-console.log(`[Proxy] .env file exists: ${fs.existsSync(envPath)}`);
+// Load environment variables from project root (one level up) in development only
+// Railway sets environment variables directly, so we don't need .env file in production
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: envPath });
+  console.log(`[Proxy] Looking for .env at: ${envPath}`);
+  console.log(`[Proxy] .env file exists: ${fs.existsSync(envPath)}`);
+}
 
 const app = express();
-const PORT = process.env.PROXY_PORT || 8002;
+// Railway sets PORT automatically, fallback to PROXY_PORT or 8002 for local dev
+const PORT = parseInt(process.env.PORT || process.env.PROXY_PORT || '8002', 10);
+
+// CORS configuration - allow both local dev and production origins
+const allowedOrigins = [
+  'http://localhost:3008',
+  'http://localhost:5173',
+  // Add your production client URL here (e.g., Railway client URL)
+  process.env.CLIENT_URL || 'https://broth-and-bullets-client-production.up.railway.app'
+].filter(Boolean); // Remove any undefined values
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:3008', 'http://localhost:5173'], // Your Vite dev server
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      // In production, be more strict; in dev, allow all
+      if (process.env.NODE_ENV === 'production') {
+        callback(new Error('Not allowed by CORS'));
+      } else {
+        callback(null, true); // Allow in development
+      }
+    }
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
@@ -174,9 +200,11 @@ app.post('/api/openai/chat', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Secure API Proxy Server running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Secure API Proxy Server running on port ${PORT}`);
+  console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`   OpenAI Whisper: POST /api/whisper/transcribe`);
   console.log(`   OpenAI Chat: POST /api/openai/chat`);
+  console.log(`   Health Check: GET /health`);
 });
 

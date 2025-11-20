@@ -306,7 +306,7 @@ export const useSpacetimeTables = ({
                     `SELECT * FROM planted_seed WHERE chunk_index = ${chunkIndex}`,
                     `SELECT * FROM sea_stack WHERE chunk_index = ${chunkIndex}`,
                     `SELECT * FROM foundation_cell WHERE chunk_index = ${chunkIndex}`,
-                    `SELECT * FROM wall_cell WHERE chunk_index = ${chunkIndex}`
+                    `SELECT * FROM wall_cell WHERE chunk_index = ${chunkIndex}`,
                 ];
                 newHandlesForChunk.push(timedBatchedSubscribe('Resources', resourceQueries));
                 
@@ -321,12 +321,7 @@ export const useSpacetimeTables = ({
                         environmentalQueries.push(`SELECT * FROM grass WHERE chunk_index = ${chunkIndex}`);
                     }
                 }
-                if (ENABLE_WORLD_TILES) {
-                    const worldWidthChunks = gameConfig.worldWidthChunks;
-                    const chunkX = chunkIndex % worldWidthChunks;
-                    const chunkY = Math.floor(chunkIndex / worldWidthChunks);
-                    environmentalQueries.push(`SELECT * FROM world_tile WHERE chunk_x = ${chunkX} AND chunk_y = ${chunkY}`);
-                }
+                // ENABLE_WORLD_TILES deprecated block removed
                 if (environmentalQueries.length > 0) {
                     newHandlesForChunk.push(timedBatchedSubscribe('Environmental', environmentalQueries));
                 }
@@ -363,12 +358,7 @@ export const useSpacetimeTables = ({
                         newHandlesForChunk.push(timedSubscribe('Grass(Full)', `SELECT * FROM grass WHERE chunk_index = ${chunkIndex}`));
                     }
                 }
-                if (ENABLE_WORLD_TILES) {
-                    const worldWidthChunks = gameConfig.worldWidthChunks;
-                    const chunkX = chunkIndex % worldWidthChunks;
-                    const chunkY = Math.floor(chunkIndex / worldWidthChunks);
-                    newHandlesForChunk.push(timedSubscribe('WorldTile', `SELECT * FROM world_tile WHERE chunk_x = ${chunkX} AND chunk_y = ${chunkY}`));
-                }
+                // ENABLE_WORLD_TILES deprecated block removed
             }
         } catch (error) {
             console.error(`[CHUNK_ERROR] Failed to create subscriptions for chunk ${chunkIndex}:`, error);
@@ -1499,9 +1489,9 @@ export const useSpacetimeTables = ({
             const currentInitialSubs = [
                  connection.subscriptionBuilder().onError((err) => console.error("[PLAYER Sub Error]:", err))
                     .subscribe('SELECT * FROM player'),
-                 connection.subscriptionBuilder().onError((err) => console.error("[RUNE_STONE Sub Error]:", err))
-                    .subscribe('SELECT * FROM rune_stone'), // Global subscription for minimap visibility
-                 connection.subscriptionBuilder().subscribe('SELECT * FROM item_definition'),
+                connection.subscriptionBuilder().onError((err) => console.error("[RUNE_STONE Sub Error]:", err))
+                   .subscribe('SELECT * FROM rune_stone'), // Global subscription for minimap visibility
+                connection.subscriptionBuilder().subscribe('SELECT * FROM item_definition'),
                  connection.subscriptionBuilder().subscribe('SELECT * FROM recipe'),
                  connection.subscriptionBuilder().subscribe('SELECT * FROM world_state'),
                  connection.subscriptionBuilder().onError((err) => console.error("[MINIMAP_CACHE Sub Error]:", err))
@@ -1705,20 +1695,14 @@ export const useSpacetimeTables = ({
                                     `SELECT * FROM planted_seed WHERE chunk_index = ${chunkIndex}`,
                                     `SELECT * FROM barrel WHERE chunk_index = ${chunkIndex}`, `SELECT * FROM sea_stack WHERE chunk_index = ${chunkIndex}`,
                                     `SELECT * FROM foundation_cell WHERE chunk_index = ${chunkIndex}`, // ADDED: Foundation initial spatial subscription
-                                    `SELECT * FROM wall_cell WHERE chunk_index = ${chunkIndex}` // ADDED: Wall initial spatial subscription
+                                    `SELECT * FROM wall_cell WHERE chunk_index = ${chunkIndex}`, // ADDED: Wall initial spatial subscription
                                 ];
                                 // Removed excessive initial chunk debug logging
                                 newHandlesForChunk.push(connection.subscriptionBuilder().onError((err) => console.error(`Resource Batch Sub Error (Chunk ${chunkIndex}):`, err)).subscribe(resourceQueries));
                                 
                                 const environmentalQueries = [];
                                 if (ENABLE_CLOUDS) environmentalQueries.push(`SELECT * FROM cloud WHERE chunk_index = ${chunkIndex}`);
-                                                            if (ENABLE_WORLD_TILES) {
-                                const worldWidthChunks = gameConfig.worldWidthChunks;
-                                const chunkX = chunkIndex % worldWidthChunks;
-                                const chunkY = Math.floor(chunkIndex / worldWidthChunks);
-                                // Removed excessive initial chunk coordinate debug logging
-                                environmentalQueries.push(`SELECT * FROM world_tile WHERE chunk_x = ${chunkX} AND chunk_y = ${chunkY}`);
-                            }
+                                // ENABLE_WORLD_TILES deprecated block removed
                                 if (environmentalQueries.length > 0) {
                                     newHandlesForChunk.push(connection.subscriptionBuilder().onError((err) => console.error(`Environmental Batch Sub Error (Chunk ${chunkIndex}):`, err)).subscribe(environmentalQueries));
                                 }
@@ -1880,7 +1864,6 @@ export const useSpacetimeTables = ({
         projectiles,
         deathMarkers,
         shelters,
-         
         minimapCache,
         playerDodgeRollStates: playerDodgeRollStatesRef.current,
         fishingSessions,

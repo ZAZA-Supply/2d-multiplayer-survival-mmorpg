@@ -148,6 +148,11 @@ pub fn place_sleeping_bag(ctx: &ReducerContext, item_instance_id: u64, world_x: 
         return Err("Cannot place sleeping bag on a wall.".to_string());
     }
 
+    // Check if placement position is on water (including hot springs)
+    if crate::environment::is_position_on_water(ctx, world_x, world_y) {
+        return Err("Cannot place sleeping bag on water.".to_string());
+    }
+
     // 5. Validate Collision with other Sleeping Bags
     for other_bag in sleeping_bags.iter() {
         let dx = world_x - other_bag.pos_x;

@@ -45,7 +45,9 @@ export type EffectType = EffectTypeVariants.HealthRegen |
   EffectTypeVariants.Exhausted |
   EffectTypeVariants.BuildingPrivilege |
   EffectTypeVariants.ProductionRune |
-  EffectTypeVariants.AgrarianRune;
+  EffectTypeVariants.AgrarianRune |
+  EffectTypeVariants.MemoryRune |
+  EffectTypeVariants.HotSpring;
 
 let _cached_EffectType_type_value: __AlgebraicTypeType | null = null;
 
@@ -73,6 +75,8 @@ export const EffectType = {
   BuildingPrivilege: { tag: "BuildingPrivilege" } as const,
   ProductionRune: { tag: "ProductionRune" } as const,
   AgrarianRune: { tag: "AgrarianRune" } as const,
+  MemoryRune: { tag: "MemoryRune" } as const,
+  HotSpring: { tag: "HotSpring" } as const,
 
   getTypeScriptAlgebraicType(): __AlgebraicTypeType {
     if (_cached_EffectType_type_value) return _cached_EffectType_type_value;
@@ -94,6 +98,8 @@ export const EffectType = {
       { name: "BuildingPrivilege", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "ProductionRune", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "AgrarianRune", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "MemoryRune", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "HotSpring", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
     );
     return _cached_EffectType_type_value;
   },

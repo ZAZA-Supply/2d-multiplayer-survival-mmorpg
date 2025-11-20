@@ -610,6 +610,15 @@ pub fn place_campfire(ctx: &ReducerContext, item_instance_id: u64, world_x: f32,
         return Err("Cannot place campfire on a wall.".to_string());
     }
     
+    // Check if placement position is on water (including hot springs)
+    let tile_x = (world_x / crate::TILE_SIZE_PX as f32).floor() as i32;
+    let tile_y = (world_y / crate::TILE_SIZE_PX as f32).floor() as i32;
+    if let Some(tile_type) = crate::get_tile_type_at_position(ctx, tile_x, tile_y) {
+        if tile_type.is_water() {
+            return Err("Cannot place campfire on water.".to_string());
+        }
+    }
+    
     for other_fire in campfires.iter() {
         let dx_fire = world_x - other_fire.pos_x;
         let dy_fire = world_y - other_fire.pos_y;

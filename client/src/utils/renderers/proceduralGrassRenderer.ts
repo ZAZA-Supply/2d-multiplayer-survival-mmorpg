@@ -40,12 +40,18 @@ export class ProceduralGrassRenderer {
     }
 
     // Generate grass for a specific world tile (48x48 pixels)
-    public getGrassForTile(tileX: number, tileY: number): GrassInstance[] {
+    public getGrassForTile(tileX: number, tileY: number, tileType?: string): GrassInstance[] {
         const tileKey = `${tileX},${tileY}`;
         
         // Check cache first
         if (this.grassCache.has(tileKey)) {
             return this.grassCache.get(tileKey)!;
+        }
+
+        // Don't generate grass on water tiles (Sea or HotSpringWater)
+        if (tileType === 'Sea' || tileType === 'HotSpringWater') {
+            this.grassCache.set(tileKey, []);
+            return [];
         }
 
         const grass: GrassInstance[] = [];
@@ -78,7 +84,8 @@ export class ProceduralGrassRenderer {
         cameraX: number, 
         cameraY: number, 
         viewportWidth: number, 
-        viewportHeight: number
+        viewportHeight: number,
+        getTileType?: (tileX: number, tileY: number) => string | null
     ): GrassInstance[] {
         const allGrass: GrassInstance[] = [];
         
@@ -92,7 +99,9 @@ export class ProceduralGrassRenderer {
         // Generate grass for all visible tiles
         for (let tileX = startTileX; tileX <= endTileX; tileX++) {
             for (let tileY = startTileY; tileY <= endTileY; tileY++) {
-                const tileGrass = this.getGrassForTile(tileX, tileY);
+                // Get tile type if function provided
+                const tileType = getTileType ? getTileType(tileX, tileY) : undefined;
+                const tileGrass = this.getGrassForTile(tileX, tileY, tileType ?? undefined);
                 
                 // Filter to only grass actually in viewport
                 for (const grass of tileGrass) {

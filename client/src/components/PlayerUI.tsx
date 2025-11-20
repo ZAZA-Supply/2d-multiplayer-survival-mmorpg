@@ -764,7 +764,7 @@ const PlayerUI: React.FC<PlayerUIProps> = ({
                             name: 'Cozy',
                             emoji: '🧣',
                             type: 'positive' as const,
-                            description: 'Comfortable near a campfire or in your shelter.',
+                            description: 'Feeling warm and comfortable.',
                             // No duration - permanent effect
                         };
                         break;
@@ -808,7 +808,7 @@ const PlayerUI: React.FC<PlayerUIProps> = ({
                             name: 'Production Zone',
                             emoji: '⚙️',
                             type: 'positive' as const,
-                            description: 'Within a red rune stone\'s influence. ALL crafting 50% faster (1.5x speed).',
+                            description: 'Within a red rune stone\'s influence.',
                             // No duration - permanent while in zone
                         };
                         break;
@@ -819,8 +819,30 @@ const PlayerUI: React.FC<PlayerUIProps> = ({
                             name: 'Agrarian Zone',
                             emoji: '🌾',
                             type: 'positive' as const,
-                            description: 'Within a green rune stone\'s influence. ALL plants grow 50% faster (1.5x speed).',
+                            description: 'Within a green rune stone\'s influence.',
                             // No duration - permanent while in zone
+                        };
+                        break;
+                    case 'MemoryRune':
+                        effectApplies = true;
+                        effectData = {
+                            id: 'memory_rune',
+                            name: 'Echoes Resonate',
+                            emoji: '🔮',
+                            type: 'neutral' as const,
+                            description: 'The ancient stone whispers forgotten truths. When darkness falls, fragments of lost memories crystallize from the aether.',
+                            // No duration - permanent while in zone
+                        };
+                        break;
+                    case 'HotSpring':
+                        effectApplies = true;
+                        effectData = {
+                            id: 'hot_spring',
+                            name: 'Hot Spring',
+                            emoji: '♨️',
+                            type: 'positive' as const,
+                            description: 'Soaking in healing hot spring waters.',
+                            // No duration - permanent while in hot spring
                         };
                         break;
                     case 'BuildingPrivilege':

@@ -103,6 +103,7 @@ export function getTileTypeFromChunkData(connection: DbConnection | null, tileX:
                     case 3: return 'Sea';
                     case 4: return 'Beach';
                     case 5: return 'Sand';
+                    case 6: return 'HotSpringWater'; // Hot spring water pools
                     default: return 'Grass';
                 }
             }
@@ -114,7 +115,7 @@ export function getTileTypeFromChunkData(connection: DbConnection | null, tileX:
 }
 
 /**
- * Checks if a world position is on a water tile (Sea type).
+ * Checks if a world position is on a water tile (Sea or HotSpringWater type).
  * Uses compressed chunk data for efficient lookup.
  * Returns true if the position is on water.
  */
@@ -127,7 +128,8 @@ function isPositionOnWater(connection: DbConnection | null, worldX: number, worl
     
     // Use compressed chunk data lookup
     const tileType = getTileTypeFromChunkData(connection, tileX, tileY);
-    return tileType === 'Sea';
+    // Block placement on both regular water (Sea) and hot spring water
+    return tileType === 'Sea' || tileType === 'HotSpringWater';
 }
 
 /**

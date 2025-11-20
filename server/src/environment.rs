@@ -29,6 +29,7 @@ use crate::{
     plants_database,
     items::ItemDefinition,
     rune_stone::{RuneStone, RuneStoneType},
+    // REMOVED: hot_spring::HotSpring, - No longer using hot spring entities
     utils::*,
     WORLD_WIDTH_TILES, WORLD_HEIGHT_TILES, WORLD_WIDTH_PX, WORLD_HEIGHT_PX, TILE_SIZE_PX,
     PLAYER_RADIUS,
@@ -210,6 +211,61 @@ pub fn is_position_on_beach_tile(ctx: &ReducerContext, pos_x: f32, pos_y: f32) -
     false
 }
 
+/// Checks if position is in a hot spring area (HotSpringWater tile or nearby)
+/// Used to prevent trees/stones from spawning in hot spring pools
+pub fn is_position_in_hot_spring_area(ctx: &ReducerContext, pos_x: f32, pos_y: f32) -> bool {
+    // Convert pixel position to tile coordinates
+    let tile_x = (pos_x / crate::TILE_SIZE_PX as f32).floor() as i32;
+    let tile_y = (pos_y / crate::TILE_SIZE_PX as f32).floor() as i32;
+    
+    // Check a radius around the position (hot springs are ~7-9 tiles radius, check up to 12 tiles away)
+    let check_radius = 12; // Check 12 tiles in each direction to clear a nice area
+    
+    for dy in -check_radius..=check_radius {
+        for dx in -check_radius..=check_radius {
+            let check_x = tile_x + dx;
+            let check_y = tile_y + dy;
+            
+            // Skip if out of bounds
+            if check_x < 0 || check_y < 0 || 
+               check_x >= WORLD_WIDTH_TILES as i32 || check_y >= WORLD_HEIGHT_TILES as i32 {
+                continue;
+            }
+            
+            // Check if this tile is HotSpringWater
+            if let Some(tile_type) = crate::get_tile_type_at_position(ctx, check_x, check_y) {
+                if tile_type == crate::TileType::HotSpringWater {
+                    // Calculate distance from position to this hot spring tile
+                    let dx_px = (check_x as f32 - tile_x as f32) * crate::TILE_SIZE_PX as f32;
+                    let dy_px = (check_y as f32 - tile_y as f32) * crate::TILE_SIZE_PX as f32;
+                    let dist_sq = dx_px * dx_px + dy_px * dy_px;
+                    
+                    // Block spawning within 600px of hot spring water (hot springs are ~336-432px diameter, so 600px gives nice clearance)
+                    if dist_sq < (600.0 * 600.0) {
+                        return true;
+                    }
+                }
+            } else {
+                // Fallback: Use database query if compressed data not available
+                let world_tiles = ctx.db.world_tile();
+                for tile in world_tiles.idx_world_position().filter((check_x, check_y)) {
+                    if tile.tile_type == crate::TileType::HotSpringWater {
+                        let dx_px = (check_x as f32 - tile_x as f32) * crate::TILE_SIZE_PX as f32;
+                        let dy_px = (check_y as f32 - tile_y as f32) * crate::TILE_SIZE_PX as f32;
+                        let dist_sq = dx_px * dx_px + dy_px * dy_px;
+                        if dist_sq < (600.0 * 600.0) {
+                            return true;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    
+    false
+}
+
 /// Helper function to check if a sea tile is too close to beach tiles
 /// Sea stacks should only spawn in deep ocean water, not near shallow coastal areas
 fn is_too_close_to_beach(ctx: &ReducerContext, tile_x: i32, tile_y: i32) -> bool {
@@ -281,7 +337,7 @@ pub fn is_position_on_ocean_water(ctx: &ReducerContext, pos_x: f32, pos_y: f32) 
     
     // Use the multi-column index to efficiently find the tile at (world_x, world_y)
     for tile in world_tiles.idx_world_position().filter((tile_x, tile_y)) {
-        if tile.tile_type == TileType::Sea {
+        if tile.tile_type.is_water() { // Includes both Sea and HotSpringWater
             // Check if it's ocean water (not inland water like rivers/lakes)
             if !is_tile_inland_water(ctx, tile_x, tile_y) {
                 // Also check that it's not too close to beach tiles
@@ -294,8 +350,8 @@ pub fn is_position_on_ocean_water(ctx: &ReducerContext, pos_x: f32, pos_y: f32) 
     false
 }
 
-/// Checks if the given world position is on a water tile (Sea)
-/// Returns true if the position is on water and resources should NOT spawn there
+/// Checks if the given world position is on a water tile (Sea or HotSpringWater)
+/// Returns true if the position is on water and resources/placeables should NOT spawn there
 /// NEW: Uses compressed chunk data for much better performance
 pub fn is_position_on_water(ctx: &ReducerContext, pos_x: f32, pos_y: f32) -> bool {
     // Convert pixel position to tile coordinates
@@ -310,7 +366,7 @@ pub fn is_position_on_water(ctx: &ReducerContext, pos_x: f32, pos_y: f32) -> boo
     
     // NEW: Try compressed lookup first for better performance
     if let Some(tile_type) = crate::get_tile_type_at_position(ctx, tile_x, tile_y) {
-        return tile_type == crate::TileType::Sea;
+        return tile_type.is_water(); // Includes both Sea and HotSpringWater
     }
     
     // FALLBACK: Use original method if compressed data not available
@@ -318,7 +374,7 @@ pub fn is_position_on_water(ctx: &ReducerContext, pos_x: f32, pos_y: f32) -> boo
     
     // Use the multi-column index to efficiently find the tile at (world_x, world_y)
     for tile in world_tiles.idx_world_position().filter((tile_x, tile_y)) {
-        return tile.tile_type == TileType::Sea;
+        return tile.tile_type.is_water(); // Includes both Sea and HotSpringWater
     }
     
     // If no tile found at these exact coordinates, default to non-water
@@ -357,7 +413,7 @@ pub fn is_position_on_inland_water(ctx: &ReducerContext, pos_x: f32, pos_y: f32)
     // Find the tile at this position
     let world_tiles = ctx.db.world_tile();
     for tile in world_tiles.idx_world_position().filter((tile_x, tile_y)) {
-        if tile.tile_type == TileType::Sea {
+        if tile.tile_type.is_water() { // Includes both Sea and HotSpringWater
             // It's a water tile, now determine if it's inland or ocean water
             return is_tile_inland_water(ctx, tile_x, tile_y);
         }
@@ -373,7 +429,7 @@ pub fn is_tile_inland_water(ctx: &ReducerContext, tile_x: i32, tile_y: i32) -> b
     let world_tiles = ctx.db.world_tile();
     let mut is_water = false;
     for tile in world_tiles.idx_world_position().filter((tile_x, tile_y)) {
-        is_water = tile.tile_type == TileType::Sea;
+        is_water = tile.tile_type.is_water(); // Includes both Sea and HotSpringWater
         break;
     }
     
@@ -436,7 +492,7 @@ fn is_position_in_lake_area(ctx: &ReducerContext, pos_x: f32, pos_y: f32) -> boo
             
             // Check if this tile is water
             for tile in world_tiles.idx_world_position().filter((check_x, check_y)) {
-                if tile.tile_type == TileType::Sea {
+                if tile.tile_type.is_water() { // Includes both Sea and HotSpringWater
                     water_tile_count += 1;
                 }
                 break; // Only check the first tile found at this position
@@ -475,7 +531,7 @@ pub fn is_wild_animal_location_suitable(ctx: &ReducerContext, pos_x: f32, pos_y:
     }
     
     // Block water tiles for all animals
-    if tile_type == TileType::Sea {
+    if tile_type.is_water() { // Includes both Sea and HotSpringWater
         return false;
     }
     
@@ -676,7 +732,7 @@ pub fn validate_spawn_location(
                     let check_y = tile_y + dy;
                     
                     for tile in world_tiles.idx_world_position().filter((check_x, check_y)) {
-                        if tile.tile_type == TileType::Sea {
+                        if tile.tile_type.is_water() { // Includes both Sea and HotSpringWater
                             // Make sure we're on a reasonable tile ourselves
                             if matches!(current_tile_type, Some(TileType::Grass | TileType::Dirt | TileType::Beach)) {
                                 return true;
@@ -692,8 +748,8 @@ pub fn validate_spawn_location(
             // Reed: Must spawn DIRECTLY IN inland water tiles (not on edges)
             // Check if the spawn position itself is an inland water tile
             for tile in world_tiles.idx_world_position().filter((tile_x, tile_y)) {
-                // Must be a water tile (Sea type) AND inland water (not ocean)
-                if tile.tile_type == TileType::Sea && is_tile_inland_water(ctx, tile_x, tile_y) {
+                // Must be a water tile (Sea or HotSpringWater) AND inland water (not ocean)
+                if tile.tile_type.is_water() && is_tile_inland_water(ctx, tile_x, tile_y) {
                     return true;
                 }
                 break;
@@ -776,8 +832,8 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
     let target_stone_count = (total_tiles as f32 * crate::stone::STONE_DENSITY_PERCENT) as u32;
     let max_stone_attempts = target_stone_count * crate::tree::MAX_TREE_SEEDING_ATTEMPTS_FACTOR;
     let target_sea_stack_count = (total_tiles as f32 * SEA_STACK_DENSITY_PERCENT) as u32;
-    let max_sea_stack_attempts = target_sea_stack_count * crate::tree::MAX_TREE_SEEDING_ATTEMPTS_FACTOR; 
-    
+    let max_sea_stack_attempts = target_sea_stack_count * crate::tree::MAX_TREE_SEEDING_ATTEMPTS_FACTOR;
+
     // SEASONAL SEEDING: Calculate targets for harvestable resources based on current season
     let current_season = crate::world_state::get_current_season(ctx)
         .unwrap_or_else(|_| {
@@ -835,6 +891,7 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("Target Trees: {}, Max Attempts: {}", target_tree_count, max_tree_attempts);
     log::info!("Target Stones: {}, Max Attempts: {}", target_stone_count, max_stone_attempts);
     log::info!("Target Sea Stacks: {}, Max Attempts: {}", target_sea_stack_count, max_sea_stack_attempts);
+    log::info!("🌊 Hot Springs: Generated as HotSpringWater tiles during world generation (no entities)");
     
     // Log harvestable resource targets
     for (plant_type, target_count) in &plant_targets {
@@ -854,6 +911,7 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
     let mut spawned_tree_positions = Vec::<(f32, f32)>::new();
     let mut spawned_stone_positions = Vec::<(f32, f32)>::new();
     let mut spawned_sea_stack_positions = Vec::<(f32, f32)>::new();
+    // REMOVED: let mut spawned_hot_spring_positions = Vec::<(f32, f32)>::new(); // No longer needed (using tile type)
     let mut spawned_harvestable_positions = Vec::<(f32, f32)>::new(); // Unified for all plants
     let mut spawned_cloud_positions = Vec::<(f32, f32)>::new();
     let mut spawned_wild_animal_positions = Vec::<(f32, f32)>::new();
@@ -865,6 +923,9 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
     let mut stone_attempts = 0;
     let mut spawned_sea_stack_count = 0;
     let mut sea_stack_attempts = 0;
+    // REMOVED: Hot spring entity counters (now using HotSpringWater tile type)
+    // let mut spawned_hot_spring_count = 0;
+    // let mut hot_spring_attempts = 0;
     
     // Unified tracking for harvestable resources
     let mut plant_spawned_counts = std::collections::HashMap::new();
@@ -968,7 +1029,7 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
                 }
             },
             (tree_type_roll_for_this_attempt, tree_resource_amount), // Pass both values as extra_args
-            |pos_x, pos_y| is_position_on_water(ctx, pos_x, pos_y) || is_position_in_central_compound(pos_x, pos_y), // Block water and central compound for trees
+            |pos_x, pos_y| is_position_on_water(ctx, pos_x, pos_y) || is_position_in_central_compound(pos_x, pos_y) || is_position_in_hot_spring_area(ctx, pos_x, pos_y), // Block water, central compound, and hot springs for trees
             trees,
         ) {
             Ok(true) => spawned_tree_count += 1,
@@ -1018,7 +1079,7 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
                 }
             },
             stone_resource_amount, // Pass the resource amount as extra_args
-            |pos_x, pos_y| is_position_on_water(ctx, pos_x, pos_y) || is_position_in_central_compound(pos_x, pos_y), // Block water and central compound for stones
+            |pos_x, pos_y| is_position_on_water(ctx, pos_x, pos_y) || is_position_in_central_compound(pos_x, pos_y) || is_position_in_hot_spring_area(ctx, pos_x, pos_y), // Block water, central compound, and hot springs for stones
             stones,
         ) {
             Ok(true) => spawned_stone_count += 1,
@@ -1090,6 +1151,16 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
         "Finished seeding {} sea stacks (target: {}, attempts: {}).",
         spawned_sea_stack_count, target_sea_stack_count, sea_stack_attempts
     );
+
+    // --- DISABLED: Hot Spring Entity Spawning (now using HotSpringWater tile type instead) ---
+    // Hot springs are now handled purely via the HotSpringWater tile type
+    // No need for entities - the healing effect triggers when standing on HotSpringWater tiles
+    // The minimap will show them in bright white/cyan color
+    log::info!("Hot springs are now generated as HotSpringWater tiles (no entities needed)");
+    
+    
+    // Set counters to 0 since we're not spawning entities anymore
+    let spawned_hot_spring_count = 0;
 
     // --- Seed Harvestable Resources (Unified System) ---
     log::info!("Seeding Harvestable Resources using unified system...");
@@ -1696,7 +1767,7 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
     }
     
     log::info!(
-        "Environment seeding complete! Summary: Trees: {}, Stones: {}, Sea Stacks: {}, Harvestable Resources: [{}], Clouds: {}, Wild Animals: {}, Grass: {}, Barrels: {}",
+        "Environment seeding complete! Summary: Trees: {}, Stones: {}, Sea Stacks: {}, Hot Springs: [tile-based], Harvestable Resources: [{}], Clouds: {}, Wild Animals: {}, Grass: {}, Barrels: {}",
         spawned_tree_count, spawned_stone_count, spawned_sea_stack_count, harvestable_summary,
         spawned_cloud_count, spawned_wild_animal_count, spawned_grass_count, ctx.db.barrel().iter().count()
     );
@@ -1820,11 +1891,15 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
         // Pre-generate effect configs BEFORE calling attempt_single_spawn to avoid borrowing rng twice
         let (agrarian_config, production_config, memory_shard_config) = match rune_type {
             crate::rune_stone::RuneStoneType::Green => {
-                // Simplified: Boosts ALL plants at 1.5x - no need to track specific plants
+                // Generate a unique random seed loot table for this rune stone
+                let seed_loot_table = crate::rune_stone::generate_random_seed_loot_table(&mut rng);
+                log::info!("Generated seed loot table for green rune stone: {:?}", seed_loot_table);
+                
                 (Some(crate::rune_stone::AgrarianEffectConfig {
-                    plants_spawned_this_night: 0,
-                    last_plant_spawn_time: None,
+                    seeds_spawned_this_night: 0,
+                    last_seed_spawn_time: None,
                     night_start_time: None,
+                    seed_loot_table,
                 }), None, None)
             }
             crate::rune_stone::RuneStoneType::Red => {

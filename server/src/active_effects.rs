@@ -59,6 +59,8 @@ pub enum EffectType {
     BuildingPrivilege, // Allows building structures near homestead hearths
     ProductionRune, // Near a red production rune stone (2x crafting speed)
     AgrarianRune, // Near a green agrarian rune stone (2x plant growth)
+    MemoryRune, // Near a blue memory rune stone (spawns memory shards at night)
+    HotSpring, // Healing effect from standing in a hot spring
 }
 
 // Table defining food poisoning risks for different food items
@@ -114,11 +116,11 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
             continue;
         }
 
-        // Skip cozy, tree cover, exhausted, building privilege, and rune stone effects - they are managed by other systems, not the effect tick system
-        // Wet effects are now processed normally like other effects
-        if effect.effect_type == EffectType::Cozy || effect.effect_type == EffectType::TreeCover || effect.effect_type == EffectType::Exhausted || effect.effect_type == EffectType::BuildingPrivilege || effect.effect_type == EffectType::ProductionRune || effect.effect_type == EffectType::AgrarianRune {
-            continue;
-        }
+    // Skip cozy, tree cover, exhausted, building privilege, rune stone effects, and hot spring - they are managed by other systems, not the effect tick system
+    // Wet effects are now processed normally like other effects
+    if effect.effect_type == EffectType::Cozy || effect.effect_type == EffectType::TreeCover || effect.effect_type == EffectType::Exhausted || effect.effect_type == EffectType::BuildingPrivilege || effect.effect_type == EffectType::ProductionRune || effect.effect_type == EffectType::AgrarianRune || effect.effect_type == EffectType::MemoryRune || effect.effect_type == EffectType::HotSpring {
+        continue;
+    }
 
         let mut effect_ended = false;
         let mut player_effect_applied_this_iteration = false; // Tracks if this specific effect iteration changed player health
@@ -159,7 +161,7 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
                         effect.target_player_id
                     },
                     // Other effect types shouldn't reach this code path, but we need to handle them
-                    EffectType::HealthRegen | EffectType::Burn | EffectType::Bleed | EffectType::Venom | EffectType::SeawaterPoisoning | EffectType::FoodPoisoning | EffectType::Cozy | EffectType::Wet | EffectType::TreeCover | EffectType::WaterDrinking | EffectType::Exhausted | EffectType::BuildingPrivilege | EffectType::ProductionRune | EffectType::AgrarianRune => {
+                    EffectType::HealthRegen | EffectType::Burn | EffectType::Bleed | EffectType::Venom | EffectType::SeawaterPoisoning | EffectType::FoodPoisoning | EffectType::Cozy | EffectType::Wet | EffectType::TreeCover | EffectType::WaterDrinking | EffectType::Exhausted | EffectType::BuildingPrivilege | EffectType::ProductionRune | EffectType::AgrarianRune | EffectType::MemoryRune | EffectType::HotSpring => {
                         log::warn!("[EffectTick] Unexpected effect type {:?} in bandage processing", effect.effect_type);
                         Some(effect.player_id)
                     }
@@ -380,6 +382,12 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
                             // It just exists for the duration to trigger client-side animations
                             amount_this_tick = 0.0;
                         }
+                        EffectType::HotSpring => {
+                            // HotSpring provides continuous healing while standing in the hot spring
+                            // The healing is handled by player_stats.rs checking position
+                            // This effect doesn't consume amount_applied_so_far
+                            amount_this_tick = 0.0;
+                        }
                         EffectType::Cozy => {
                             // Cozy provides health regeneration bonus and food healing bonus
                             // The health regen bonus is handled in player_stats.rs
@@ -420,6 +428,12 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
                         EffectType::AgrarianRune => {
                             // AgrarianRune provides 2x plant growth in green rune stone zones
                             // The growth speed bonus is handled in plant growth system
+                            // This effect doesn't consume amount_applied_so_far
+                            amount_this_tick = 0.0;
+                        },
+                        EffectType::MemoryRune => {
+                            // MemoryRune spawns memory shards at night in blue rune stone zones
+                            // The spawning is handled in rune stone scheduled reducers
                             // This effect doesn't consume amount_applied_so_far
                             amount_this_tick = 0.0;
                         },
@@ -1547,6 +1561,7 @@ pub fn update_player_rune_stone_zone_effects(ctx: &ReducerContext, player_id: Id
     
     let mut in_production_zone = false;
     let mut in_agrarian_zone = false;
+    let mut in_memory_zone = false;
     
     // Check all rune stones to see if player is in their effect radius
     for rune_stone in ctx.db.rune_stone().iter() {
@@ -1558,7 +1573,7 @@ pub fn update_player_rune_stone_zone_effects(ctx: &ReducerContext, player_id: Id
             match rune_stone.rune_type {
                 RuneStoneType::Red => in_production_zone = true,
                 RuneStoneType::Green => in_agrarian_zone = true,
-                RuneStoneType::Blue => {}, // Blue runes don't provide a status effect
+                RuneStoneType::Blue => in_memory_zone = true,
             }
         }
     }
@@ -1579,6 +1594,14 @@ pub fn update_player_rune_stone_zone_effects(ctx: &ReducerContext, player_id: Id
         remove_agrarian_rune_effect(ctx, player_id);
     }
     
+    // Update memory rune effect
+    let has_memory_effect = player_has_memory_rune_effect(ctx, player_id);
+    if in_memory_zone && !has_memory_effect {
+        apply_memory_rune_effect(ctx, player_id)?;
+    } else if !in_memory_zone && has_memory_effect {
+        remove_memory_rune_effect(ctx, player_id);
+    }
+    
     Ok(())
 }
 
@@ -1592,6 +1615,12 @@ pub fn player_has_production_rune_effect(ctx: &ReducerContext, player_id: Identi
 pub fn player_has_agrarian_rune_effect(ctx: &ReducerContext, player_id: Identity) -> bool {
     ctx.db.active_consumable_effect().iter()
         .any(|effect| effect.player_id == player_id && effect.effect_type == EffectType::AgrarianRune)
+}
+
+/// Checks if a player has the memory rune effect
+pub fn player_has_memory_rune_effect(ctx: &ReducerContext, player_id: Identity) -> bool {
+    ctx.db.active_consumable_effect().iter()
+        .any(|effect| effect.player_id == player_id && effect.effect_type == EffectType::MemoryRune)
 }
 
 /// Applies production rune zone effect
@@ -1681,5 +1710,147 @@ fn remove_agrarian_rune_effect(ctx: &ReducerContext, player_id: Identity) {
     for effect_id in effects_to_remove {
         ctx.db.active_consumable_effect().effect_id().delete(&effect_id);
         log::info!("Removed agrarian rune zone effect {} from player {:?}", effect_id, player_id);
+    }
+}
+
+/// Applies memory rune zone effect
+fn apply_memory_rune_effect(ctx: &ReducerContext, player_id: Identity) -> Result<(), String> {
+    let current_time = ctx.timestamp;
+    let very_far_future = current_time + TimeDuration::from_micros(365 * 24 * 60 * 60 * 1_000_000i64);
+    
+    let effect = ActiveConsumableEffect {
+        effect_id: 0,
+        player_id,
+        target_player_id: None,
+        item_def_id: 0,
+        consuming_item_instance_id: None,
+        started_at: current_time,
+        ends_at: very_far_future,
+        total_amount: None,
+        amount_applied_so_far: None,
+        effect_type: EffectType::MemoryRune,
+        tick_interval_micros: 1_000_000,
+        next_tick_at: current_time + TimeDuration::from_micros(1_000_000),
+    };
+    
+    match ctx.db.active_consumable_effect().try_insert(effect) {
+        Ok(inserted) => {
+            log::info!("Applied memory rune zone effect {} to player {:?}", inserted.effect_id, player_id);
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("Failed to apply memory rune effect: {:?}", e);
+            Err("Failed to apply memory rune effect".to_string())
+        }
+    }
+}
+
+/// Removes memory rune zone effect
+fn remove_memory_rune_effect(ctx: &ReducerContext, player_id: Identity) {
+    let effects_to_remove: Vec<_> = ctx.db.active_consumable_effect().iter()
+        .filter(|e| e.player_id == player_id && e.effect_type == EffectType::MemoryRune)
+        .map(|e| e.effect_id)
+        .collect();
+    
+    for effect_id in effects_to_remove {
+        ctx.db.active_consumable_effect().effect_id().delete(&effect_id);
+        log::info!("Removed memory rune zone effect {} from player {:?}", effect_id, player_id);
+    }
+}
+
+// Hot Spring Effect Management
+// ============================
+
+/// Checks if a player is currently standing in a hot spring (tile-based detection)
+pub fn is_player_in_hot_spring(ctx: &ReducerContext, player_x: f32, player_y: f32) -> bool {
+    // Convert player position to tile coordinates
+    let tile_x = (player_x / crate::TILE_SIZE_PX as f32).floor() as i32;
+    let tile_y = (player_y / crate::TILE_SIZE_PX as f32).floor() as i32;
+    
+    // Check if the player is standing on a HotSpringWater tile
+    if let Some(tile_type) = crate::get_tile_type_at_position(ctx, tile_x, tile_y) {
+        return tile_type == crate::TileType::HotSpringWater;
+    }
+    
+    false
+}
+
+/// Updates hot spring healing effect for a player based on their position
+/// Hot springs provide healing and cold immunity, but NOT cozy effect
+pub fn update_player_hot_spring_status(ctx: &ReducerContext, player_id: Identity, player_x: f32, player_y: f32) -> Result<(), String> {
+    let is_in_hot_spring = is_player_in_hot_spring(ctx, player_x, player_y);
+    let has_hot_spring_effect = player_has_hot_spring_effect(ctx, player_id);
+    
+    log::debug!("Hot spring status check for player {:?}: in_hot_spring={}, has_hot_spring_effect={}", 
+        player_id, is_in_hot_spring, has_hot_spring_effect);
+    
+    if is_in_hot_spring {
+        // Apply hot spring effect if not present (provides healing + cold immunity)
+        if !has_hot_spring_effect {
+            log::info!("Applying hot spring effect to player {:?} (healing + cold immunity)", player_id);
+            apply_hot_spring_effect(ctx, player_id)?;
+        }
+    } else {
+        // Remove hot spring effect when player leaves
+        if has_hot_spring_effect {
+            log::info!("Removing hot spring effect from player {:?}", player_id);
+            remove_hot_spring_effect(ctx, player_id);
+        }
+    }
+    
+    Ok(())
+}
+
+/// Checks if a player currently has the hot spring effect active
+pub fn player_has_hot_spring_effect(ctx: &ReducerContext, player_id: Identity) -> bool {
+    ctx.db.active_consumable_effect().iter()
+        .any(|effect| effect.player_id == player_id && effect.effect_type == EffectType::HotSpring)
+}
+
+/// Applies hot spring healing effect to a player
+fn apply_hot_spring_effect(ctx: &ReducerContext, player_id: Identity) -> Result<(), String> {
+    let current_time = ctx.timestamp;
+    // Set a very far future time (1 year from now) - effectively permanent
+    let very_far_future = current_time + TimeDuration::from_micros(365 * 24 * 60 * 60 * 1_000_000i64);
+    
+    let hot_spring_effect = ActiveConsumableEffect {
+        effect_id: 0, // auto_inc
+        player_id,
+        target_player_id: None,
+        item_def_id: 0, // Not from an item
+        consuming_item_instance_id: None,
+        started_at: current_time,
+        ends_at: very_far_future, // Effectively permanent
+        total_amount: None, // No accumulation for hot spring effect
+        amount_applied_so_far: None,
+        effect_type: EffectType::HotSpring,
+        tick_interval_micros: 1_000_000, // 1 second ticks
+        next_tick_at: current_time + TimeDuration::from_micros(1_000_000),
+    };
+    
+    match ctx.db.active_consumable_effect().try_insert(hot_spring_effect) {
+        Ok(inserted_effect) => {
+            log::info!("Applied hot spring healing effect {} to player {:?}", inserted_effect.effect_id, player_id);
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("Failed to apply hot spring effect to player {:?}: {:?}", player_id, e);
+            Err("Failed to apply hot spring effect".to_string())
+        }
+    }
+}
+
+/// Removes hot spring effect from a player
+fn remove_hot_spring_effect(ctx: &ReducerContext, player_id: Identity) {
+    let mut effects_to_remove = Vec::new();
+    for effect in ctx.db.active_consumable_effect().iter() {
+        if effect.player_id == player_id && effect.effect_type == EffectType::HotSpring {
+            effects_to_remove.push(effect.effect_id);
+        }
+    }
+    
+    for effect_id in effects_to_remove {
+        ctx.db.active_consumable_effect().effect_id().delete(&effect_id);
+        log::info!("Removed hot spring effect {} from player {:?}", effect_id, player_id);
     }
 }

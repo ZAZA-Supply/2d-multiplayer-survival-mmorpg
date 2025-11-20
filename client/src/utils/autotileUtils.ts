@@ -378,6 +378,14 @@ export const AUTOTILE_CONFIGS: { [key: string]: AutotileConfig } = {
         columns: 6,    // 6 columns: 1280 ÷ 6 ≈ 213.33 pixels wide
         rows: 8        // 8 rows: 1280 ÷ 8 = 160 pixels tall
     },
+    'Grass_HotSpringWater': {
+        primaryType: 'Grass',
+        secondaryType: 'HotSpringWater',
+        tilesetPath: grassBeachAutotile, // Use grass-beach tileset for grass-to-hotspring transitions
+        tileSize: 213,
+        columns: 6,
+        rows: 8
+    },
     'Beach_Sea': {
         primaryType: 'Beach',
         secondaryType: 'Sea',
@@ -385,6 +393,22 @@ export const AUTOTILE_CONFIGS: { [key: string]: AutotileConfig } = {
         tileSize: 213, // Keep this for compatibility, but actual sprite size differs
         columns: 6,    // 6 columns: 1280 ÷ 6 ≈ 213.33 pixels wide
         rows: 8        // 8 rows: 1280 ÷ 8 = 160 pixels tall
+    },
+    'Beach_HotSpringWater': {
+        primaryType: 'Beach',
+        secondaryType: 'HotSpringWater',
+        tilesetPath: beachSeaAutotile, // Use same tileset as Beach_Sea
+        tileSize: 213,
+        columns: 6,
+        rows: 8
+    },
+    'HotSpringWater_Beach': {
+        primaryType: 'HotSpringWater',
+        secondaryType: 'Beach',
+        tilesetPath: beachSeaAutotile, // Use same tileset as Beach_Sea
+        tileSize: 213,
+        columns: 6,
+        rows: 8
     },
     'Dirt_Beach': {
         primaryType: 'Dirt',
@@ -567,10 +591,19 @@ export function getAutotilesForTile(
     for (const [configKey, config] of Object.entries(AUTOTILE_CONFIGS)) {
         // Only check configs where this tile is the primary type
         if (tileType === config.primaryType) {
-            // SPECIAL CASE: Do NOT generate DirtRoad -> Grass transitions on DirtRoad tiles.
+            // SPECIAL CASE 1: Do NOT generate DirtRoad -> Grass transitions on DirtRoad tiles.
             // We only want the Grass tiles to transition into DirtRoad (Grass_DirtRoad),
             // not the other way around, so inner road tiles stay as pure DirtRoad.
             if (config.primaryType === 'DirtRoad' && config.secondaryType === 'Grass') {
+                continue;
+            }
+
+            // SPECIAL CASE 2: Do NOT autotile HotSpringWater itself.
+            // The world generator already bakes a clean HotSpringWater interior with a 2–3 tile
+            // Beach ring around it. If we let HotSpringWater autotile against Beach, we end up
+            // with an extra \"foam\" band *inside* the pool (an unwanted inner transition layer).
+            // Beach tiles handle the Beach <-> HotSpringWater transition visuals on their side.
+            if (config.primaryType === 'HotSpringWater') {
                 continue;
             }
 

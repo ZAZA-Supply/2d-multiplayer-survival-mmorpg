@@ -292,6 +292,11 @@ pub fn place_lantern(ctx: &ReducerContext, item_instance_id: u64, world_x: f32, 
         return Err("Cannot place lantern on a wall.".to_string());
     }
 
+    // Check if placement position is on water (including hot springs)
+    if crate::environment::is_position_on_water(ctx, world_x, world_y) {
+        return Err("Cannot place lantern on water.".to_string());
+    }
+
     // Check for collision with other lanterns
     for other_lantern in lanterns.iter() {
         let dx_lantern = world_x - other_lantern.pos_x;

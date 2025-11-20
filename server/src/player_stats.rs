@@ -352,27 +352,51 @@ pub fn process_player_stats(ctx: &ReducerContext, _schedule: PlayerStatSchedule)
         }
         // <<< END RUNE STONE ZONE EFFECT MANAGEMENT >>>
 
+        // <<< ADD HOT SPRING HEALING EFFECT MANAGEMENT >>>
+        // Update hot spring healing status based on player position
+        if let Err(e) = crate::active_effects::update_player_hot_spring_status(ctx, player_id, player.position_x, player.position_y) {
+            log::warn!("Failed to update hot spring status for player {:?}: {}", player_id, e);
+        }
+        // <<< END HOT SPRING HEALING EFFECT MANAGEMENT >>>
+
+        // <<< HOT SPRING COLD IMMUNITY >>>
+        // Players in hot springs are immune to ALL cold effects (rain, wet, night, etc.)
+        let is_in_hot_spring = crate::active_effects::player_has_hot_spring_effect(ctx, player_id);
+        if is_in_hot_spring {
+            // Neutralize ALL negative warmth changes - hot springs provide complete cold immunity
+            if total_warmth_change_per_sec < 0.0 {
+                log::info!("Player {:?} in hot spring - negating {:.2} warmth drain (COLD IMMUNE)", 
+                    player_id, total_warmth_change_per_sec);
+                total_warmth_change_per_sec = 0.0; // No warmth loss in hot springs!
+            }
+        }
+        // <<< END HOT SPRING COLD IMMUNITY >>>
+
         // <<< WET EFFECT MANAGEMENT MOVED TO EFFECT PROCESSING SYSTEM >>>
         // Wet effects are now handled in active_effects.rs every 2 seconds
         // This prevents conflicts between the 1-second player stats and 2-second effect processing
         // <<< END WET EFFECT MANAGEMENT >>>
 
         // <<< ADD RAIN WARMTH DRAIN >>>
-        let rain_warmth_drain = world_state::get_rain_warmth_drain_modifier(ctx, player.position_x, player.position_y);
-        log::info!("Rain warmth drain check: player at ({:.1}, {:.1}), drain = {:.2}", player.position_x, player.position_y, rain_warmth_drain);
-        if rain_warmth_drain > 0.0 {
-            total_warmth_change_per_sec -= rain_warmth_drain; // Subtract rain drain
-            log::info!(
-                "Player {:?} losing {:.2} warmth/sec from rain (total warmth change now: {:.2})", 
-                player_id, rain_warmth_drain, total_warmth_change_per_sec
-            );
-        } else {
-            log::info!("Player {:?} protected from rain or no rain active", player_id);
+        // Only apply if NOT in hot spring (hot springs provide immunity)
+        if !is_in_hot_spring {
+            let rain_warmth_drain = world_state::get_rain_warmth_drain_modifier(ctx, player.position_x, player.position_y);
+            log::info!("Rain warmth drain check: player at ({:.1}, {:.1}), drain = {:.2}", player.position_x, player.position_y, rain_warmth_drain);
+            if rain_warmth_drain > 0.0 {
+                total_warmth_change_per_sec -= rain_warmth_drain; // Subtract rain drain
+                log::info!(
+                    "Player {:?} losing {:.2} warmth/sec from rain (total warmth change now: {:.2})", 
+                    player_id, rain_warmth_drain, total_warmth_change_per_sec
+                );
+            } else {
+                log::info!("Player {:?} protected from rain or no rain active", player_id);
+            }
         }
         // <<< END RAIN WARMTH DRAIN >>>
 
         // <<< ADD WET EFFECT WARMTH DRAIN >>>
-        if crate::active_effects::player_has_wet_effect(ctx, player_id) {
+        // Only apply if NOT in hot spring (hot springs provide immunity)
+        if !is_in_hot_spring && crate::active_effects::player_has_wet_effect(ctx, player_id) {
             total_warmth_change_per_sec -= crate::wet::WET_WARMTH_DRAIN_PER_SECOND;
             log::trace!("Player {:?} losing {:.2} warmth/sec from being wet (total warmth change now: {:.2})", 
                 player_id, crate::wet::WET_WARMTH_DRAIN_PER_SECOND, total_warmth_change_per_sec);
@@ -470,6 +494,18 @@ pub fn process_player_stats(ctx: &ReducerContext, _schedule: PlayerStatSchedule)
             
             health_change_per_sec += health_regen;
         }
+
+        // <<< ADD HOT SPRING HEALING >>>
+        // Hot springs provide continuous healing regardless of other conditions
+        if crate::active_effects::player_has_hot_spring_effect(ctx, player_id) {
+            const HOT_SPRING_HEAL_PER_SEC: f32 = 2.0; // Health points per second when in hot spring
+            health_change_per_sec += HOT_SPRING_HEAL_PER_SEC;
+            log::trace!(
+                "Player {:?} in hot spring - gaining {:.2} health/sec", 
+                player_id, HOT_SPRING_HEAL_PER_SEC
+            );
+        }
+        // <<< END HOT SPRING HEALING >>>
 
         let health_change = health_change_per_sec * elapsed_seconds;
         let mut final_health = player.health + health_change;

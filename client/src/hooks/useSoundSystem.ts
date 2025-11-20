@@ -88,6 +88,7 @@ const SOUND_DEFINITIONS = {
     error_jar_placement: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Jar placement error sound (client-side immediate for instant feedback when trying to place soup back into broth pot output slot)
     error_broth_not_compatible: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Broth not compatible error sound (when trying to place incompatible item in broth pot)
     error_field_cauldron_placement: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Field cauldron placement error sound (client-side immediate for instant feedback when trying to place cauldron without nearby campfire)
+    error_placement_failed: { strategy: SoundStrategy.IMMEDIATE, volume: 1.0 }, // Placeable placement error sound (client-side immediate for instant feedback when trying to place campfire/furnace/etc on water or invalid location)
 } as const;
 
 type SoundType = keyof typeof SOUND_DEFINITIONS;
@@ -104,6 +105,7 @@ const NO_PITCH_VARIATION_SOUNDS: Set<SoundType> = new Set([
     'error_foundation_monument',
     'error_jar_placement',
     'error_broth_not_compatible',
+    'error_placement_failed',
 ] as SoundType[]);
 
 // Track active error sounds to prevent multiple from playing simultaneously
@@ -583,6 +585,8 @@ const playLocalSound = async (
                 variationCount = 1; // error_jar_placement.mp3
             } else if (soundType === 'error_broth_not_compatible') {
                 variationCount = 1; // error_broth_not_compatible.mp3
+            } else if (soundType === 'error_placement_failed') {
+                variationCount = 1; // error_placement_failed.mp3
             } else if (soundType === 'arrow_hit') {
                 variationCount = 1; // arrow_hit.mp3
             } else if (soundType === 'shoot_bow') {

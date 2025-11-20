@@ -80,6 +80,8 @@ import { renderYSortedEntities } from '../utils/renderers/renderingUtils.ts';
 import { renderFoundationTargetIndicator, renderWallTargetIndicator } from '../utils/renderers/foundationRenderingUtils'; // ADDED: Foundation and wall target indicators
 import { renderInteractionLabels } from '../utils/renderers/labelRenderingUtils.ts';
 import { renderPlacementPreview, isPlacementTooFar } from '../utils/renderers/placementRenderingUtils.ts';
+import { detectHotSprings } from '../utils/hotSpringDetector'; // ADDED: Hot spring detection
+import { renderHotSprings } from '../utils/renderers/hotSpringRenderingUtils'; // ADDED: Hot spring rendering
 import { useBuildingManager, BuildingMode, BuildingTier, FoundationShape } from '../hooks/useBuildingManager'; // ADDED: Building manager
 import { BuildingRadialMenu } from './BuildingRadialMenu'; // ADDED: Building radial menu
 import { UpgradeRadialMenu } from './UpgradeRadialMenu'; // ADDED: Upgrade radial menu
@@ -553,6 +555,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     wallCells, // ADDED: Building walls
     localPlayerId, // ADDED: Local player ID for building visibility
     isTreeFalling, // NEW: Pass falling tree checker so falling trees stay visible
+    connection?.db?.worldChunkData ? new Map(Array.from(connection.db.worldChunkData.iter()).map((chunk: any) => [`${chunk.chunkX},${chunk.chunkY}`, chunk])) : undefined, // ADDED: World chunk data for grass filtering
   );
 
   // --- UI State ---
@@ -665,6 +668,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     });
   }, [activeConsumableEffects, localPlayerId]);
 
+  // Detect hot springs from world chunk data
+  const detectedHotSprings = useMemo(() => {
+    return detectHotSprings(chunkCacheRef.current);
+  }, [chunkCacheVersion]); // Recalculate when chunk data changes
+
   // Optimized: Memoize the integer tile coordinates for the viewport
   // This prevents visibleWorldTiles from recalculating on every sub-pixel camera movement
   const tileSize = 48; // matches server TILE_SIZE_PX
@@ -696,6 +704,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         case 3: return 'Sea';
         case 4: return 'Beach';
         case 5: return 'Sand';
+        case 6: return 'HotSpringWater'; // Hot spring water pools
         default: return 'Grass';
       }
     };
@@ -1000,11 +1009,61 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       }
     };
 
+    // Generic placement error handler for all placeable items (campfire, furnace, lantern, etc.)
+    const handlePlacementError = (ctx: any, itemName: string) => {
+      if (ctx.event?.status?.tag === 'Failed') {
+        const errorMsg = ctx.event.status.value || '';
+        console.log(`[GameCanvas] ${itemName} placement failed:`, errorMsg);
+        // Play error sound for invalid placement (water, too far, etc.)
+        playImmediateSound('error_placement_failed', 1.0);
+      }
+    };
+
+    // Placement reducer error handlers
+    const handlePlaceCampfireResult = (ctx: any, itemInstanceId: bigint, worldX: number, worldY: number) => {
+      handlePlacementError(ctx, 'Campfire');
+    };
+    const handlePlaceFurnaceResult = (ctx: any, itemInstanceId: bigint, worldX: number, worldY: number) => {
+      handlePlacementError(ctx, 'Furnace');
+    };
+    const handlePlaceLanternResult = (ctx: any, itemInstanceId: bigint, worldX: number, worldY: number) => {
+      handlePlacementError(ctx, 'Lantern');
+    };
+    const handlePlaceWoodenStorageBoxResult = (ctx: any, itemInstanceId: bigint, worldX: number, worldY: number) => {
+      handlePlacementError(ctx, 'Wooden Storage Box');
+    };
+    const handlePlaceSleepingBagResult = (ctx: any, itemInstanceId: bigint, worldX: number, worldY: number) => {
+      handlePlacementError(ctx, 'Sleeping Bag');
+    };
+    const handlePlaceStashResult = (ctx: any, itemInstanceId: bigint, worldX: number, worldY: number) => {
+      handlePlacementError(ctx, 'Stash');
+    };
+    const handlePlaceShelterResult = (ctx: any, itemInstanceId: bigint, worldX: number, worldY: number) => {
+      handlePlacementError(ctx, 'Shelter');
+    };
+    const handlePlaceRainCollectorResult = (ctx: any, itemInstanceId: bigint, worldX: number, worldY: number) => {
+      handlePlacementError(ctx, 'Rain Collector');
+    };
+    const handlePlaceHomesteadHearthResult = (ctx: any, itemInstanceId: bigint, worldX: number, worldY: number) => {
+      handlePlacementError(ctx, "Matron's Chest");
+    };
+
     connection.reducers.onDestroyFoundation(handleDestroyFoundationResult);
     connection.reducers.onDestroyWall(handleDestroyWallResult);
     connection.reducers.onFireProjectile(handleFireProjectileResult);
     connection.reducers.onLoadRangedWeapon(handleLoadRangedWeaponResult);
     connection.reducers.onUpgradeFoundation(handleUpgradeFoundationResult);
+    
+    // Register placement error handlers
+    connection.reducers.onPlaceCampfire(handlePlaceCampfireResult);
+    connection.reducers.onPlaceFurnace(handlePlaceFurnaceResult);
+    connection.reducers.onPlaceLantern(handlePlaceLanternResult);
+    connection.reducers.onPlaceWoodenStorageBox(handlePlaceWoodenStorageBoxResult);
+    connection.reducers.onPlaceSleepingBag(handlePlaceSleepingBagResult);
+    connection.reducers.onPlaceStash(handlePlaceStashResult);
+    connection.reducers.onPlaceShelter(handlePlaceShelterResult);
+    connection.reducers.onPlaceRainCollector(handlePlaceRainCollectorResult);
+    connection.reducers.onPlaceHomesteadHearth(handlePlaceHomesteadHearthResult);
 
     return () => {
       connection.reducers.removeOnDestroyFoundation(handleDestroyFoundationResult);
@@ -1012,6 +1071,17 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       connection.reducers.removeOnFireProjectile(handleFireProjectileResult);
       connection.reducers.removeOnLoadRangedWeapon(handleLoadRangedWeaponResult);
       connection.reducers.removeOnUpgradeFoundation(handleUpgradeFoundationResult);
+      
+      // Cleanup placement error handlers
+      connection.reducers.removeOnPlaceCampfire(handlePlaceCampfireResult);
+      connection.reducers.removeOnPlaceFurnace(handlePlaceFurnaceResult);
+      connection.reducers.removeOnPlaceLantern(handlePlaceLanternResult);
+      connection.reducers.removeOnPlaceWoodenStorageBox(handlePlaceWoodenStorageBoxResult);
+      connection.reducers.removeOnPlaceSleepingBag(handlePlaceSleepingBagResult);
+      connection.reducers.removeOnPlaceStash(handlePlaceStashResult);
+      connection.reducers.removeOnPlaceShelter(handlePlaceShelterResult);
+      connection.reducers.removeOnPlaceRainCollector(handlePlaceRainCollectorResult);
+      connection.reducers.removeOnPlaceHomesteadHearth(handlePlaceHomesteadHearthResult);
     };
   }, [connection]);
 
@@ -1524,7 +1594,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     });
     // --- END SEA STACK WATER LINES ---
 
-    // Now players render OVER the rock, water gradient, AND water line
+    // Now players render OVER the rock, water gradient, and water line
 
     // --- STEP 1: Render ONLY swimming player bottom halves ---
     // Filter out swimming players and render them manually with exact same logic as renderYSortedEntities
@@ -2065,6 +2135,17 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       }
     });
     // --- End Y-Sorted Entities ---
+
+    // --- Render Hot Springs (ABOVE players for steam/bubbles to show on top) ---
+    renderHotSprings(
+      ctx,
+      detectedHotSprings,
+      -cameraOffsetX, // Camera X in world coordinates
+      -cameraOffsetY, // Camera Y in world coordinates
+      canvasSize.width,
+      canvasSize.height
+    );
+    // --- END HOT SPRINGS ---
 
     // --- Render Foundation Target Indicator (for upgrade targeting) ---
     if (targetedFoundation && hasRepairHammer && !targetedWall && ctx) {

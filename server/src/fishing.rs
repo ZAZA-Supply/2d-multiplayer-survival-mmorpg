@@ -164,7 +164,7 @@ pub fn is_water_tile(ctx: &ReducerContext, x: f32, y: f32) -> bool {
     
     // NEW: Try compressed lookup first for better performance
     if let Some(tile_type) = get_tile_type_at_position(ctx, tile_x, tile_y) {
-        return tile_type == TileType::Sea;
+        return tile_type.is_water(); // Includes both Sea and HotSpringWater
     }
     
     // FALLBACK: Use original method if compressed data not available
@@ -173,7 +173,7 @@ pub fn is_water_tile(ctx: &ReducerContext, x: f32, y: f32) -> bool {
     
     // Use the indexed world_position btree for fast lookup
     for tile in world_tiles.idx_world_position().filter((tile_x, tile_y)) {
-        return tile.tile_type == TileType::Sea;
+        return tile.tile_type.is_water(); // Includes both Sea and HotSpringWater
     }
     
     // No tile found at this position, assume not water (safety fallback)

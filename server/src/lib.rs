@@ -364,7 +364,7 @@ pub fn is_player_on_water(ctx: &ReducerContext, player_x: f32, player_y: f32) ->
     
     // NEW: Try compressed lookup first for much better performance
     if let Some(tile_type) = get_tile_type_at_position(ctx, tile_x, tile_y) {
-        return tile_type == TileType::Sea;
+        return tile_type.is_water(); // Includes both Sea and HotSpringWater
     }
     
     // FALLBACK: Use original method if compressed data not available
@@ -414,7 +414,7 @@ pub fn is_player_on_water_compressed(ctx: &ReducerContext, player_x: f32, player
         // Check bounds and extract tile type
         if tile_index < chunk.tile_types.len() {
             if let Some(tile_type) = TileType::from_u8(chunk.tile_types[tile_index]) {
-                return tile_type == TileType::Sea;
+                return tile_type.is_water(); // Includes both Sea and HotSpringWater
             }
         }
         break; // Found the chunk, no need to continue
@@ -580,7 +580,7 @@ pub fn init_module(ctx: &ReducerContext) -> Result<(), String> {
     // ADD: Initialize rune stone spawning systems
     crate::rune_stone::init_rune_stone_shard_spawning(ctx)?;
     crate::rune_stone::init_rune_stone_item_spawning(ctx)?;
-    crate::rune_stone::init_rune_stone_plant_spawning(ctx)?;
+    crate::rune_stone::init_rune_stone_seed_spawning(ctx)?;
     
     // ADD: Initialize WorldState for scheduled systems
     crate::world_state::seed_world_state(ctx)?;
@@ -881,7 +881,7 @@ pub fn register_player(ctx: &ReducerContext, username: String) -> Result<(), Str
                     for dy in -1..=1i32 {
                         if dx == 0 && dy == 0 { continue; }
                         if let Some(adj_type) = get_tile_type_at_position(ctx, tile_x + dx, tile_y + dy) {
-                            if adj_type == TileType::Sea {
+                            if adj_type.is_water() { // Includes both Sea and HotSpringWater
                                 is_coastal = true;
                                 break;
                             }
@@ -1183,6 +1183,53 @@ pub enum TileType {
     Sea,
     Beach,
     Sand,
+    HotSpringWater, // NEW: Distinct type for hot spring water pools
+}
+
+impl TileType {
+    /// Returns true if this tile type is any form of water (Sea or HotSpringWater)
+    /// Use this instead of checking `== TileType::Sea` to include hot springs
+    pub fn is_water(&self) -> bool {
+        matches!(self, TileType::Sea | TileType::HotSpringWater)
+    }
+    
+    /// Returns true if this tile type is specifically ocean/sea water (not hot springs)
+    pub fn is_sea_water(&self) -> bool {
+        matches!(self, TileType::Sea)
+    }
+    
+    /// Returns true if this tile type is hot spring water
+    pub fn is_hot_spring_water(&self) -> bool {
+        matches!(self, TileType::HotSpringWater)
+    }
+    
+    /// Returns true if this tile is walkable (not water)
+    pub fn is_walkable(&self) -> bool {
+        !self.is_water()
+    }
+    
+    /// Returns true if this tile can be fished in
+    pub fn is_fishable(&self) -> bool {
+        // Both sea and hot springs can be fished
+        self.is_water()
+    }
+    
+    /// Returns true if drinking is allowed from this tile
+    pub fn is_drinkable(&self) -> bool {
+        // Both sea and hot springs can be drunk from
+        self.is_water()
+    }
+    
+    /// Returns true if this tile should block building placement
+    pub fn blocks_building(&self) -> bool {
+        // Water tiles block building
+        self.is_water()
+    }
+    
+    /// Returns true if this tile should have water visual effects (waves, etc.)
+    pub fn has_water_visuals(&self) -> bool {
+        self.is_water()
+    }
 }
 
 #[derive(spacetimedb::SpacetimeType, Clone, Debug)]
@@ -1262,6 +1309,7 @@ impl TileType {
             TileType::Sea => 3,
             TileType::Beach => 4,
             TileType::Sand => 5,
+            TileType::HotSpringWater => 6,
         }
     }
     
@@ -1274,6 +1322,7 @@ impl TileType {
             3 => Some(TileType::Sea),
             4 => Some(TileType::Beach),
             5 => Some(TileType::Sand),
+            6 => Some(TileType::HotSpringWater),
             _ => None,
         }
     }

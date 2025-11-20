@@ -44,4 +44,6 @@ export type Exhausted = { tag: "Exhausted" };
 export type BuildingPrivilege = { tag: "BuildingPrivilege" };
 export type ProductionRune = { tag: "ProductionRune" };
 export type AgrarianRune = { tag: "AgrarianRune" };
+export type MemoryRune = { tag: "MemoryRune" };
+export type HotSpring = { tag: "HotSpring" };
 

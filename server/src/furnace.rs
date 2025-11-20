@@ -533,6 +533,11 @@ pub fn place_furnace(ctx: &ReducerContext, item_instance_id: u64, world_x: f32, 
         return Err(format!("Furnace placement too far away (max distance: {:.1})", FURNACE_PLACEMENT_MAX_DISTANCE));
     }
 
+    // Check if placement position is on water (including hot springs)
+    if crate::environment::is_position_on_water(ctx, world_x, world_y) {
+        return Err("Cannot place furnace on water.".to_string());
+    }
+
     // Check for collisions with other furnaces
     for existing_furnace in furnaces.iter() {
         if existing_furnace.is_destroyed {

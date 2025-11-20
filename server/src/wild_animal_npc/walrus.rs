@@ -396,8 +396,8 @@ fn is_position_on_beach_or_coastal(ctx: &ReducerContext, pos_x: f32, pos_y: f32)
                     let check_y = tile_y + dy;
                     
                     if let Some(adjacent_tile_type) = crate::get_tile_type_at_position(ctx, check_x, check_y) {
-                        if adjacent_tile_type == crate::TileType::Sea || adjacent_tile_type == crate::TileType::Beach {
-                            return true; // Adjacent to water/beach = coastal
+                        if adjacent_tile_type.is_water() || adjacent_tile_type == crate::TileType::Beach {
+                            return true; // Adjacent to water/beach = coastal (includes Sea and HotSpringWater)
                         }
                     }
                 }

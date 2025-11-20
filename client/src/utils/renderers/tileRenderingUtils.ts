@@ -64,6 +64,10 @@ export const TILE_ASSETS: Record<string, TileAssetConfig> = {
     'Sand': {
         baseTexture: beachTile, // Use beach texture for sand for now
     },
+    'HotSpringWater': {
+        baseTexture: seaTile, // Use sea texture for hot spring water (bright blue)
+        // Hot springs are rendered as bright cyan/white water pools
+    },
 };
 
 export function getTileAssetKey(tileTypeName: string, variant?: number, frameIndex?: number, autotileKey?: string): string {

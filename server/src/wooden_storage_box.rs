@@ -404,6 +404,12 @@ pub fn place_wooden_storage_box(ctx: &ReducerContext, item_instance_id: u64, wor
 
     // 3. Validate Placement Location (Collision Checks)
     let new_chunk_index = calculate_chunk_index(world_x, world_y);
+    
+    // Check if placement position is on water (including hot springs)
+    if crate::environment::is_position_on_water(ctx, world_x, world_y) {
+        return Err("Cannot place storage box on water.".to_string());
+    }
+    
     // Check collision with existing boxes - account for visual center offset
     if boxes.iter().any(|b| {
         let existing_visual_y = b.pos_y - BOX_COLLISION_Y_OFFSET;

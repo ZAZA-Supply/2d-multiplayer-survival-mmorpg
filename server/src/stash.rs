@@ -239,6 +239,11 @@ pub fn place_stash(ctx: &ReducerContext, item_instance_id: u64, world_x: f32, wo
         return Err("Cannot place stash on a wall.".to_string());
     }
 
+    // Check if placement position is on water (including hot springs)
+    if crate::environment::is_position_on_water(ctx, world_x, world_y) {
+        return Err("Cannot place stash on water.".to_string());
+    }
+
     // 4. Create the Stash entity
     let new_chunk_index = calculate_chunk_index(world_x, world_y);
     let new_stash = Stash {

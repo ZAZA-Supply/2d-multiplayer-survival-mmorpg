@@ -73,8 +73,8 @@ const PIN_SIZE = 24; // Standard size
 const PIN_BORDER_WIDTH = 1; // Thin border width
 
 // Grid Constants - Cyberpunk SOVA style with enhanced readability
-const GRID_LINE_COLOR = 'rgba(0, 212, 255, 0.15)'; // Subtle cyan grid
-const GRID_LINE_HIGHLIGHT_COLOR = 'rgba(0, 212, 255, 0.4)'; // Brighter cyan for major grid lines
+const GRID_LINE_COLOR = 'rgba(0, 212, 255, 0.08)'; // Very subtle cyan grid (was 0.15)
+const GRID_LINE_HIGHLIGHT_COLOR = 'rgba(0, 212, 255, 0.20)'; // Subtle cyan for major grid lines (was 0.4)
 const GRID_TEXT_COLOR = 'rgba(0, 255, 255, 1.0)'; // FULL BRIGHTNESS cyan for instant readability
 const GRID_TEXT_FONT = 'bold 13px "Courier New", monospace'; // LARGER and BOLD for combat readability
 const GRID_TEXT_SHADOW = '0 0 8px rgba(0, 255, 255, 1.0), 0 0 3px #000000'; // Stronger glow + black outline
@@ -211,24 +211,26 @@ interface MinimapProps {
   showGridCoordinates?: boolean; // Whether to show grid coordinate labels (A1, B2, etc.)
 }
 
-// Cyberpunk SOVA-style terrain color mapping with enhanced differentiation
-// Keeps dark aesthetic but improves clarity between terrain types
+// Bright, clear terrain colors for easy readability
+// Significantly brightened for better visibility and differentiation
 function getTerrainColor(colorValue: number): [number, number, number] {
   switch (colorValue) {
-    case 0:   // Sea - Deep cyberpunk blue with stronger blue tint
-      return [8, 20, 42]; // Dark blue-black (more blue, less purple)
-    case 64:  // Beach - Lighter grey-blue with cyan tint
-      return [50, 58, 62]; // Medium grey-blue (lighter than before)
-    case 96:  // Sand - Warm beige-grey
-      return [48, 46, 42]; // Warm dark grey (distinct from beach)
-    case 128: // Grass - Dark green with stronger green tint
-      return [20, 38, 28]; // Dark green (more green, less grey)
-    case 192: // Dirt - Warm brown-grey
-      return [38, 32, 28]; // Dark brown (warmer, more distinct)
-    case 224: // DirtRoad - Darkest but with slight warm tint
-      return [24, 22, 20]; // Near black with warm brown hint
+    case 0:   // Sea - Bright blue, easily recognizable as water
+      return [30, 80, 140]; // Rich blue (much brighter)
+    case 64:  // Beach - Sandy beige, distinct from water and land
+      return [180, 170, 140]; // Light sandy beige (very bright)
+    case 96:  // Sand - Warm sand color
+      return [200, 180, 130]; // Warm light sand (distinct from beach)
+    case 128: // Grass - Vibrant green, clearly vegetation
+      return [60, 120, 70]; // Medium-bright green (much more visible)
+    case 192: // Dirt - Earthy brown
+      return [110, 85, 65]; // Medium brown (clearly dirt)
+    case 224: // DirtRoad - Darker brown for roads
+      return [80, 65, 50]; // Dark brown (still visible, distinct from dirt)
+    case 255: // HotSpringWater - BRIGHT WHITE/CYAN for maximum visibility!
+      return [255, 255, 200]; // Bright white-cyan (highly visible)
     default:  // Fallback
-      return [25, 35, 30]; // Dark green-grey
+      return [70, 100, 75]; // Medium green-grey
   }
 }
 
@@ -241,6 +243,7 @@ function getTerrainType(colorValue: number): number {
   if (colorValue === 0) return 0; // Sea
   if (colorValue === 64) return 1; // Beach
   if (colorValue === 96) return 2; // Sand
+  if (colorValue === 255) return 6; // HotSpringWater - separate type for visibility
   if (colorValue >= 128 && colorValue < 192) return 3; // Grass
   if (colorValue >= 192 && colorValue < 224) return 4; // Dirt
   return 5; // DirtRoad/other
@@ -298,11 +301,11 @@ function renderRegionsWithEdges(
   }
   
   // Second pass: Draw clean edges between different terrain types (OPTIMIZED - batched)
-  // Enhanced visibility for better terrain differentiation
-  ctx.strokeStyle = 'rgba(0, 212, 255, 0.4)'; // More visible cyan edges
-  ctx.lineWidth = 1.5; // Slightly thicker for clarity
-  ctx.shadowColor = 'rgba(0, 212, 255, 0.2)'; // Subtle glow
-  ctx.shadowBlur = 1;
+  // Subtle edges for definition without overwhelming the terrain colors
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)'; // Very subtle dark edges instead of bright cyan
+  ctx.lineWidth = 0.5; // Thin edges for subtle definition
+  ctx.shadowColor = 'transparent'; // No glow effect
+  ctx.shadowBlur = 0;
   
   // Batch all edges into a single path for much better performance
   ctx.beginPath();
@@ -404,7 +407,7 @@ function applyEdgeDetection(
   return output;
 }
 
-// Apply cyberpunk scan line effect (optimized - fewer lines, batched drawing)
+// Apply subtle scan line effect (optimized - fewer lines, batched drawing)
 function applyScanLines(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -413,14 +416,14 @@ function applyScanLines(
   height: number
 ) {
   ctx.save();
-  ctx.globalAlpha = 0.05;
+  ctx.globalAlpha = 0.02; // Much more subtle (was 0.05)
   ctx.strokeStyle = '#00d4ff';
   ctx.lineWidth = 1;
   
   // Batch all scan lines into a single path for better performance
   ctx.beginPath();
-  // Horizontal scan lines - reduced frequency (every 6px instead of 3px)
-  for (let i = 0; i < height; i += 6) {
+  // Horizontal scan lines - much less frequent (every 12px instead of 6px)
+  for (let i = 0; i < height; i += 12) {
     ctx.moveTo(x, y + i);
     ctx.lineTo(x + width, y + i);
   }
@@ -903,8 +906,6 @@ export function drawMinimapOntoCanvas({
       ctx.restore();
     }
   });
-
-
 
   // --- Draw Campfires ---
   if (showNightLights) {

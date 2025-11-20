@@ -166,16 +166,16 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .build(),
 
         // === BONE ARMOR SET ===
-        // High projectile resistance, moderate melee protection
-        // Full set provides strong defense against ranged attacks
+        // High projectile resistance, moderate melee protection, good fire resistance
+        // Full set provides strong defense against ranged attacks and fire
 
-        ItemBuilder::new("Bone Helmet", "A helmet crafted from animal bones. Lightweight yet surprisingly durable against arrows and bolts.", ItemCategory::Armor)
+        ItemBuilder::new("Bone Helmet", "A helmet crafted from animal bones. Lightweight yet surprisingly durable against arrows and bolts. Bones don't burn easily.", ItemCategory::Armor)
             .icon("bone_helmet.png")
             .equippable(Some(EquipmentSlotType::Head))
             .armor_resistances(ArmorResistances {
                 melee_resistance: 0.08,
                 projectile_resistance: 0.15, // High projectile resist
-                fire_resistance: -0.5,       // Vulnerable to fire
+                fire_resistance: 0.10,       // Good fire resistance - bones don't burn
                 blunt_resistance: 0.05,      // Weak to blunt
                 slash_resistance: 0.08,
                 pierce_resistance: 0.12,     // Good vs pierce
@@ -197,7 +197,7 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .armor_resistances(ArmorResistances {
                 melee_resistance: 0.12,
                 projectile_resistance: 0.20, // Very high projectile resist
-                fire_resistance: -0.5,
+                fire_resistance: 0.15,       // Good fire resistance - bones don't burn
                 blunt_resistance: 0.08,
                 slash_resistance: 0.12,
                 pierce_resistance: 0.16,
@@ -219,7 +219,7 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .armor_resistances(ArmorResistances {
                 melee_resistance: 0.10,
                 projectile_resistance: 0.18,
-                fire_resistance: -0.5,
+                fire_resistance: 0.12,       // Good fire resistance - bones don't burn
                 blunt_resistance: 0.06,
                 slash_resistance: 0.10,
                 pierce_resistance: 0.14,
@@ -241,7 +241,7 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .armor_resistances(ArmorResistances {
                 melee_resistance: 0.06,
                 projectile_resistance: 0.12,
-                fire_resistance: -0.5,
+                fire_resistance: 0.08,       // Good fire resistance - bones don't burn
                 blunt_resistance: 0.04,
                 slash_resistance: 0.06,
                 pierce_resistance: 0.10,
@@ -263,7 +263,7 @@ pub fn get_armor_definitions() -> Vec<ItemDefinition> {
             .armor_resistances(ArmorResistances {
                 melee_resistance: 0.06,
                 projectile_resistance: 0.12,
-                fire_resistance: -0.5,
+                fire_resistance: 0.08,       // Good fire resistance - bones don't burn
                 blunt_resistance: 0.04,
                 slash_resistance: 0.06,
                 pierce_resistance: 0.10,
