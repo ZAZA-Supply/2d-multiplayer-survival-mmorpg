@@ -36,8 +36,12 @@ const PORT = parseInt(process.env.PORT || process.env.PROXY_PORT || '8002', 10);
 const allowedOrigins = [
   'http://localhost:3008',
   'http://localhost:5173',
-  // Add your production client URL here (e.g., Railway client URL)
-  process.env.CLIENT_URL || 'https://broth-and-bullets-client-production.up.railway.app'
+  // Production URLs - Railway and custom domain
+  'https://broth-and-bullets-production-client-production.up.railway.app',
+  'https://www.brothandbullets.com',
+  'https://brothandbullets.com', // Also allow without www
+  // Allow additional CLIENT_URL from env if set
+  process.env.CLIENT_URL
 ].filter(Boolean); // Remove any undefined values
 
 console.log('🔒 CORS Configuration:');
