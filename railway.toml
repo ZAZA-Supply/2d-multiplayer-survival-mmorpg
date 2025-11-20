@@ -1,9 +1,6 @@
 [build]
 builder = "nixpacks"
-
-# This tells Railway to use auth-server-openauth as the root
-[build.watchPatterns]
-include = ["auth-server-openauth/**"]
+watchPatterns = ["auth-server-openauth/**"]
 
 [deploy]
 restartPolicyType = "on_failure"
