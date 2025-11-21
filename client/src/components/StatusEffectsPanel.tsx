@@ -100,7 +100,17 @@ const StatusEffectsPanel: React.FC<StatusEffectsPanelProps> = ({ effects }) => {
 
   if (effects.length === 0) return null;
 
-  const getEffectColor = (type: string) => {
+  const getEffectColor = (type: string, effectId?: string) => {
+    // Special cases for runestones
+    if (effectId === 'blue_runestone') {
+      return '#00d4ff'; // Bright cyan/blue
+    }
+    if (effectId === 'production_rune') {
+      return '#DC143C'; // Deep crimson red (distinct from negative)
+    }
+    if (effectId === 'agrarian_rune') {
+      return '#50C878'; // True emerald green (darker, richer than default positive)
+    }
     switch (type) {
       case 'positive': return '#00ff88';
       case 'negative': return '#ff4444';
@@ -108,7 +118,17 @@ const StatusEffectsPanel: React.FC<StatusEffectsPanelProps> = ({ effects }) => {
     }
   };
 
-  const getEffectGlow = (type: string) => {
+  const getEffectGlow = (type: string, effectId?: string) => {
+    // Special cases for runestones
+    if (effectId === 'blue_runestone') {
+      return '0 0 8px rgba(0, 212, 255, 0.6)';
+    }
+    if (effectId === 'production_rune') {
+      return '0 0 8px rgba(220, 20, 60, 0.6)'; // Deep crimson glow
+    }
+    if (effectId === 'agrarian_rune') {
+      return '0 0 8px rgba(80, 200, 120, 0.6)'; // Emerald green glow
+    }
     switch (type) {
       case 'positive': return '0 0 8px rgba(0, 255, 136, 0.6)';
       case 'negative': return '0 0 8px rgba(255, 68, 68, 0.6)';
@@ -161,12 +181,12 @@ const StatusEffectsPanel: React.FC<StatusEffectsPanelProps> = ({ effects }) => {
                 transform: 'translateY(-50%)',
                 marginRight: '12px',
                 background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(20, 20, 40, 0.95) 100%)',
-                border: `2px solid ${getEffectColor(effect.type)}`,
+                border: `2px solid ${getEffectColor(effect.type, effect.id)}`,
                 borderRadius: '8px',
                 padding: '12px 16px',
                 minWidth: '200px',
                 maxWidth: '300px',
-                boxShadow: `0 0 25px ${getEffectColor(effect.type)}60, inset 0 1px 0 rgba(255, 255, 255, 0.1)`,
+                boxShadow: `0 0 25px ${getEffectColor(effect.type, effect.id)}60, inset 0 1px 0 rgba(255, 255, 255, 0.1)`,
                 backdropFilter: 'blur(10px)',
                 zIndex: 100,
                 fontFamily: '"Courier New", monospace',
@@ -182,15 +202,15 @@ const StatusEffectsPanel: React.FC<StatusEffectsPanelProps> = ({ effects }) => {
                 }}>
                   <span style={{ 
                     fontSize: '18px',
-                    filter: `drop-shadow(0 0 4px ${getEffectColor(effect.type)})`
+                    filter: `drop-shadow(0 0 4px ${getEffectColor(effect.type, effect.id)})`
                   }}>
                     {effect.emoji}
                   </span>
                   <span style={{
-                    color: getEffectColor(effect.type),
+                    color: getEffectColor(effect.type, effect.id),
                     fontSize: '14px',
                     fontWeight: 'bold',
-                    textShadow: `0 0 8px ${getEffectColor(effect.type)}80`,
+                    textShadow: `0 0 8px ${getEffectColor(effect.type, effect.id)}80`,
                     letterSpacing: '1px'
                   }}>
                     {effect.name.toUpperCase()}
@@ -253,7 +273,7 @@ const StatusEffectsPanel: React.FC<StatusEffectsPanelProps> = ({ effects }) => {
                   height: 0,
                   borderTop: '8px solid transparent',
                   borderBottom: '8px solid transparent',
-                  borderLeft: `8px solid ${getEffectColor(effect.type)}`
+                  borderLeft: `8px solid ${getEffectColor(effect.type, effect.id)}`
                 }} />
               </div>
             )}
@@ -266,10 +286,10 @@ const StatusEffectsPanel: React.FC<StatusEffectsPanelProps> = ({ effects }) => {
               width: '28px',
               height: '28px',
               fontSize: '16px',
-              border: `2px solid ${getEffectColor(effect.type)}`,
+              border: `2px solid ${getEffectColor(effect.type, effect.id)}`,
               borderRadius: '6px',
               background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.6) 0%, rgba(20, 20, 40, 0.6) 100%)',
-              boxShadow: `${getEffectGlow(effect.type)}, inset 0 1px 0 rgba(255, 255, 255, 0.1)`,
+              boxShadow: `${getEffectGlow(effect.type, effect.id)}, inset 0 1px 0 rgba(255, 255, 255, 0.1)`,
               transition: 'all 0.2s ease',
               transform: hoveredEffect === effect.id ? 'scale(1.15)' : 'scale(1)'
             }}>

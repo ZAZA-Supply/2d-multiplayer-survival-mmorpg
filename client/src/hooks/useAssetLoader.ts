@@ -9,7 +9,7 @@ import heroIdleSpriteSheet from '../assets/hero_idle.png';
 import heroWaterSpriteSheet from '../assets/hero_swim.png';
 import heroCrouchSpriteSheet from '../assets/hero_crouch.png';
 import heroDodgeSpriteSheet from '../assets/hero_dodge.png';
-import grassTexture from '../assets/tiles/grass2.png';
+import grassTexture from '../assets/tiles/grass_new.png';
 import campfireSprite from '../assets/doodads/campfire.png';
 import burlapSackUrl from '../assets/items/burlap_sack.png';
 import deathMarkerUrl from '../assets/items/death_marker.png';

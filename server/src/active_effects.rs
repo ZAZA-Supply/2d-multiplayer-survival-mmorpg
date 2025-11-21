@@ -4,7 +4,7 @@ use crate::Player; // For the struct
 use crate::player; // For the table trait
 use crate::items::{ItemDefinition, item_definition as ItemDefinitionTableTrait}; // To check item properties
 use crate::items::{InventoryItem, inventory_item as InventoryItemTableTrait}; // Added for item consumption
-use crate::consumables::{MAX_HEALTH_VALUE, MIN_STAT_VALUE}; // Import constants from consumables
+use crate::consumables::{MAX_HEALTH_VALUE, MAX_THIRST_VALUE, MIN_STAT_VALUE}; // Import constants from consumables
 use rand::Rng; // For random number generation
 use log;
 
@@ -263,9 +263,9 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
             }
         }
         // --- Handle Other Progressive Effects (HealthRegen, Bleed, item-based Damage) ---
-        // Wet effects don't have total_amount, so handle them separately
-        if effect.effect_type == EffectType::Wet {
-            // Wet effects are purely time-based, no per-tick processing needed
+        // Wet and WaterDrinking effects don't have total_amount, so handle them separately
+        if effect.effect_type == EffectType::Wet || effect.effect_type == EffectType::WaterDrinking {
+            // These effects are purely time-based, no per-tick processing needed
             // They just exist until they expire or are removed by environmental conditions
         } else if let Some(total_amount_val) = effect.total_amount {
             let total_duration_micros = effect.ends_at.to_micros_since_unix_epoch().saturating_sub(effect.started_at.to_micros_since_unix_epoch());
@@ -334,24 +334,28 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
                                 effect.effect_type, effect.player_id, player_to_update.health);
                         }
                         EffectType::SeawaterPoisoning => {
-                            log::trace!("[EffectTick] SeawaterPoisoning Pre-Damage for Player {:?}: Health {:.2}, AmountThisTick {:.2}",
-                                effect.player_id, player_to_update.health, amount_this_tick);
+                            log::trace!("[EffectTick] SeawaterPoisoning Pre-Thirst-Drain for Player {:?}: Thirst {:.2}, AmountThisTick {:.2}",
+                                effect.player_id, player_to_update.thirst, amount_this_tick);
                             
                             // --- KNOCKED OUT PLAYERS ARE IMMUNE TO SEAWATER POISONING ---
                             if player_to_update.is_knocked_out {
-                                // Knocked out players are completely immune to seawater poisoning damage
-                                amount_this_tick = 0.0; // No damage applied
-                                log::info!("[EffectTick] Knocked out player {:?} is immune to SeawaterPoisoning damage. No damage applied.",
+                                // Knocked out players are completely immune to seawater poisoning thirst drain
+                                amount_this_tick = 0.0; // No thirst drain applied
+                                log::info!("[EffectTick] Knocked out player {:?} is immune to SeawaterPoisoning thirst drain. No drain applied.",
                                     effect.player_id);
                             } else {
-                                // Normal damage application for conscious players - always exactly 1 damage per tick
-                                amount_this_tick = 1.0; // Override calculated amount to ensure exactly 1 damage per tick
-                                player_to_update.health = (player_to_update.health - amount_this_tick).clamp(MIN_STAT_VALUE, MAX_HEALTH_VALUE);
+                                // Seawater poisoning drains thirst over time instead of dealing health damage
+                                // This creates a gradual dehydration effect that makes sense mechanically
+                                amount_this_tick = 2.5; // Drain 2.5 thirst per tick (per second)
+                                let old_thirst = player_to_update.thirst;
+                                player_to_update.thirst = (player_to_update.thirst - amount_this_tick).clamp(MIN_STAT_VALUE, MAX_THIRST_VALUE);
+                                log::debug!("[EffectTick] SeawaterPoisoning drained {:.1} thirst from player {:?} ({:.1} -> {:.1})",
+                                    amount_this_tick, effect.player_id, old_thirst, player_to_update.thirst);
                             }
                             // --- END KNOCKED OUT IMMUNITY ---
                             
-                            log::trace!("[EffectTick] SeawaterPoisoning Post-Damage for Player {:?}: Health now {:.2}",
-                                effect.player_id, player_to_update.health);
+                            log::trace!("[EffectTick] SeawaterPoisoning Post-Thirst-Drain for Player {:?}: Thirst now {:.2}",
+                                effect.player_id, player_to_update.thirst);
                         }
                         EffectType::FoodPoisoning => {
                             log::trace!("[EffectTick] FoodPoisoning Pre-Damage for Player {:?}: Health {:.2}, AmountThisTick {:.2}",
@@ -462,8 +466,8 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
                 }
 
         // Check if effect should end based on amount or time
-        // For SeawaterPoisoning, Venom, and Wet effects, only end based on time, not accumulated damage
-        if effect.effect_type == EffectType::SeawaterPoisoning || effect.effect_type == EffectType::Venom || effect.effect_type == EffectType::Wet {
+        // For SeawaterPoisoning, Venom, Wet, and WaterDrinking effects, only end based on time, not accumulated damage
+        if effect.effect_type == EffectType::SeawaterPoisoning || effect.effect_type == EffectType::Venom || effect.effect_type == EffectType::Wet || effect.effect_type == EffectType::WaterDrinking {
             if current_time >= effect.ends_at {
                 effect_ended = true;
             }
@@ -731,7 +735,7 @@ pub fn apply_seawater_poisoning_effect(ctx: &ReducerContext, player_id: Identity
     let current_time = ctx.timestamp;
     let duration_micros = (duration_seconds as u64) * 1_000_000;
     let tick_interval_micros = 1_000_000u64; // 1 second per tick
-    let total_damage = duration_seconds as f32; // 1 damage per second
+    let total_thirst_drain = duration_seconds as f32 * 2.5; // 2.5 thirst drain per second
     
     // Check if player already has seawater poisoning - if so, extend the duration
     let existing_effects: Vec<_> = ctx.db.active_consumable_effect().iter()
@@ -742,22 +746,22 @@ pub fn apply_seawater_poisoning_effect(ctx: &ReducerContext, player_id: Identity
         // Extend existing effect instead of creating a new one
         for existing_effect in existing_effects {
             let mut updated_effect = existing_effect.clone();
-            let additional_damage = duration_seconds as f32;
+            let additional_thirst_drain = duration_seconds as f32 * 2.5;
             
             // Extend the end time
             updated_effect.ends_at = current_time + TimeDuration::from_micros(duration_micros as i64);
             
-            // Add to total damage amount
+            // Add to total thirst drain amount
             if let Some(current_total) = updated_effect.total_amount {
-                updated_effect.total_amount = Some(current_total + additional_damage);
+                updated_effect.total_amount = Some(current_total + additional_thirst_drain);
             } else {
-                updated_effect.total_amount = Some(additional_damage);
+                updated_effect.total_amount = Some(additional_thirst_drain);
             }
             
-            let total_damage_amount = updated_effect.total_amount.unwrap_or(0.0);
+            let total_drain_amount = updated_effect.total_amount.unwrap_or(0.0);
             ctx.db.active_consumable_effect().effect_id().update(updated_effect);
-            log::info!("Extended seawater poisoning effect for player {:?} by {} seconds (total damage now: {:.1})", 
-                player_id, duration_seconds, total_damage_amount);
+            log::info!("Extended seawater poisoning effect for player {:?} by {} seconds (total thirst drain now: {:.1})", 
+                player_id, duration_seconds, total_drain_amount);
         }
     } else {
         // Create new seawater poisoning effect
@@ -769,7 +773,7 @@ pub fn apply_seawater_poisoning_effect(ctx: &ReducerContext, player_id: Identity
             consuming_item_instance_id: None, // No item to consume
             started_at: current_time,
             ends_at: current_time + TimeDuration::from_micros(duration_micros as i64),
-            total_amount: Some(total_damage),
+            total_amount: Some(total_thirst_drain),
             amount_applied_so_far: Some(0.0),
             effect_type: EffectType::SeawaterPoisoning,
             tick_interval_micros,
@@ -777,8 +781,8 @@ pub fn apply_seawater_poisoning_effect(ctx: &ReducerContext, player_id: Identity
         };
 
         ctx.db.active_consumable_effect().insert(effect);
-        log::info!("Applied seawater poisoning effect to player {:?} for {} seconds ({} total damage)", 
-            player_id, duration_seconds, total_damage);
+        log::info!("Applied seawater poisoning effect to player {:?} for {} seconds ({:.1} total thirst drain)", 
+            player_id, duration_seconds, total_thirst_drain);
 
         // Emit throwing up sound for seawater poisoning
         if let Some(player) = ctx.db.player().identity().find(&player_id) {

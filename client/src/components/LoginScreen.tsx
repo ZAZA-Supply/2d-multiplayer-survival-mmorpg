@@ -86,6 +86,33 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
     // Ref for username input focus
     const usernameInputRef = useRef<HTMLInputElement>(null);
 
+    // Shake animation hook for "Learn More" button
+    const [isShaking, setIsShaking] = useState(false);
+    useEffect(() => {
+        const interval = 3200;
+        const duration = 700;
+        const shakeTimeouts: NodeJS.Timeout[] = [];
+        let mounted = true;
+        
+        function triggerShake() {
+            if (!mounted) return;
+            setIsShaking(true);
+            shakeTimeouts.push(setTimeout(() => {
+                if (mounted) setIsShaking(false);
+            }, duration));
+        }
+        
+        const mainInterval = setInterval(triggerShake, interval);
+        // Initial shake after 700ms
+        shakeTimeouts.push(setTimeout(triggerShake, 700));
+        
+        return () => {
+            mounted = false;
+            clearInterval(mainInterval);
+            shakeTimeouts.forEach(clearTimeout);
+        };
+    }, []);
+
     // Check for mobile screen size
     useEffect(() => {
         const checkIsMobile = () => {
@@ -660,17 +687,18 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                gap: '15px',
-                                marginTop: '15px',
+                                gap: '17px',
+                                marginTop: '19px',
                             }}>
                                 <span style={{
-                                    fontSize: '13px',
-                                    color: 'rgba(255, 255, 255, 0.9)',
+                                    fontSize: '13.5px',
+                                    color: 'rgba(255, 255, 255, 0.97)',
+                                    fontWeight: 600,
                                     fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif",
-                                    textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
-                                    letterSpacing: '0.5px',
+                                    textShadow: '1px 1px 3px rgba(60,18,0,0.7)',
+                                    letterSpacing: '0.7px',
                                 }}>
-                                    Early Access v0.53
+                                    Early Access Alpha v0.82
                                 </span>
                                 <button
                                     type="button"
@@ -691,29 +719,77 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
                                         }
                                     }}
                                     style={{
-                                        background: 'none',
-                                        border: '1px solid rgba(255, 255, 255, 0.4)',
-                                        color: 'rgba(255, 255, 255, 0.9)',
-                                        padding: '4px 8px',
-                                        fontSize: '11px',
-                                        borderRadius: '12px',
+                                        background: 'linear-gradient(90deg, #ffe0b2, #ffd180 40%, #ff8c00 90%, #cc6400)',
+                                        border: 'none',
+                                        color: '#852100',
+                                        fontWeight: 800,
+                                        padding: '7px 22px',
+                                        fontSize: '13px',
+                                        borderRadius: '18px',
+                                        boxShadow: isShaking
+                                            ? '0 0 16px 2px rgba(255, 140, 0, 0.55), 0 1.5px 11px 2px rgba(0,0,0,0.2)'
+                                            : '0 1.5px 11px 2px rgba(0,0,0,0.08)',
                                         cursor: 'pointer',
                                         fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif",
-                                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
-                                        transition: 'all 0.2s ease',
-                                        letterSpacing: '0.3px',
+                                        textShadow: '1px 1px 3px rgba(255,255,255,0.15)',
+                                        transition: 'all 0.22s cubic-bezier(0.63, 0.1, 0.32, 1), box-shadow 0.13s',
+                                        letterSpacing: '1.2px',
+                                        outline: isShaking ? '2.5px solid #ffd180' : 'none',
+                                        transform: isShaking ? 'translateX(-2px) rotate(-1.3deg)' : 'none',
+                                        position: 'relative',
+                                        userSelect: 'none'
                                     }}
+                                    className={isShaking ? 'shake-animating' : ''}
                                     onMouseEnter={(e) => {
-                                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
+                                        e.currentTarget.style.background =
+                                            'linear-gradient(92deg, #fff3e0, #ffb94f 50%, #ff8c00 90%, #e67c00)';
+                                        e.currentTarget.style.color = '#7a2200';
+                                        e.currentTarget.style.boxShadow = '0 0 21px 2px rgba(255,220,120,0.48), 0 3px 12px 0 rgba(0,0,0,0.22)';
                                     }}
                                     onMouseLeave={(e) => {
-                                        e.currentTarget.style.backgroundColor = 'transparent';
-                                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+                                        e.currentTarget.style.background = 'linear-gradient(90deg, #ffe0b2, #ffd180 40%, #ff8c00 90%, #cc6400)';
+                                        e.currentTarget.style.color = '#852100';
+                                        e.currentTarget.style.boxShadow = isShaking
+                                            ? '0 0 16px 2px rgba(255, 140, 0, 0.55), 0 1.5px 11px 2px rgba(0,0,0,0.2)'
+                                            : '0 1.5px 11px 2px rgba(0,0,0,0.08)';
                                     }}
                                 >
-                                    learn more
+                                    <span
+                                        style={{
+                                            fontWeight: 800,
+                                            textTransform: "uppercase",
+                                            letterSpacing: "1.8px",
+                                            fontSize: 'inherit',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            filter: isShaking ? 'brightness(1.09) drop-shadow(0 0 2.5px #ffd180)' : undefined
+                                        }}
+                                    >
+                                        {isShaking && (
+                                            <svg width="17" height="17" style={{ marginRight: '3px', verticalAlign: 'text-bottom' }} viewBox="0 0 20 20" fill="none"><g><ellipse cx="10" cy="10" rx="8" ry="8" fill="#fffacd" /><ellipse cx="10" cy="10" rx="6.2" ry="6.2" fill="#ffe7b2" /><ellipse cx="10" cy="10" rx="4" ry="4" fill="#ffd180" /><ellipse cx="10" cy="10" rx="2.2" ry="2.2" fill="#ffb94f" /></g></svg>
+                                        )}
+                                        learn more
+                                    </span>
                                 </button>
+                                <style>{`
+                                    .shake-animating {
+                                        animation:
+                                            shakekeyframes 0.65s cubic-bezier(.36,.07,.19,.97) both;
+                                    }
+                                    @keyframes shakekeyframes {
+                                        10% { transform: translateX(-1px) rotate(-1.5deg);}
+                                        20% { transform: translateX(2.2px) rotate(2.2deg);}
+                                        26% { transform: translateX(-2.5px) rotate(-3deg);}
+                                        32% { transform: translateX(2.3px) rotate(3deg);}
+                                        41% { transform: translateX(-1.3px) rotate(-2deg);}
+                                        50% { transform: translateX(2.5px) rotate(2deg);}
+                                        57% { transform: translateX(-2px) rotate(-2.4deg);}
+                                        75% { transform: translateX(1px) rotate(1deg);}
+                                        100% { transform: none;}
+                                    }
+                                `}
+                                </style>
                             </div>
                         </form>
                     )}

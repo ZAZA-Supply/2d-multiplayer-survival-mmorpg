@@ -804,6 +804,22 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
         
         let travel_distance = ((current_x - projectile.start_pos_x).powi(2) + (current_y - projectile.start_pos_y).powi(2)).sqrt();
         
+        // CRITICAL: Check max range BEFORE collision checks to prevent infinite looping
+        // This is especially important for thrown items which have no gravity and travel in straight lines
+        if travel_distance > projectile.max_range || elapsed_time > 10.0 {
+            log::info!("DEBUG: Projectile {} reached max range/time BEFORE collision checks. Distance: {:.1}, Range: {:.1}, Time: {:.1}s", 
+                projectile.id, travel_distance, projectile.max_range, elapsed_time);
+            
+            // Create fire patch if this is a fire arrow (100% chance)
+            if let Some(ammo_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                create_fire_patch_if_fire_arrow(ctx, &ammo_def, current_x, current_y, projectile.owner_id);
+            }
+            
+            missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
+            projectiles_to_delete.push(projectile.id);
+            continue;
+        }
+        
         // Check for wall collision first (before shelter)
         if let Some((wall_id, collision_x, collision_y)) = crate::building::check_projectile_wall_collision(
             ctx,
@@ -1700,21 +1716,6 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
         }
         
         if hit_deployable_this_tick {
-            continue;
-        }
-        
-        if travel_distance > projectile.max_range || elapsed_time > 10.0 {
-            // Projectile missed - store info for dropped item creation
-            log::info!("DEBUG: Projectile {} reached max range/time. Distance: {:.1}, Range: {:.1}, Time: {:.1}s", 
-                projectile.id, travel_distance, projectile.max_range, elapsed_time);
-            
-            // Create fire patch if this is a fire arrow (100% chance)
-            if let Some(ammo_def) = item_defs_table.id().find(projectile.ammo_def_id) {
-                create_fire_patch_if_fire_arrow(ctx, &ammo_def, current_x, current_y, projectile.owner_id);
-            }
-            
-            missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
-            projectiles_to_delete.push(projectile.id);
             continue;
         }
 

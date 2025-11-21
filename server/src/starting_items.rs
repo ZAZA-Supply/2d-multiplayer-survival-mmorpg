@@ -65,6 +65,26 @@ pub(crate) fn grant_starting_items(ctx: &ReducerContext, player_id: Identity, us
                 log::warn!("[GrantItems] Item {} for player {:?} had neither hotbar nor inventory slot specified. Setting to Unknown.", item_name, player_id);
                 ItemLocation::Unknown 
             };
+            
+            // IDEMPOTENCY CHECK: Check if this specific slot already has an item
+            let slot_already_occupied = inventory.iter().any(|existing_item| {
+                match (&existing_item.location, &location) {
+                    (ItemLocation::Hotbar(existing), ItemLocation::Hotbar(new)) => {
+                        existing.owner_id == new.owner_id && existing.slot_index == new.slot_index
+                    },
+                    (ItemLocation::Inventory(existing), ItemLocation::Inventory(new)) => {
+                        existing.owner_id == new.owner_id && existing.slot_index == new.slot_index
+                    },
+                    _ => false,
+                }
+            });
+            
+            if slot_already_occupied {
+                log::info!("[GrantItems] Slot already occupied for {} (H: {:?}, I: {:?}) for player {:?}. Skipping (idempotent).", 
+                           item_name, hotbar_slot_opt, inventory_slot_opt, player_id);
+                continue;
+            }
+            
             let item_to_insert = InventoryItem { 
                 instance_id: 0,
                 item_def_id: item_def.id,

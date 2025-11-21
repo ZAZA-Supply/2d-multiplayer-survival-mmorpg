@@ -58,7 +58,7 @@ class OpenAIService {
   private maxStoredTimings = 100; // Keep last 100 requests for analysis
 
   constructor() {
-    console.log('[OpenAI] 🔒 Using secure proxy - API key never exposed to client');
+    // console.log('[OpenAI] 🔒 Using secure proxy - API key never exposed to client');
   }
 
   /**

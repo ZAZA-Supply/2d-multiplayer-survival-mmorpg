@@ -69,34 +69,27 @@ import { PLAYER_CORPSE_INTERACTION_DISTANCE_SQUARED } from './utils/renderers/pl
 import { initCutGrassEffectSystem, cleanupCutGrassEffectSystem } from './effects/cutGrassEffect';
 import { filterVisibleEntities, filterVisibleTrees } from './utils/entityFilteringUtils';
 
-// Simple error boundary to surface the real error causing the white screen
-class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: any }> {
+// Graceful error boundary that logs errors but doesn't crash the app
+class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: any; hasError: boolean }> {
     constructor(props: { children: React.ReactNode }) {
         super(props);
-        this.state = { error: null };
+        this.state = { error: null, hasError: false };
     }
 
     static getDerivedStateFromError(error: any) {
-        return { error };
+        // Log the error but don't set hasError to true - let the app continue
+        console.error('[AppErrorBoundary] Error caught:', error);
+        return { error, hasError: false }; // Don't show error UI, just log it
     }
 
     componentDidCatch(error: any, info: any) {
-        // This should reveal the actual runtime error in the console
-        // instead of the generic React "An error occurred in <AppContent>" message.
-        // eslint-disable-next-line no-console
-        console.error('[AppErrorBoundary] Caught error in AppContent:', error, info);
+        // Log detailed error info for debugging
+        console.error('[AppErrorBoundary] Detailed error:', error, info);
+        // Optionally send to error tracking service here
     }
 
     render() {
-        if (this.state.error) {
-            return (
-                <div style={{ padding: '16px', color: '#ff5555', background: '#1b1b1b', fontFamily: 'monospace' }}>
-                    <h2>Game client crashed</h2>
-                    <p>{String(this.state.error)}</p>
-                    <p>Check the browser console for full stack trace from [AppErrorBoundary].</p>
-                </div>
-            );
-        }
+        // Always render children - errors are logged but don't crash the app
         return this.props.children;
     }
 }

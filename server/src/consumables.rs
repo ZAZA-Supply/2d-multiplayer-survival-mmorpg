@@ -415,10 +415,11 @@ pub fn consume_filled_water_container(ctx: &ReducerContext, item_instance_id: u6
     let actual_consumption = water_content.min(CONSUMPTION_AMOUNT_LITERS);
     
     // --- Calculate thirst value ---
-    // Salt water dehydrates, fresh water hydrates
+    // Salt water: NO immediate thirst change (dehydration happens over time via SeawaterPoisoning effect)
+    // Fresh water: immediate hydration
     let thirst_value = if is_salt_water {
-        // Salt water causes dehydration (negative thirst)
-        actual_consumption * -10.0 // Same as drinking sea water directly
+        // Salt water causes NO immediate thirst change - the SeawaterPoisoning effect will drain thirst over time
+        0.0
     } else {
         // Fresh water hydrates
         actual_consumption * 15.0
@@ -449,7 +450,7 @@ pub fn consume_filled_water_container(ctx: &ReducerContext, item_instance_id: u6
         // Salt water - unpleasant throwing up sound
         crate::sound_events::emit_throwing_up_sound(ctx, player_to_update.position_x, player_to_update.position_y, sender_id);
         
-        // Apply seawater poisoning effect
+        // Apply seawater poisoning effect (drains 2.5 thirst per second = 25 total thirst drain over 10 seconds)
         const SEAWATER_POISONING_DURATION: u32 = 10; // 10 seconds
         match crate::active_effects::apply_seawater_poisoning_effect(ctx, sender_id, SEAWATER_POISONING_DURATION) {
             Ok(_) => {

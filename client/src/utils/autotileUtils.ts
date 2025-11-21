@@ -1,8 +1,8 @@
 import { WorldTile } from '../generated/world_tile_type';
 // Import autotile images
 import grassDirtAutotile from '../assets/tiles/tileset_grass_dirt_autotile.png';
-import grassBeachAutotile from '../assets/tiles/tileset_grass_beach_autotile.png';
-import beachSeaAutotile from '../assets/tiles/tileset_beach_sea_autotile.png';
+import grassBeachAutotile from '../assets/tiles/tileset_grass_beach_autotile_new.png';
+import beachSeaAutotile from '../assets/tiles/tileset_beach_sea_autotile_new.png';
 import grassDirtRoadAutotile from '../assets/tiles/tileset_grass_dirtroad_autotile.png';
 import dirtRoadDirtAutotile from '../assets/tiles/tileset_dirtroad_dirt_autotile.png';
 
@@ -214,6 +214,13 @@ const DEBUG_OVERRIDES: { [bitmask: number]: number } = {
     194: 12,
     107: 47,
     154: 47,
+    30: 47,
+    76: 47,
+    53: 47,
+    82: 26,
+    15: 47,
+    236: 47,
+    178: 2
     // Add your test overrides here!
 };
 

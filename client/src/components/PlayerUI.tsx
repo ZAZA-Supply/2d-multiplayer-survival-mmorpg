@@ -808,7 +808,7 @@ const PlayerUI: React.FC<PlayerUIProps> = ({
                             name: 'Production Zone',
                             emoji: '⚙️',
                             type: 'positive' as const,
-                            description: 'Within a red rune stone\'s influence.',
+                            description: 'The crimson runestone\'s power surges through your tools. Crafting stations hum with enhanced efficiency, bending metal and stone to your will with supernatural speed.',
                             // No duration - permanent while in zone
                         };
                         break;
@@ -819,18 +819,18 @@ const PlayerUI: React.FC<PlayerUIProps> = ({
                             name: 'Agrarian Zone',
                             emoji: '🌾',
                             type: 'positive' as const,
-                            description: 'Within a green rune stone\'s influence.',
+                            description: 'The emerald runestone pulses with primal life force. Seeds sprout faster, crops flourish with unnatural vigor, and the very earth yields its bounty more readily.',
                             // No duration - permanent while in zone
                         };
                         break;
                     case 'MemoryRune':
                         effectApplies = true;
                         effectData = {
-                            id: 'memory_rune',
+                            id: 'blue_runestone',
                             name: 'Echoes Resonate',
                             emoji: '🔮',
                             type: 'neutral' as const,
-                            description: 'The ancient stone whispers forgotten truths. When darkness falls, fragments of lost memories crystallize from the aether.',
+                            description: 'The azure runestone whispers forgotten truths. When darkness falls, fragments of lost memories crystallize from the aether, manifesting as ethereal memory shards.',
                             // No duration - permanent while in zone
                         };
                         break;

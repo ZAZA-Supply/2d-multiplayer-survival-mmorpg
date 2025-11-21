@@ -163,8 +163,8 @@ pub fn drink_water(ctx: &ReducerContext) -> Result<(), String> {
         // Inland water (rivers/lakes) - clean, fresh water
         (RIVER_WATER_THIRST_GAIN, "fresh water from a river")
     } else {
-        // Sea water - salty, causes dehydration
-        (SEA_WATER_THIRST_LOSS, "salt water from the sea")
+        // Sea water - NO immediate thirst change (dehydration happens over time via SeawaterPoisoning effect)
+        (0.0, "salt water from the sea")
     };
     
     // Apply thirst change with bounds checking
@@ -196,7 +196,7 @@ pub fn drink_water(ctx: &ReducerContext) -> Result<(), String> {
     
     // Apply seawater poisoning effect if drinking sea water
     if !is_inland_water {
-        // Apply 10 seconds of seawater poisoning (10 damage over 10 seconds)
+        // Apply 10 seconds of seawater poisoning (drains 2.5 thirst per second = 25 total thirst drain over 10 seconds)
         const SEAWATER_POISONING_DURATION: u32 = 10; // 10 seconds
         match apply_seawater_poisoning_effect(ctx, player_id, SEAWATER_POISONING_DURATION) {
             Ok(_) => {
