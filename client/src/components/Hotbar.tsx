@@ -9,13 +9,6 @@ import { isPlantableSeed } from '../utils/plantsUtils';
 import DraggableItem from './DraggableItem';
 import DroppableSlot from './DroppableSlot';
 
-// WATER FILLING FEATURE:
-// When a player is on a water tile and left-clicks with a water container selected,
-// instead of placing water, the container fills with 250mL per click.
-// - Only works on fresh water sources (salt water is blocked)
-// - Respects container capacity limits
-// - Requires server-side reducer: fillWaterContainerFromNaturalSource(itemInstanceId, fillAmount)
-
 // Import shared types
 import { PopulatedItem } from './InventoryUI';
 import { DragSourceSlotInfo, DraggedItemInfo } from '../types/dragDropTypes';
@@ -632,10 +625,17 @@ const Hotbar: React.FC<HotbarProps> = ({
 
   const activateHotbarSlot = useCallback((slotIndex: number, isMouseWheelScroll: boolean = false, currentSelectedSlot?: number) => {
     const itemInSlot = findItemForSlot(slotIndex);
+    
+    // Helper to update selection state locally
+    const updateSelection = (newSlot: number) => {
+        setSelectedSlot(newSlot);
+    };
+
     if (!connection?.reducers) {
       if (!itemInSlot && playerIdentity) {
         cancelPlacement();
         try { connection?.reducers.clearActiveItemReducer(playerIdentity); } catch (err) { console.error("Error clearActiveItemReducer:", err); }
+        updateSelection(-1);
       }
       return;
     }
@@ -644,6 +644,7 @@ const Hotbar: React.FC<HotbarProps> = ({
       if (playerIdentity) {
         cancelPlacement();
         try { connection.reducers.clearActiveItemReducer(playerIdentity); } catch (err) { console.error("Error clearActiveItemReducer:", err); }
+        updateSelection(-1);
       }
       return;
     }
@@ -669,71 +670,57 @@ const Hotbar: React.FC<HotbarProps> = ({
       return; // Prevent weapon activation in water (except allowed items)
     }
 
-    // console.log(`[Hotbar] Activating slot ${slotIndex}: "${itemInSlot.definition.name}" (Category: ${categoryTag}, Equippable: ${isEquippable})`);
-
-
+    console.log(`[Hotbar] Activating slot ${slotIndex}: "${itemInSlot.definition.name}" (Category: ${categoryTag}, Equippable: ${isEquippable})`);
 
     // Use the passed currentSelectedSlot (from before state update) to reliably detect double-click
-    // This prevents false positives when state updates synchronously
     const previousSelectedSlot = currentSelectedSlot !== undefined ? currentSelectedSlot : selectedSlot;
     const isDoubleClick = previousSelectedSlot === slotIndex && !isMouseWheelScroll;
     
     // Handle Consumable category items (food, drinks, etc.)
-    // Note: Seeds are Placeable and should NOT be consumed via hotbar - they're for planting only
     if (categoryTag === 'Consumable') {
-      cancelPlacement(); // Always cancel placement if activating a consumable slot
-      // Always clear any active item when selecting a consumable
+      cancelPlacement();
       if (playerIdentity) {
         try { connection.reducers.clearActiveItemReducer(playerIdentity); } catch (err) { console.error("Error clearActiveItemReducer when selecting consumable:", err); }
       }
-
-      // console.log(`[Hotbar] Consumable click debug: slotIndex=${slotIndex}, currentSelectedSlot=${currentSelectedSlot}, selectedSlot=${selectedSlot}, previousSelectedSlot=${previousSelectedSlot}, isDoubleClick=${isDoubleClick}, isMouseWheelScroll=${isMouseWheelScroll}`);
       
+      // Always highlight selected consumable
+      updateSelection(slotIndex);
+
       if (isDoubleClick) {
         // Second click/press on already selected consumable - actually consume it
-        // Check if animation is already running on this slot
         if (isVisualCooldownActive && cooldownSlot === slotIndex) {
-          // console.log('[Hotbar] Animation already running on slot:', slotIndex, '- ignoring click');
-          return; // Don't consume again or retrigger animation
+          return; 
         }
         
         try {
-          // console.log('[Hotbar] Consuming item on second click:', itemInSlot.definition.name, 'Instance ID:', instanceId);
           connection.reducers.consumeItem(instanceId);
-          // Trigger immediate animation - optimistic UI for responsiveness (1 second for consumables)
-          // console.log('[Hotbar] Triggering consumable animation (1 second) on slot:', slotIndex);
-          triggerClientCooldownAnimation(false, slotIndex); // Use default duration, specify the clicked slot
+          triggerClientCooldownAnimation(false, slotIndex); 
         } catch (err) { console.error(`Error consuming item ${instanceId}:`, err); }
       }
-      // Note: Slot selection for consumables happens outside this function (handled by caller)
     }
     
-    // Handle Placeable items (including seeds on first click)
-    if (categoryTag === 'Placeable') {
-      // console.log(`[Hotbar] Handling placeable: ${itemInSlot.definition.name}`);
+    // Handle Placeable items
+    else if (categoryTag === 'Placeable') {
+      // Special handling for seeds - keep placement active if we have more in the stack
+      const isSeed = isPlantableSeed(itemInSlot.definition);
       
-      // Check if we're already placing the same item type from the same slot
-      const actualCurrentSlot = currentSelectedSlot !== undefined ? currentSelectedSlot : selectedSlot;
-      const isCurrentlySelected = actualCurrentSlot === slotIndex;
+      // Check if we are already placing this exact item
       const isAlreadyPlacingThisItem = placementInfo && 
         placementInfo.itemName === itemInSlot.definition.name && 
-        isCurrentlySelected;
-      
-      // Special handling for seeds - keep placement active if we have more in the stack
-              // Dynamic seed list using plant utils - no more hardcoding!
-        const isSeed = isPlantableSeed(itemInSlot.definition);
-      
+        previousSelectedSlot === slotIndex;
+
       if (isAlreadyPlacingThisItem && isSeed && !isMouseWheelScroll) {
-        // Already placing this seed type and clicking the same slot again - keep placement active
-        // console.log(`[Hotbar] Already placing ${itemInSlot.definition.name}, keeping placement mode active`);
-        return; // Don't call startPlacement again, just stay in placement mode
-      } else if (isCurrentlySelected && !isMouseWheelScroll && !isSeed && isAlreadyPlacingThisItem) {
-        // Second click on non-seed placeable that's already in placement mode - cancel placement
+        // Keep placement active
+        updateSelection(slotIndex);
+        return;
+      } else if (previousSelectedSlot === slotIndex && !isMouseWheelScroll && !isSeed && isAlreadyPlacingThisItem) {
+        // Second click on non-seed placeable - cancel
         cancelPlacement();
+        updateSelection(-1);
         return;
       }
       
-      // Start placement for any placeable item (first click or not currently placing this item)
+      // Start placement
       const placementInfoData: PlacementItemInfo = {
         itemDefId: BigInt(itemInSlot.definition.id),
         itemName: itemInSlot.definition.name,
@@ -741,91 +728,57 @@ const Hotbar: React.FC<HotbarProps> = ({
         instanceId: BigInt(itemInSlot.instance.instanceId)
       };
       startPlacement(placementInfoData);
+      updateSelection(slotIndex);
+      
       try { 
         if (playerIdentity) connection.reducers.clearActiveItemReducer(playerIdentity); 
-        // console.log(`[Hotbar] Cleared active item for placeable: ${itemInSlot.definition.name}`);
       } catch (err) { 
         console.error("Error clearActiveItemReducer when selecting placeable:", err); 
       }
-    } else if (categoryTag === 'RangedWeapon') {
-      // console.log(`[Hotbar] Handling ranged weapon: ${itemInSlot.definition.name}`);
-      // console.log(`[Hotbar] Ranged weapon category tag: ${categoryTag}`);
-      // console.log(`[Hotbar] Instance ID: ${instanceId}`);
+    } 
+    // Handle Weapons, Tools, and Equippables
+    else if (categoryTag === 'RangedWeapon' || categoryTag === 'Tool' || categoryTag === 'Weapon' || isEquippable) {
       cancelPlacement();
       
-      // Check if this is a second click on the same ranged weapon slot (similar to weapon logic)
-      const actualCurrentSlot = currentSelectedSlot !== undefined ? currentSelectedSlot : selectedSlot;
-      const isCurrentlySelected = actualCurrentSlot === slotIndex;
+      // Robust Toggle Check: Check if this specific item instance is currently equipped on server
+      const isEquippedOnServer = activeEquipment?.equippedItemInstanceId === instanceId;
       
-      if (isCurrentlySelected && !isMouseWheelScroll) {
-        // Second click on already selected ranged weapon - unequip it and deselect slot
+      // Fallback to local state if server state isn't available or matching (e.g. lag)
+      // This ensures toggle works even if server hasn't confirmed equip yet
+      const isLocallySelected = previousSelectedSlot === slotIndex;
+      const shouldUnequip = (isEquippedOnServer || isLocallySelected) && !isMouseWheelScroll;
+      
+      if (shouldUnequip) {
+        // Unequip
         try {
           if (playerIdentity) {
             connection.reducers.clearActiveItemReducer(playerIdentity);
-            // console.log(`[Hotbar] Unequipped ranged weapon: ${itemInSlot.definition.name}`);
-            setSelectedSlot(-1);
-          }
-        } catch (err) {
-          console.error("Error clearActiveItemReducer on second click for ranged weapon:", err);
-        }
-      } else {
-        // First click - equip the ranged weapon
-        try { 
-          connection.reducers.setActiveItemReducer(instanceId); 
-          // console.log(`[Hotbar] Successfully set active ranged weapon: ${itemInSlot.definition.name}`);
-          // console.log(`[Hotbar] Ranged weapon should now be equipped and ready to fire`);
-          // TODO: Activate targeting reticle system here
-          // Select this slot since we're equipping the ranged weapon
-          setSelectedSlot(slotIndex);
-        } catch (err) { 
-          console.error("Error setActiveItemReducer for ranged weapon:", err); 
-        }
-      }
-    } else if (categoryTag === 'Tool' || categoryTag === 'Weapon' || isEquippable) {
-      // console.log(`[Hotbar] Handling tool/weapon/equippable: ${itemInSlot.definition.name} (Category: ${categoryTag})`);
-      cancelPlacement();
-      
-      // Check if this is a second click on the same weapon/tool slot (similar to consumables logic)
-      const actualCurrentSlot = currentSelectedSlot !== undefined ? currentSelectedSlot : selectedSlot;
-      const isCurrentlySelected = actualCurrentSlot === slotIndex;
-      
-      if (isCurrentlySelected && !isMouseWheelScroll) {
-        // Second click on already selected weapon/tool - unequip it and deselect slot
-        try {
-          if (playerIdentity) {
-            connection.reducers.clearActiveItemReducer(playerIdentity);
-            // console.log(`[Hotbar] Unequipped weapon/tool: ${itemInSlot.definition.name}`);
-            // Deselect the hotbar slot by setting it to -1
-            setSelectedSlot(-1);
+            updateSelection(-1);
           }
         } catch (err) {
           console.error("Error clearActiveItemReducer on second click:", err);
         }
       } else {
-        // First click - equip the weapon/tool
+        // Equip
         try { 
           connection.reducers.setActiveItemReducer(instanceId); 
-          // console.log(`[Hotbar] Successfully set active item: ${itemInSlot.definition.name}`);
-          // Select this slot since we're equipping the weapon/tool
-          setSelectedSlot(slotIndex);
+          updateSelection(slotIndex);
         } catch (err) { 
           console.error("Error setActiveItemReducer:", err); 
         }
       }
-    } else {
-      // console.log(`[Hotbar] Unhandled category or non-equippable item: ${itemInSlot.definition.name} (Category: ${categoryTag})`);
-      // If item is not consumable, armor, placeable, or equippable,
-      // it implies it's not directly "activatable" by selecting its hotbar slot.
-      // Default behavior might be to clear any previously active item.
+    } 
+    // Default / Fallback
+    else {
       cancelPlacement();
       try { 
         if (playerIdentity) connection.reducers.clearActiveItemReducer(playerIdentity); 
-        // console.log(`[Hotbar] Cleared active item for unhandled category: ${itemInSlot.definition.name}`);
       } catch (err) { 
         console.error("Error clearActiveItemReducer:", err); 
       }
+      updateSelection(-1);
     }
-  }, [findItemForSlot, connection, playerIdentity, cancelPlacement, startPlacement, triggerClientCooldownAnimation, isVisualCooldownActive, cooldownSlot, localPlayer, selectedSlot, placementInfo]);
+  }, [findItemForSlot, connection, playerIdentity, cancelPlacement, startPlacement, triggerClientCooldownAnimation, isVisualCooldownActive, cooldownSlot, localPlayer, selectedSlot, placementInfo, activeEquipment]);
 
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
     const inventoryPanel = document.querySelector('.inventoryPanel');
@@ -842,23 +795,10 @@ const Hotbar: React.FC<HotbarProps> = ({
     if (keyNum !== -1 && keyNum >= 1 && keyNum <= numSlots) {
       const newSlotIndex = keyNum - 1;
       const currentSlot = selectedSlot; // Capture current value before state update
-      // console.log(`[Hotbar] Keyboard ${keyNum} pressed: newSlotIndex=${newSlotIndex}, currentSlot=${currentSlot}, selectedSlot state=${selectedSlot}`);
-      
-      // Check if this is a weapon/tool slot that might unequip
       const itemInSlot = findItemForSlot(newSlotIndex);
-      const isWeaponOrTool = itemInSlot && (
-        itemInSlot.definition.category.tag === 'Tool' || 
-        itemInSlot.definition.category.tag === 'Weapon' || 
-        itemInSlot.definition.category.tag === 'RangedWeapon' ||
-        itemInSlot.definition.isEquippable
-      );
+      console.log(`[Hotbar] Keyboard ${keyNum} pressed: newSlotIndex=${newSlotIndex}, currentSlot=${currentSlot}, item=${itemInSlot?.definition.name}, category=${itemInSlot?.definition.category.tag}, isEquippable=${itemInSlot?.definition.isEquippable}`);
       
-      if (!isWeaponOrTool) {
-        // For non-weapon items, always select the slot
-        setSelectedSlot(newSlotIndex);
-      }
-      
-      // console.log(`[Hotbar] Called setSelectedSlot(${newSlotIndex})`);
+      // Delegate all state updates to activateHotbarSlot to prevent flickering/race conditions
       activateHotbarSlot(newSlotIndex, false, currentSlot);
     }
   }, [numSlots, activateHotbarSlot, selectedSlot, findItemForSlot]); // Updated dependencies
@@ -873,21 +813,8 @@ const Hotbar: React.FC<HotbarProps> = ({
   const handleSlotClick = (index: number) => {
       // console.log('[Hotbar] Slot clicked:', index);
       const currentSlot = selectedSlot; // Capture current value before state update
-      // For most items, we want to select the slot, but weapons/tools might unequip and deselect
-      // Let activateHotbarSlot handle the selection logic
-      const itemInSlot = findItemForSlot(index);
-      const isWeaponOrTool = itemInSlot && (
-        itemInSlot.definition.category.tag === 'Tool' || 
-        itemInSlot.definition.category.tag === 'Weapon' || 
-        itemInSlot.definition.category.tag === 'RangedWeapon' ||
-        itemInSlot.definition.isEquippable
-      );
       
-      if (!isWeaponOrTool) {
-        // For non-weapon items, always select the slot
-        setSelectedSlot(index);
-      }
-      
+      // Delegate all state updates to activateHotbarSlot to prevent flickering/race conditions
       activateHotbarSlot(index, false, currentSlot); // Pass the current slot
   };
 
