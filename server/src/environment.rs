@@ -1691,23 +1691,22 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
     if spawned_cloud_count > 0 {
         log::info!("Scheduling initial cloud position update.");
         let update_interval_seconds = 5.0; // How often to update cloud positions
-        match ctx.db.cloud_update_schedule().try_insert(CloudUpdateSchedule {
-            schedule_id: 0, // auto_inc
-            scheduled_at: spacetimedb::TimeDuration::from_micros((update_interval_seconds * 1_000_000.0) as i64).into(),
-            delta_time_seconds: update_interval_seconds,
-        }) {
-            Ok(_) => log::info!("Cloud update successfully scheduled every {} seconds.", update_interval_seconds),
-            Err(e) => log::error!("Failed to schedule cloud update: {}", e),
-        }
+        crate::try_insert_schedule!(
+            ctx.db.cloud_update_schedule(),
+            CloudUpdateSchedule {
+                schedule_id: 0,
+                scheduled_at: spacetimedb::TimeDuration::from_micros((update_interval_seconds * 1_000_000.0) as i64).into(),
+                delta_time_seconds: update_interval_seconds,
+            },
+            "Cloud update"
+        );
 
         // --- Initialize Cloud Intensity System --- (NEW)
         log::info!("Initializing cloud intensity system.");
         if let Err(e) = crate::cloud::init_cloud_intensity_system(ctx) {
             log::error!("Failed to initialize cloud intensity system: {}", e);
         }
-        // --- End Initialize Cloud Intensity System ---
     }
-    // --- End Schedule initial cloud update ---
 
 
     // --- Seed Barrels on Dirt Roads ---

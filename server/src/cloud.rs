@@ -285,12 +285,14 @@ pub fn init_cloud_intensity_system(ctx: &ReducerContext) -> Result<(), String> {
     
     // Schedule periodic cloud intensity updates
     let update_interval = TimeDuration::from_micros((CLOUD_INTENSITY_UPDATE_INTERVAL_SECS * 1_000_000) as i64);
-    ctx.db.cloud_intensity_schedule().insert(CloudIntensitySchedule {
-        schedule_id: 0, // Auto-increment
-        scheduled_at: update_interval.into(), // Periodic execution
-    });
+    crate::try_insert_schedule!(
+        ctx.db.cloud_intensity_schedule(),
+        CloudIntensitySchedule {
+            schedule_id: 0,
+            scheduled_at: update_interval.into(),
+        },
+        "Cloud intensity"
+    );
     
-    log::info!("Cloud intensity system initialized with {}-second update interval", 
-              CLOUD_INTENSITY_UPDATE_INTERVAL_SECS);
     Ok(())
 } 

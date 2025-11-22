@@ -565,22 +565,25 @@
      }
  }
  
- // Initialize the spittle projectile system
- #[spacetimedb::reducer]
- pub fn init_viper_spittle_system(ctx: &ReducerContext) -> Result<(), String> {
-     // Only schedule if not already scheduled
-     let schedule_table = ctx.db.viper_spittle_update_schedule();
-     if schedule_table.iter().count() == 0 {
-         // Schedule spittle collision detection every 50ms (same as regular projectiles)
-         let update_interval = TimeDuration::from_micros(50_000); // 50ms
-         schedule_table.insert(ViperSpittleUpdateSchedule {
-             id: 0, // auto_inc
-             scheduled_at: update_interval.into(),
-         });
-         log::info!("Viper spittle projectile system initialized with 50ms updates");
-     }
-     Ok(())
- }
+// Initialize the spittle projectile system
+#[spacetimedb::reducer]
+pub fn init_viper_spittle_system(ctx: &ReducerContext) -> Result<(), String> {
+    // Only schedule if not already scheduled
+    let schedule_table = ctx.db.viper_spittle_update_schedule();
+    if schedule_table.iter().count() == 0 {
+        // Schedule spittle collision detection every 50ms (same as regular projectiles)
+        let update_interval = TimeDuration::from_micros(50_000); // 50ms
+        crate::try_insert_schedule!(
+            schedule_table,
+            ViperSpittleUpdateSchedule {
+                id: 0,
+                scheduled_at: update_interval.into(),
+            },
+            "Viper spittle projectile"
+        );
+    }
+    Ok(())
+}
  
  // Update viper spittle projectiles
  #[spacetimedb::reducer]

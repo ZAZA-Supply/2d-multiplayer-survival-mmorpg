@@ -837,14 +837,15 @@ pub fn create_player_corpse(ctx: &ReducerContext, dead_player_id: Identity, deat
         log::error!("[CorpseCreate:{:?}] Failed to find corpse {} to update its despawn_scheduled_at time.", dead_player_id, new_corpse_id);
     }
 
-    // Insert panics on failure, so if it doesn't panic, it succeeded.
-    // The error from TryInsertError would be SpacetimeDB specific, not a string directly.
-    // If a string error message is desired, try_insert should be used and mapped.
-    // For now, assuming panic on error is acceptable for this insert.
-    corpse_schedules.insert(PlayerCorpseDespawnSchedule {
-        corpse_id: new_corpse_id as u64, // This should be u32 if PlayerCorpse.id is u32 - it is u64 in the table.
-        scheduled_at: despawn_time.into(),
-    });
+    // Use macro for consistent retry logic
+    crate::try_insert_schedule!(
+        corpse_schedules,
+        PlayerCorpseDespawnSchedule {
+            corpse_id: new_corpse_id as u64,
+            scheduled_at: despawn_time.into(),
+        },
+        "Player corpse despawn"
+    );
 
     Ok(())
 } 

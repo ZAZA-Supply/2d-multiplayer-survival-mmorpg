@@ -463,13 +463,14 @@ pub fn init_wild_animal_ai_schedule(ctx: &ReducerContext) -> Result<(), String> 
     if schedule_table.iter().count() == 0 {
         log::info!("Starting wild animal AI schedule (every {}ms).", AI_TICK_INTERVAL_MS);
         let interval = Duration::from_millis(AI_TICK_INTERVAL_MS);
-        match schedule_table.try_insert(WildAnimalAiSchedule {
-            id: 0,
-            scheduled_at: ScheduleAt::Interval(interval.into()),
-        }) {
-            Ok(_) => log::info!("Wild animal AI schedule initialized."),
-            Err(e) => log::error!("Failed to initialize wild animal AI schedule: {}", e),
-        };
+        crate::try_insert_schedule!(
+            schedule_table,
+            WildAnimalAiSchedule {
+                id: 0,
+                scheduled_at: ScheduleAt::Interval(interval.into()),
+            },
+            "Wild animal AI"
+        );
     }
     Ok(())
 }

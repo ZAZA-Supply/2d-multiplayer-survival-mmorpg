@@ -201,7 +201,7 @@ const tipSectionDefinitions = {
             'Craft Reed Water Bottles or find Plastic Water Jugs to store and transport water.',
             'Build Rain Collectors to automatically gather fresh water during rainstorms.',
             'Rain Collectors fill with clean, drinkable water that can be collected with containers.',
-            'Equip a water container and left-click over water sources to fill it.',
+            'Equip a water container and press F while standing over water sources to fill it.',
             'Right-click with a filled water container to drink from it anywhere.',
             'Left-click with filled containers to dump water - useful for multiple purposes.',
             'Pour water onto plants and crops to make them grow significantly faster.',
@@ -244,6 +244,31 @@ const tipSectionDefinitions = {
             'Campfires provide an ambient warmth bonus that helps prevent freezing.',
             'Cooked food from campfires provides better nutrition than raw food.',
             'Eating cooked food next to a campfire increases its healing properties.',
+        ]
+    },
+
+    fieldCauldron: {
+        title: '🍲 Field Cauldron',
+        tips: [
+            'The Cerametal Field Cauldron Mk. II is your advanced cooking vessel for broths, teas, and potions.',
+            'Place the cauldron on a campfire - it will automatically snap on top of the fire.',
+            'The cauldron only works when the campfire beneath it is actively burning.',
+            'Open the cauldron interface by clicking on it to access water and ingredient slots.',
+            'Every recipe starts with water - add water first before adding ingredients.',
+            'To add water: Equip a filled water container, open the cauldron, and drag it to the water slot.',
+            'The cauldron has 3 ingredient slots - experiment with different combinations.',
+            'Drag ingredients from your inventory into the cauldron slots to create recipes.',
+            'Desalinate seawater: Pour salt water into the cauldron and let it boil over the fire.',
+            'Boiling converts harmful seawater into safe, drinkable fresh water over time.',
+            'Create healing broths by combining water with meat, vegetables, and herbs.',
+            'Brew medicinal teas using water and foraged plants like fireweed or nettles.',
+            'Bone broths from animal bones provide powerful healing and nutrition.',
+            'The cauldron can catch rainwater automatically when exposed to precipitation.',
+            'Place cauldrons under tree cover to protect the campfire while still catching rain.',
+            'Pick up the cauldron to move it, but water will spill during transport.',
+            'Complex recipes with multiple ingredients provide better buffs than simple ones.',
+            'Experiment with different ingredient combinations to discover new recipes.',
+            'The cauldron is essential for advanced survival - master it to thrive.',
         ]
     },
 
@@ -348,6 +373,7 @@ const tipSectionOrder = [
     'waterSources',
     'waterContainers',
     'campfires',
+    'fieldCauldron',
     'foodCooking',
     'fishing',
     'buildingCrafting',

@@ -80,6 +80,31 @@ pub fn get_consumable_definitions() -> Vec<ItemDefinition> {
             .respawn_time(60)
             .build(),
 
+        ItemBuilder::new("Raw Corn", "Fresh corn kernels. Sweet and crunchy when raw, but better when cooked.", ItemCategory::Consumable)
+            .icon("corn.png")
+            .stackable(20)
+            .consumable(7.0, 18.0, 8.0)
+            .cookable(35.0, "Cooked Corn")
+            .respawn_time(200)
+            .build(),
+
+        ItemBuilder::new("Cooked Corn", "Tender, sweet cooked corn. A delicious and nutritious staple food.", ItemCategory::Consumable)
+            .icon("cooked_corn.png")
+            .stackable(20)
+            .consumable(28.0, 65.0, 20.0) // Good nutrition - comparable to cooked potato
+            .cookable(45.0, "Burnt Corn")
+            .respawn_time(260)
+            .build(),
+
+        ItemBuilder::new("Burnt Corn", "Charred and blackened corn. Bitter and unpleasant, but can be processed into charcoal.", ItemCategory::Consumable)
+            .icon("burnt_corn.png")
+            .stackable(20)
+            .consumable(-3.0, 12.0, -10.0)
+            .crafting_output(14, 0)
+            .cookable(50.0, "Charcoal")
+            .respawn_time(80)
+            .build(),
+
         // === NEW ARCTIC/SUBARCTIC PLANTS ===
         ItemBuilder::new("Scurvy Grass", "Arctic plant rich in vitamin C. Essential for preventing scurvy on long voyages. Grows year-round in coastal areas.", ItemCategory::Consumable)
             .icon("scurvy_grass.png")

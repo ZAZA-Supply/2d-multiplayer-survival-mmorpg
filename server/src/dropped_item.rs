@@ -315,11 +315,14 @@ pub(crate) fn init_dropped_item_schedule(ctx: &ReducerContext) -> Result<(), Str
     if schedule_table.iter().count() == 0 {
         log::info!("Starting dropped item despawn schedule (every {}s).", DESPAWN_CHECK_INTERVAL_SECS);
         let interval = Duration::from_secs(DESPAWN_CHECK_INTERVAL_SECS);
-        // Insert the schedule row (insert returns the row, not Result)
-        schedule_table.insert(DroppedItemDespawnSchedule {
-            id: 0, // Auto-incremented
-            scheduled_at: ScheduleAt::Interval(interval.into()),
-        });
+        crate::try_insert_schedule!(
+            schedule_table,
+            DroppedItemDespawnSchedule {
+                id: 0,
+                scheduled_at: ScheduleAt::Interval(interval.into()),
+            },
+            "Dropped item despawn"
+        );
     } else {
         log::debug!("Dropped item despawn schedule already exists.");
     }

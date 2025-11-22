@@ -18,6 +18,7 @@ pub enum PlantType {
     Carrot,       // Cold-hardy root crop
     Beets,        // Cold-hardy root crop
     Horseradish,  // Extremely cold-hardy perennial - single best root crop for Aleutian Islands
+    Corn,         // Cold-hardy variety - grows near water sources
     
     // === HERBS & MEDICINAL PLANTS (Arctic/Subarctic species) ===
     Chicory,      // Cold-hardy perennial herb
@@ -329,6 +330,23 @@ lazy_static! {
             max_respawn_time_secs: 3000, // 50 minutes
             spawn_condition: SpawnCondition::NearWater,
             growing_seasons: vec![Season::Autumn],
+        });
+        
+        configs.insert(PlantType::Corn, PlantConfig {
+            entity_name: "Corn".to_string(),
+            density_percent: 0.0005, // ~125 plants - moderate density
+            min_distance_sq: 35.0 * 35.0,
+            min_tree_distance_sq: 20.0 * 20.0,
+            min_stone_distance_sq: 25.0 * 25.0,
+            noise_threshold: 0.65,
+            primary_yield: ("Raw Corn".to_string(), 1, 3), // 1-3 corn per harvest
+            secondary_yield: Some(("Plant Fiber".to_string(), 2, 4, 0.70)), // 70% chance for fiber from stalks
+            seed_type: "Corn Seeds".to_string(),
+            seed_drop_chance: 0.70, // 70% chance - important food crop must be sustainable
+            min_respawn_time_secs: 1200, // 20 minutes
+            max_respawn_time_secs: 1800, // 30 minutes
+            spawn_condition: SpawnCondition::NearWater, // Corn needs water nearby
+            growing_seasons: vec![Season::Summer, Season::Autumn], // Warm season crop
         });
         
         // === HERBS & MEDICINAL PLANTS ===

@@ -1294,21 +1294,17 @@ fn start_seasonal_plant_transition(ctx: &ReducerContext, new_season: &Season) ->
             let delay_seconds = (batch as u64) * SPAWN_INTERVAL_SECONDS;
             let progress = (batch as f32) / (TRANSITION_DURATION_MINUTES as f32);
             
-            match ctx.db.seasonal_plant_management_schedule().try_insert(SeasonalPlantManagementSchedule {
-                schedule_id: 0, // auto_inc
-                scheduled_at: spacetimedb::TimeDuration::from_micros((delay_seconds * 1_000_000) as i64).into(),
-                transition_season: new_season.clone(),
-                transition_progress: progress,
-                spawn_batch_size: batch_size,
-            }) {
-                Ok(_) => {
-                    log::info!("🕒 Scheduled plant spawn batch {} at +{}s (progress: {:.1}%)", 
-                              batch + 1, delay_seconds, progress * 100.0);
-                }
-                Err(e) => {
-                    log::error!("Failed to schedule plant spawn batch {}: {}", batch + 1, e);
-                }
-            }
+            crate::try_insert_schedule!(
+                ctx.db.seasonal_plant_management_schedule(),
+                SeasonalPlantManagementSchedule {
+                    schedule_id: 0,
+                    scheduled_at: spacetimedb::TimeDuration::from_micros((delay_seconds * 1_000_000) as i64).into(),
+                    transition_season: new_season.clone(),
+                    transition_progress: progress,
+                    spawn_batch_size: batch_size,
+                },
+                "Seasonal plant management"
+            );
         }
     }
     

@@ -95,13 +95,14 @@ pub fn init_building_decay_schedule(ctx: &ReducerContext) -> Result<(), String> 
             DECAY_PROCESS_INTERVAL_SECONDS
         );
         let interval = Duration::from_secs(DECAY_PROCESS_INTERVAL_SECONDS);
-        match schedule_table.try_insert(BuildingDecaySchedule {
-            id: 0,
-            scheduled_at: ScheduleAt::Interval(interval.into()),
-        }) {
-            Ok(_) => log::info!("Building decay schedule inserted."),
-            Err(e) => log::error!("Failed to insert building decay schedule: {}", e),
-        };
+        crate::try_insert_schedule!(
+            schedule_table,
+            BuildingDecaySchedule {
+                id: 0,
+                scheduled_at: ScheduleAt::Interval(interval.into()),
+            },
+            "Building decay"
+        );
     } else {
         log::debug!("Building decay schedule already exists.");
     }

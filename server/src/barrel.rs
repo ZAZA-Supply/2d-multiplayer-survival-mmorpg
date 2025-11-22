@@ -396,10 +396,14 @@ pub(crate) fn init_barrel_system(ctx: &ReducerContext) -> Result<(), String> {
         
         log::info!("Initializing barrel respawn system (check every 30s)");
         
-        schedule_table.insert(BarrelRespawnSchedule {
-            id: 0, // Auto-incremented
-            scheduled_at: ScheduleAt::Interval(check_interval.into()),
-        });
+        crate::try_insert_schedule!(
+            schedule_table,
+            BarrelRespawnSchedule {
+                id: 0,
+                scheduled_at: ScheduleAt::Interval(check_interval.into()),
+            },
+            "Barrel respawn"
+        );
     } else {
         log::debug!("Barrel respawn system already initialized");
     }

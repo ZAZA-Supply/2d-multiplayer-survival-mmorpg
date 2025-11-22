@@ -31,13 +31,14 @@ pub fn init_global_tick_schedule(ctx: &ReducerContext) -> Result<(), String> {
             GLOBAL_TICK_INTERVAL_SECS
         );
         let interval = Duration::from_secs(GLOBAL_TICK_INTERVAL_SECS);
-        match schedule_table.try_insert(GlobalTickSchedule {
-            id: 0,
-            scheduled_at: ScheduleAt::Interval(interval.into()),
-        }) {
-            Ok(_) => log::info!("Global tick schedule inserted."),
-            Err(e) => log::error!("Failed to insert global tick schedule: {}", e),
-        };
+        crate::try_insert_schedule!(
+            schedule_table,
+            GlobalTickSchedule {
+                id: 0,
+                scheduled_at: ScheduleAt::Interval(interval.into()),
+            },
+            "Global tick"
+        );
     } else {
         log::debug!("Global tick schedule already exists.");
     }

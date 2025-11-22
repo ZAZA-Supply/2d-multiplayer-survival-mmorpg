@@ -704,10 +704,14 @@ pub fn init_crafting_schedule(ctx: &ReducerContext) -> Result<(), String> {
     if schedule_table.iter().count() == 0 {
         log::info!("Starting crafting finish check schedule (every {}s).", CRAFTING_CHECK_INTERVAL_SECS);
         let interval = Duration::from_secs(CRAFTING_CHECK_INTERVAL_SECS);
-        schedule_table.insert(CraftingFinishSchedule {
-            id: 0, // Auto-incremented
-            scheduled_at: spacetimedb::spacetimedb_lib::ScheduleAt::Interval(interval.into()),
-        });
+        crate::try_insert_schedule!(
+            schedule_table,
+            CraftingFinishSchedule {
+                id: 0,
+                scheduled_at: spacetimedb::spacetimedb_lib::ScheduleAt::Interval(interval.into()),
+            },
+            "Crafting finish check"
+        );
     } else {
         log::debug!("Crafting finish check schedule already exists.");
     }

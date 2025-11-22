@@ -883,17 +883,15 @@ pub fn init_dodge_roll_cleanup_system(ctx: &ReducerContext) -> Result<(), String
     // Schedule cleanup to run every 100ms (0.1 seconds)
     let cleanup_interval_micros = 100_000i64; // 100ms in microseconds
     
-    match ctx.db.dodge_roll_cleanup_schedule().try_insert(DodgeRollCleanupSchedule {
-        id: 0, // auto_inc
-        scheduled_at: spacetimedb::TimeDuration::from_micros(cleanup_interval_micros).into(),
-    }) {
-        Ok(_) => {
-            log::info!("Dodge roll cleanup system initialized successfully (runs every 100ms)");
-            Ok(())
-        }
-        Err(e) => {
-            log::error!("Failed to initialize dodge roll cleanup system: {}", e);
-            Err(format!("Failed to initialize dodge roll cleanup system: {}", e))
-        }
-    }
+    crate::try_insert_schedule!(
+        ctx.db.dodge_roll_cleanup_schedule(),
+        DodgeRollCleanupSchedule {
+            id: 0,
+            scheduled_at: spacetimedb::TimeDuration::from_micros(cleanup_interval_micros).into(),
+        },
+        "Dodge roll cleanup"
+    );
+    
+    log::info!("Dodge roll cleanup system initialized successfully (runs every 100ms)");
+    Ok(())
 }

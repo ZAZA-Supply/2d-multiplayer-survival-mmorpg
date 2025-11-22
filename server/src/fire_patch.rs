@@ -76,18 +76,26 @@ pub fn init_fire_patch_system(ctx: &ReducerContext) -> Result<(), String> {
     // Schedule periodic cleanup
     let cleanup_interval = spacetimedb::TimeDuration::from_micros(FIRE_PATCH_CLEANUP_INTERVAL_SECS as i64 * 1_000_000);
     
-    ctx.db.fire_patch_cleanup_schedule().insert(FirePatchCleanupSchedule {
-        id: 0,
-        scheduled_at: cleanup_interval.into(),
-    });
+    crate::try_insert_schedule!(
+        ctx.db.fire_patch_cleanup_schedule(),
+        FirePatchCleanupSchedule {
+            id: 0,
+            scheduled_at: cleanup_interval.into(),
+        },
+        "Fire patch cleanup"
+    );
 
     // Schedule periodic damage processing (like campfires)
     let damage_interval = spacetimedb::TimeDuration::from_micros(FIRE_PATCH_DAMAGE_INTERVAL_SECS as i64 * 1_000_000);
     
-    ctx.db.fire_patch_damage_schedule().insert(FirePatchDamageSchedule {
-        id: 0,
-        scheduled_at: damage_interval.into(),
-    });
+    crate::try_insert_schedule!(
+        ctx.db.fire_patch_damage_schedule(),
+        FirePatchDamageSchedule {
+            id: 0,
+            scheduled_at: damage_interval.into(),
+        },
+        "Fire patch damage"
+    );
 
     log::info!("[FirePatchInit] Fire patch system initialized with cleanup interval of {} seconds and damage interval of {} seconds", 
         FIRE_PATCH_CLEANUP_INTERVAL_SECS, FIRE_PATCH_DAMAGE_INTERVAL_SECS);

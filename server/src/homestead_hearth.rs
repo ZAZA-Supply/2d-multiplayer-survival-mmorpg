@@ -653,13 +653,14 @@ pub fn init_building_privilege_check_schedule(ctx: &ReducerContext) -> Result<()
             BUILDING_PRIVILEGE_CHECK_INTERVAL_SECS
         );
         let interval = Duration::from_secs(BUILDING_PRIVILEGE_CHECK_INTERVAL_SECS);
-        match schedule_table.try_insert(BuildingPrivilegeCheckSchedule {
-            id: 0,
-            scheduled_at: ScheduleAt::Interval(interval.into()),
-        }) {
-            Ok(_) => log::info!("Building privilege check schedule inserted."),
-            Err(e) => log::error!("Failed to insert building privilege check schedule: {}", e),
-        };
+        crate::try_insert_schedule!(
+            schedule_table,
+            BuildingPrivilegeCheckSchedule {
+                id: 0,
+                scheduled_at: ScheduleAt::Interval(interval.into()),
+            },
+            "Building privilege check"
+        );
     } else {
         log::debug!("Building privilege check schedule already exists.");
     }
@@ -727,13 +728,14 @@ pub fn init_hearth_upkeep_schedule(ctx: &ReducerContext) -> Result<(), String> {
             UPKEEP_PROCESS_INTERVAL_SECONDS
         );
         let interval = Duration::from_secs(UPKEEP_PROCESS_INTERVAL_SECONDS);
-        match schedule_table.try_insert(HearthUpkeepSchedule {
-            id: 0,
-            scheduled_at: ScheduleAt::Interval(interval.into()),
-        }) {
-            Ok(_) => log::info!("Hearth upkeep schedule inserted."),
-            Err(e) => log::error!("Failed to insert hearth upkeep schedule: {}", e),
-        };
+        crate::try_insert_schedule!(
+            schedule_table,
+            HearthUpkeepSchedule {
+                id: 0,
+                scheduled_at: ScheduleAt::Interval(interval.into()),
+            },
+            "Hearth upkeep"
+        );
     } else {
         log::debug!("Hearth upkeep schedule already exists.");
     }

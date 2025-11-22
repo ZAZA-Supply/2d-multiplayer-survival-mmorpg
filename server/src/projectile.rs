@@ -128,11 +128,14 @@ pub fn init_projectile_system(ctx: &ReducerContext) -> Result<(), String> {
     if schedule_table.iter().count() == 0 {
         // Schedule projectile collision detection every 50ms
         let update_interval = TimeDuration::from_micros(50_000); // 50ms = 0.05 seconds
-        schedule_table.insert(ProjectileUpdateSchedule {
-            id: 0, // auto_inc
-            scheduled_at: update_interval.into(),
-        });
-        log::info!("Projectile collision detection system initialized with 50ms updates");
+        crate::try_insert_schedule!(
+            schedule_table,
+            ProjectileUpdateSchedule {
+                id: 0,
+                scheduled_at: update_interval.into(),
+            },
+            "Projectile collision detection"
+        );
     }
     Ok(())
 }

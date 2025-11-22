@@ -409,12 +409,14 @@ pub fn init_plant_growth_system(ctx: &ReducerContext) -> Result<(), String> {
     if ctx.db.planted_seed_growth_schedule().count() == 0 {
         let check_interval = TimeDuration::from(Duration::from_secs(PLANT_GROWTH_CHECK_INTERVAL_SECS));
         
-        ctx.db.planted_seed_growth_schedule().insert(PlantedSeedGrowthSchedule {
-            id: 0, // Auto-inc
-            scheduled_at: check_interval.into(), // Periodic scheduling
-        });
-        
-        log::info!("Plant growth system initialized - checking every {} seconds", PLANT_GROWTH_CHECK_INTERVAL_SECS);
+        crate::try_insert_schedule!(
+            ctx.db.planted_seed_growth_schedule(),
+            PlantedSeedGrowthSchedule {
+                id: 0,
+                scheduled_at: check_interval.into(),
+            },
+            "Plant growth"
+        );
     }
     
     Ok(())

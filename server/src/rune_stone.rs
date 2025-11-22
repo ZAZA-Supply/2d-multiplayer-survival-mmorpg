@@ -158,49 +158,9 @@ pub struct RuneStoneSeedSpawnSchedule {
 /// Each rune stone gets 2-4 random seed types from all available plantable seeds
 /// This creates variety and permanence across server wipes
 pub fn generate_random_seed_loot_table(rng: &mut impl rand::Rng) -> Vec<String> {
-    // All plantable seed types (excluding burnt/toasted variants)
-    let all_seeds = vec![
-        // Large nutritious seeds
-        "Pumpkin Seeds",
-        "Sunflower Seeds",
-        "Flax Seeds",
-        // Vegetable seeds
-        "Carrot Seeds",
-        "Beet Seeds",
-        "Chicory Seeds",
-        "Salsify Seeds",
-        // Medicinal herb seeds
-        "Yarrow Seeds",
-        "Chamomile Seeds",
-        "Valerian Seeds",
-        "Mugwort Seeds",
-        "Ginseng Seeds",
-        // Fiber plant seeds
-        "Dogbane Seeds",
-        "Bog Cotton Seeds",
-        // Berry seeds
-        "Lingonberry Seeds",
-        "Cloudberry Seeds",
-        "Bilberry Seeds",
-        "Wild Strawberry Seeds",
-        "Rowan Seeds",
-        "Cranberry Seeds",
-        // Toxic plant seeds (rare but valuable for alchemy)
-        "Mandrake Seeds",
-        "Belladonna Seeds",
-        "Henbane Seeds",
-        "Datura Seeds",
-        "Wolfsbane Seeds",
-        // Grain seeds
-        "Corn Seeds",
-        // Coastal/Arctic seeds
-        "Nettle Seeds",
-        "Scurvy Grass Seeds",
-        "Crowberry Seeds",
-        "Sea Plantain Seeds",
-        "Glasswort Seeds",
-        "Beach Lyme Grass Seeds",
-    ];
+    // Get all plantable seed types from centralized plant database
+    // This automatically stays in sync with the plant configuration
+    let all_seeds = crate::plants_database::get_all_seed_types();
     
     // Each rune stone gets 2-4 random seed types
     let num_seeds = rng.gen_range(2..=4);
@@ -213,6 +173,27 @@ pub fn generate_random_seed_loot_table(rng: &mut impl rand::Rng) -> Vec<String> 
     shuffled.into_iter()
         .take(num_seeds)
         .map(|s| s.to_string())
+        .collect()
+}
+
+/// Filter a seed loot table to only include seeds that can grow in the current season
+/// Returns the filtered list of seed names
+fn filter_seeds_by_season(seed_names: &[String], current_season: &Season) -> Vec<String> {
+    use crate::plants_database::{get_plant_type_by_seed, can_grow_in_season};
+    
+    seed_names.iter()
+        .filter(|seed_name| {
+            // Get the plant type for this seed
+            if let Some(plant_type) = get_plant_type_by_seed(seed_name) {
+                // Check if this plant can grow in the current season
+                can_grow_in_season(&plant_type, current_season)
+            } else {
+                // If we can't find the plant type, don't spawn it (safety)
+                log::warn!("Could not find plant type for seed: {}", seed_name);
+                false
+            }
+        })
+        .cloned()
         .collect()
 }
 
@@ -363,10 +344,14 @@ pub fn spawn_memory_shards_at_night(
     if !is_night_period {
         // Not night time, reschedule for later
         let check_interval = TimeDuration::from(Duration::from_secs(BLUE_RUNE_SHARD_SPAWN_INTERVAL_SECS));
-        ctx.db.rune_stone_shard_spawn_schedule().insert(RuneStoneShardSpawnSchedule {
-            id: 0,
-            scheduled_at: check_interval.into(),
-        });
+        crate::try_insert_schedule!(
+            ctx.db.rune_stone_shard_spawn_schedule(),
+            RuneStoneShardSpawnSchedule {
+                id: 0,
+                scheduled_at: check_interval.into(),
+            },
+            "Rune stone shard spawn (reschedule)"
+        );
         return Ok(());
     }
     
@@ -484,10 +469,14 @@ pub fn spawn_memory_shards_at_night(
     
     // Reschedule for next check
     let check_interval = TimeDuration::from(Duration::from_secs(BLUE_RUNE_SHARD_SPAWN_INTERVAL_SECS));
-    ctx.db.rune_stone_shard_spawn_schedule().insert(RuneStoneShardSpawnSchedule {
-        id: 0,
-        scheduled_at: check_interval.into(),
-    });
+    crate::try_insert_schedule!(
+        ctx.db.rune_stone_shard_spawn_schedule(),
+        RuneStoneShardSpawnSchedule {
+            id: 0,
+            scheduled_at: check_interval.into(),
+        },
+        "Rune stone shard spawn (reschedule)"
+    );
     
     Ok(())
 }
@@ -524,10 +513,14 @@ pub fn spawn_items_at_night(
     
     if !is_night_period {
         let check_interval = TimeDuration::from(Duration::from_secs(RED_RUNE_ITEM_SPAWN_INTERVAL_SECS));
-        ctx.db.rune_stone_item_spawn_schedule().insert(RuneStoneItemSpawnSchedule {
-            id: 0,
-            scheduled_at: check_interval.into(),
-        });
+        crate::try_insert_schedule!(
+            ctx.db.rune_stone_item_spawn_schedule(),
+            RuneStoneItemSpawnSchedule {
+                id: 0,
+                scheduled_at: check_interval.into(),
+            },
+            "Rune stone item spawn (reschedule)"
+        );
         return Ok(());
     }
     
@@ -652,10 +645,14 @@ pub fn spawn_items_at_night(
     
     // Reschedule
     let check_interval = TimeDuration::from(Duration::from_secs(RED_RUNE_ITEM_SPAWN_INTERVAL_SECS));
-    ctx.db.rune_stone_item_spawn_schedule().insert(RuneStoneItemSpawnSchedule {
-        id: 0,
-        scheduled_at: check_interval.into(),
-    });
+    crate::try_insert_schedule!(
+        ctx.db.rune_stone_item_spawn_schedule(),
+        RuneStoneItemSpawnSchedule {
+            id: 0,
+            scheduled_at: check_interval.into(),
+        },
+        "Rune stone item spawn (reschedule)"
+    );
     
     Ok(())
 }
@@ -693,10 +690,14 @@ pub fn spawn_seeds_at_night(
     
     if !is_night_period {
         let check_interval = TimeDuration::from(Duration::from_secs(GREEN_RUNE_SEED_SPAWN_INTERVAL_SECS));
-        ctx.db.rune_stone_seed_spawn_schedule().insert(RuneStoneSeedSpawnSchedule {
-            id: 0,
-            scheduled_at: check_interval.into(),
-        });
+        crate::try_insert_schedule!(
+            ctx.db.rune_stone_seed_spawn_schedule(),
+            RuneStoneSeedSpawnSchedule {
+                id: 0,
+                scheduled_at: check_interval.into(),
+            },
+            "Rune stone seed spawn (reschedule)"
+        );
         return Ok(());
     }
     
@@ -755,6 +756,19 @@ pub fn spawn_seeds_at_night(
                 continue;
             }
             
+            // Filter loot table to only include seeds that can grow in current season
+            let seasonal_seeds = filter_seeds_by_season(&config.seed_loot_table, &current_season);
+            
+            if seasonal_seeds.is_empty() {
+                // No seeds can grow in current season, skip spawning
+                log::debug!(
+                    "Green rune stone {} has no seeds that can grow in {:?}, skipping spawn",
+                    rune_stone.id, current_season
+                );
+                rune_stones_to_update.push((rune_stone.id, config));
+                continue;
+            }
+            
             // Spawn a BURST of seeds (randomized 1-2 seeds per spawn)
             let seeds_to_spawn = rng.gen_range(GREEN_RUNE_MIN_SEEDS_PER_BURST..=GREEN_RUNE_MAX_SEEDS_PER_BURST);
             let mut spawned_this_burst = 0;
@@ -766,8 +780,8 @@ pub fn spawn_seeds_at_night(
                     break;
                 }
                 
-                // Pick a random seed from this rune stone's loot table
-                let seed_name = &config.seed_loot_table[rng.gen_range(0..config.seed_loot_table.len())];
+                // Pick a random seed from the SEASONAL loot table
+                let seed_name = &seasonal_seeds[rng.gen_range(0..seasonal_seeds.len())];
                 
                 // Find the seed item definition
                 let seed_def_id = ctx.db.item_definition().iter()
@@ -814,8 +828,8 @@ pub fn spawn_seeds_at_night(
             
             if spawned_this_burst > 0 {
                 log::info!(
-                    "Green rune stone {} spawned {} seeds: {:?} (total: {})",
-                    rune_stone.id, spawned_this_burst, spawned_seed_names, config.seeds_spawned_this_night
+                    "Green rune stone {} spawned {} seeds in {:?}: {:?} (total: {})",
+                    rune_stone.id, spawned_this_burst, current_season, spawned_seed_names, config.seeds_spawned_this_night
                 );
             }
         }
@@ -833,10 +847,14 @@ pub fn spawn_seeds_at_night(
     
     // Reschedule
     let check_interval = TimeDuration::from(Duration::from_secs(GREEN_RUNE_SEED_SPAWN_INTERVAL_SECS));
-    ctx.db.rune_stone_seed_spawn_schedule().insert(RuneStoneSeedSpawnSchedule {
-        id: 0,
-        scheduled_at: check_interval.into(),
-    });
+    crate::try_insert_schedule!(
+        ctx.db.rune_stone_seed_spawn_schedule(),
+        RuneStoneSeedSpawnSchedule {
+            id: 0,
+            scheduled_at: check_interval.into(),
+        },
+        "Rune stone seed spawn (reschedule)"
+    );
     
     Ok(())
 }
@@ -850,12 +868,14 @@ pub fn init_rune_stone_shard_spawning(ctx: &spacetimedb::ReducerContext) -> Resu
     if ctx.db.rune_stone_shard_spawn_schedule().count() == 0 {
         let check_interval = TimeDuration::from(Duration::from_secs(BLUE_RUNE_SHARD_SPAWN_INTERVAL_SECS));
         
-        ctx.db.rune_stone_shard_spawn_schedule().insert(RuneStoneShardSpawnSchedule {
-            id: 0,
-            scheduled_at: check_interval.into(),
-        });
-        
-        log::info!("Initialized rune stone shard spawning system");
+        crate::try_insert_schedule!(
+            ctx.db.rune_stone_shard_spawn_schedule(),
+            RuneStoneShardSpawnSchedule {
+                id: 0,
+                scheduled_at: check_interval.into(),
+            },
+            "Rune stone shard spawning"
+        );
     }
     
     Ok(())
@@ -869,12 +889,14 @@ pub fn init_rune_stone_item_spawning(ctx: &spacetimedb::ReducerContext) -> Resul
     if ctx.db.rune_stone_item_spawn_schedule().count() == 0 {
         let check_interval = TimeDuration::from(Duration::from_secs(RED_RUNE_ITEM_SPAWN_INTERVAL_SECS));
         
-        ctx.db.rune_stone_item_spawn_schedule().insert(RuneStoneItemSpawnSchedule {
-            id: 0,
-            scheduled_at: check_interval.into(),
-        });
-        
-        log::info!("Initialized rune stone item spawning system");
+        crate::try_insert_schedule!(
+            ctx.db.rune_stone_item_spawn_schedule(),
+            RuneStoneItemSpawnSchedule {
+                id: 0,
+                scheduled_at: check_interval.into(),
+            },
+            "Rune stone item spawning"
+        );
     }
     
     Ok(())
@@ -888,12 +910,14 @@ pub fn init_rune_stone_seed_spawning(ctx: &spacetimedb::ReducerContext) -> Resul
     if ctx.db.rune_stone_seed_spawn_schedule().count() == 0 {
         let check_interval = TimeDuration::from(Duration::from_secs(GREEN_RUNE_SEED_SPAWN_INTERVAL_SECS));
         
-        ctx.db.rune_stone_seed_spawn_schedule().insert(RuneStoneSeedSpawnSchedule {
-            id: 0,
-            scheduled_at: check_interval.into(),
-        });
-        
-        log::info!("Initialized rune stone seed spawning system");
+        crate::try_insert_schedule!(
+            ctx.db.rune_stone_seed_spawn_schedule(),
+            RuneStoneSeedSpawnSchedule {
+                id: 0,
+                scheduled_at: check_interval.into(),
+            },
+            "Rune stone seed spawning"
+        );
     }
     
     Ok(())

@@ -87,12 +87,15 @@ pub struct ProcessEffectsSchedule {
 
 pub fn schedule_effect_processing(ctx: &ReducerContext) -> Result<(), String> {
     if ctx.db.process_effects_schedule().iter().find(|job| job.job_name == "process_consumable_effects").is_none() {
-        ctx.db.process_effects_schedule().insert(ProcessEffectsSchedule {
-            job_id: 0,
-            job_name: "process_consumable_effects".to_string(),
-            scheduled_at: TimeDuration::from_micros(1_000_000).into(), // Tick every 1 second
-        });
-        log::info!("Scheduled active consumable effect processing.");
+        crate::try_insert_schedule!(
+            ctx.db.process_effects_schedule(),
+            ProcessEffectsSchedule {
+                job_id: 0,
+                job_name: "process_consumable_effects".to_string(),
+                scheduled_at: TimeDuration::from_micros(1_000_000).into(),
+            },
+            "Active consumable effect processing"
+        );
     }
     Ok(())
 }

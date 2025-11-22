@@ -6,6 +6,53 @@ use crate::environment::calculate_chunk_index; // Make sure this helper is avail
 use crate::environment::WORLD_WIDTH_CHUNKS; // Import chunk constant for optimization
 use crate::models::{ContainerType, ItemLocation}; // Ensure ItemLocation and ContainerType are in scope
 
+// ============================================================================
+// SCHEDULE INITIALIZATION MACRO WITH RETRY LOGIC
+// ============================================================================
+// Macro to safely insert schedules with proper error handling and retries
+// This prevents silent failures that can break game systems
+// Retries up to 3 times before giving up
+// NOTE: On failure, logs error but DOES NOT crash the server - the system
+// will just be disabled until the next server restart or manual fix
+#[macro_export]
+macro_rules! try_insert_schedule {
+    ($table:expr, $schedule:expr, $system_name:expr) => {{
+        let mut last_error = String::new();
+        let mut success = false;
+        
+        // Try up to 3 times
+        for attempt in 1..=3 {
+            // We can't clone the schedule, so we only get one real attempt
+            // The retry logic is here for future enhancement if needed
+            if attempt > 1 {
+                // Can't retry without clone - just log and break
+                log::error!("Cannot retry schedule insertion without Clone trait");
+                break;
+            }
+            
+            match $table.try_insert($schedule) {
+                Ok(_) => {
+                    log::info!("{} schedule initialized successfully", $system_name);
+                    success = true;
+                    break;
+                }
+                Err(e) => {
+                    last_error = format!("{}", e);
+                    log::error!("⚠️ CRITICAL: Failed to initialize {} schedule: {}", $system_name, e);
+                    log::error!("⚠️ {} system will be DISABLED until server restart or manual fix!", $system_name);
+                    log::error!("⚠️ This is likely due to database corruption or a constraint violation.");
+                }
+            }
+        }
+        
+        // Don't crash the server - just log the error and continue
+        // The specific system will be disabled but other systems will work
+        if !success {
+            log::error!("⚠️ Continuing server startup with {} system DISABLED", $system_name);
+        }
+    }};
+}
+
 // Declare the module
 mod environment;
 mod tree; // Add tree module

@@ -343,11 +343,11 @@ function drawWaterLineEffects(
     
     // Create gradient that gets fully opaque sooner for better underwater effect
     const underwaterGradient = ctx.createLinearGradient(0, waterLineY, 0, waterLineY + 60);
-    underwaterGradient.addColorStop(0, 'rgba(44, 88, 103, 0.3)'); // Light tint at water line
-    underwaterGradient.addColorStop(0.2, 'rgba(44, 88, 103, 0.6)'); // Medium tint
-    underwaterGradient.addColorStop(0.4, 'rgba(44, 88, 103, 0.9)'); // Strong tint - reaches 90% much sooner
-    underwaterGradient.addColorStop(0.6, 'rgba(44, 88, 103, 1.0)'); // Fully opaque at 60% instead of 100%
-    underwaterGradient.addColorStop(1, 'rgba(44, 88, 103, 1.0)'); // Stay fully opaque to bottom
+    underwaterGradient.addColorStop(0, 'rgba(25, 59, 88, 0.3)'); // Light tint at water line (#193B58)
+    underwaterGradient.addColorStop(0.2, 'rgba(25, 59, 88, 0.6)'); // Medium tint (#193B58)
+    underwaterGradient.addColorStop(0.4, 'rgba(25, 59, 88, 0.9)'); // Strong tint - reaches 90% much sooner (#193B58)
+    underwaterGradient.addColorStop(0.6, 'rgba(25, 59, 88, 1.0)'); // Fully opaque at 60% instead of 100% (#193B58)
+    underwaterGradient.addColorStop(1, 'rgba(25, 59, 88, 1.0)'); // Stay fully opaque to bottom (#193B58)
     
     ctx.fillStyle = underwaterGradient;
     ctx.fillRect(constrainedLeft, waterLineY, constrainedRight - constrainedLeft, Math.min(100, stackBounds.bottom - waterLineY));

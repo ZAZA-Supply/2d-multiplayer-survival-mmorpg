@@ -9,7 +9,7 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import styles from './InventoryUI.module.css'; // Reuse styles for now
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowUp, faArrowDown, faDroplet } from '@fortawesome/free-solid-svg-icons';
+import { faArrowUp, faArrowDown, faDroplet, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 
 // Import Custom Components
 import ContainerSlots from './ContainerSlots';
@@ -934,11 +934,11 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
                             Field Cauldron
                         </h3>
                         
-                        {/* All 5 slots in one row: Water Container + 3 Ingredient slots + Output slot */}
-                        <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginBottom: '12px' }}>
+                        {/* All 5 slots in one row: Water Container + 3 Ingredient slots + Arrow + Output slot */}
+                        <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginBottom: '12px', alignItems: 'center', gap: '8px' }}>
                             <div style={{ 
                                 display: 'grid',
-                                gridTemplateColumns: 'repeat(5, 1fr)',
+                                gridTemplateColumns: 'repeat(4, 1fr)',
                                 gap: '4px',
                                 maxWidth: 'fit-content'
                             }}>
@@ -1070,7 +1070,23 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
                                         </DroppableSlot>
                                     );
                                 })}
-                                
+                            </div>
+                            
+                            {/* Arrow indicator between ingredients and output */}
+                            <div style={{
+                                fontSize: '20px',
+                                color: '#ffcc44',
+                                textShadow: '0 0 8px rgba(255, 200, 0, 0.6)',
+                                userSelect: 'none',
+                                pointerEvents: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                            }}>
+                                <FontAwesomeIcon icon={faArrowRight} />
+                            </div>
+                            
+                            {/* Output Slot container */}
+                            <div>
                                 {/* Output Slot (4th slot) - for brewed result */}
                                 {(() => {
                                     const outputItem = attachedBrothPot.outputItemInstanceId 

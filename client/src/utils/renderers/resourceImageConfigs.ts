@@ -12,6 +12,7 @@ import beachLymeGrassImageSource from '../../assets/doodads/beach_lyme_grass_b.p
 import carrotImageSource from '../../assets/doodads/carrot_b.png';
 import beetsImageSource from '../../assets/doodads/beet.png';
 import horseradishImageSource from '../../assets/doodads/horseradish.png';
+import cornImageSource from '../../assets/doodads/corn_stalk_b.png';
 import chicoryImageSource from '../../assets/doodads/chicory.png';
 import yarrowImageSource from '../../assets/doodads/yarrow.png';
 import chamomileImageSource from '../../assets/doodads/chamomile.png';
@@ -78,6 +79,7 @@ export const RESOURCE_IMAGE_SOURCES: Record<HarvestableResourceType, string> = {
   Carrot: carrotImageSource,
   Beets: beetsImageSource,
   Horseradish: horseradishImageSource,
+  Corn: cornImageSource,
   
   // === HERBS & MEDICINAL PLANTS (Arctic/Subarctic species) ===
   Chicory: chicoryImageSource,

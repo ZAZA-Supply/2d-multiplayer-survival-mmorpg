@@ -68,12 +68,14 @@ pub fn init_water_patch_system(ctx: &ReducerContext) -> Result<(), String> {
     if ctx.db.water_patch_cleanup_schedule().count() == 0 {
         let cleanup_interval = TimeDuration::from(Duration::from_secs(WATER_PATCH_CLEANUP_INTERVAL_SECS));
         
-        ctx.db.water_patch_cleanup_schedule().insert(WaterPatchCleanupSchedule {
-            id: 0, // Auto-inc
-            scheduled_at: cleanup_interval.into(), // Periodic scheduling
-        });
-        
-        log::info!("Water patch cleanup system initialized - checking every {} seconds", WATER_PATCH_CLEANUP_INTERVAL_SECS);
+        crate::try_insert_schedule!(
+            ctx.db.water_patch_cleanup_schedule(),
+            WaterPatchCleanupSchedule {
+                id: 0,
+                scheduled_at: cleanup_interval.into(),
+            },
+            "Water patch cleanup"
+        );
     }
     
     Ok(())

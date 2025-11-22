@@ -173,6 +173,9 @@ import burntPotatoIcon from '../assets/items/burnt_potato.png';
 import carrotIcon from '../assets/items/carrot.png';
 import cookedCarrotIcon from '../assets/items/cooked_carrot.png';
 import burntCarrotIcon from '../assets/items/burnt_carrot.png';
+import cornIcon from '../assets/items/corn.png';
+import cookedCornIcon from '../assets/items/cooked_corn.png';
+import burntCornIcon from '../assets/items/burnt_corn.png';
 import beetsIcon from '../assets/items/beets.png';
 import horseradishIcon from '../assets/items/horseradish.png';
 import salsifyIcon from '../assets/items/salsify.png';
@@ -283,6 +286,7 @@ import valerianSeedsIcon from '../assets/items/valerian_seeds.png';
 
 import nettleSeedsIcon from '../assets/items/nettle_seeds.png';
 import carrotSeedsIcon from '../assets/items/carrot_seeds.png';
+import cornSeedsIcon from '../assets/items/corn_seeds.png';
 import chamomileSeedsIcon from '../assets/items/chamomile_seeds.png';
 import chicorySeedsIcon from '../assets/items/chicory_seeds.png';
 import salsifySeedsIcon from '../assets/items/salsify_seeds.png';
@@ -488,6 +492,9 @@ const iconMap: { [key: string]: string | undefined } = {
   'carrot.png': carrotIcon,
   'cooked_carrot.png': cookedCarrotIcon,
   'burnt_carrot.png': burntCarrotIcon,
+  'corn.png': cornIcon,
+  'cooked_corn.png': cookedCornIcon,
+  'burnt_corn.png': burntCornIcon,
   'beets.png': beetsIcon,
   'horseradish.png': horseradishIcon,
   'salsify.png': salsifyIcon,
@@ -599,6 +606,7 @@ const iconMap: { [key: string]: string | undefined } = {
   'valerian_seeds.png': valerianSeedsIcon,
   'nettle_seeds.png': nettleSeedsIcon,
   'carrot_seeds.png': carrotSeedsIcon,
+  'corn_seeds.png': cornSeedsIcon,
   'chamomile_seeds.png': chamomileSeedsIcon,
   'chicory_seeds.png': chicorySeedsIcon,
   'salsify_seeds.png': salsifySeedsIcon,

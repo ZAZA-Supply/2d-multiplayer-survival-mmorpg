@@ -49,6 +49,13 @@ const ActiveCraftingQueueUI: React.FC<ActiveCraftingQueueUIProps> = ({
 
   const outputDef = itemDefinitions.get(activeItem.outputItemDefId.toString());
   const remainingTime = calculateRemainingTime(activeItem.finishTime.microsSinceUnixEpoch);
+  
+  // Hide the notification only after it's been finished for 2+ seconds
+  // This gives the server time to process (checks every 1 second) and prevents premature hiding
+  if (remainingTime < -2) {
+    return null;
+  }
+  
   const itemName = outputDef?.name || 'Unknown Item';
   const itemIcon = outputDef?.iconAssetName || 'error.png';
 

@@ -171,12 +171,21 @@ const CraftingUI: React.FC<CraftingUIProps> = ({
     }, [inventoryItems, playerIdentity]);
 
     // Filter and sort crafting queue for the current player
+    // Filter out items that have been finished for 2+ seconds (gives server time to process)
     const playerQueue = useMemo(() => {
         if (!playerIdentity) return [];
+        const now = Date.now();
         return Array.from(craftingQueueItems.values())
-            .filter(item => item.playerIdentity.isEqual(playerIdentity))
+            .filter(item => {
+                if (!item.playerIdentity.isEqual(playerIdentity)) return false;
+                // Only hide items that have been finished for 2+ seconds
+                // This gives the server time to process (checks every 1 second) and grant the item
+                const finishTimeMs = Number(item.finishTime.microsSinceUnixEpoch / 1000n);
+                const remainingTime = Math.ceil((finishTimeMs - now) / 1000);
+                return remainingTime > -2; // Show items until 2 seconds after completion
+            })
             .sort((a, b) => Number(a.finishTime.microsSinceUnixEpoch - b.finishTime.microsSinceUnixEpoch)); // Sort by finish time ASC
-    }, [craftingQueueItems, playerIdentity]);
+    }, [craftingQueueItems, playerIdentity, currentTime]); // Add currentTime to dependencies so it updates every second
 
     // --- Crafting Handlers ---
     const handleCraftItem = (recipeId: bigint, quantity: number) => {

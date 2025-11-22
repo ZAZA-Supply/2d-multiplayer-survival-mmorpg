@@ -813,8 +813,13 @@ pub fn schedule_next_furnace_processing(ctx: &ReducerContext, furnace_id: u32) -
             furnace_id: furnace_id as u64,
             scheduled_at: interval.into(), // PERIODIC - same as campfire
         };
-        ctx.db.furnace_processing_schedule().insert(schedule);
-        log::debug!("Scheduled periodic processing for furnace {}", furnace_id);
+        match ctx.db.furnace_processing_schedule().try_insert(schedule) {
+            Ok(_) => log::debug!("Scheduled periodic processing for furnace {}", furnace_id),
+            Err(e) => {
+                log::error!("Failed to schedule furnace {} processing: {}", furnace_id, e);
+                return Err(format!("Failed to schedule furnace processing: {}", e));
+            }
+        }
     } else {
         log::debug!("Furnace {} not burning and has no fuel, not scheduling processing.", furnace_id);
     }

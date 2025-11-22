@@ -156,14 +156,14 @@ pub fn init_player_stat_schedule(ctx: &ReducerContext) -> Result<(), String> {
             PLAYER_STAT_UPDATE_INTERVAL_SECS
         );
         let interval = Duration::from_secs(PLAYER_STAT_UPDATE_INTERVAL_SECS);
-        // Use try_insert and handle potential errors (though unlikely for init schedule)
-        match schedule_table.try_insert(PlayerStatSchedule {
-            id: 0, // Auto-incremented
-            scheduled_at: ScheduleAt::Interval(interval.into()),
-        }) {
-            Ok(_) => log::info!("Player stat schedule inserted."),
-            Err(e) => log::error!("Failed to insert player stat schedule: {}", e),
-        };
+        crate::try_insert_schedule!(
+            schedule_table,
+            PlayerStatSchedule {
+                id: 0,
+                scheduled_at: ScheduleAt::Interval(interval.into()),
+            },
+            "Player stat"
+        );
     } else {
         log::debug!("Player stat schedule already exists.");
     }
