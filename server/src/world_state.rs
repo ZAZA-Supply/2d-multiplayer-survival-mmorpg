@@ -54,12 +54,12 @@ pub(crate) const WARMTH_DRAIN_RAIN_HEAVY: f32 = 3.0;      // Heavy rain adds 3.0
 pub(crate) const WARMTH_DRAIN_RAIN_STORM: f32 = 4.0;      // Heavy storm adds 4.0 per second
 
 // --- Weather Constants ---
-// Aleutian islands are rainy but not constantly stormy - aim for ~40% rain coverage at any time
-const MIN_RAIN_DURATION_SECONDS: f32 = 300.0; // 5 minutes
-const MAX_RAIN_DURATION_SECONDS: f32 = 900.0; // 15 minutes
-const RAIN_PROBABILITY_BASE: f32 = 0.25; // 25% base chance per day (reduced from 60% - was too aggressive)
-const RAIN_PROBABILITY_SEASONAL_MODIFIER: f32 = 0.15; // Additional variability
-const MIN_TIME_BETWEEN_RAIN_CYCLES: f32 = 900.0; // 15 minutes minimum between rain events (increased from 10 - give more clear time)
+// Aleutian islands are rainy but not constantly stormy - aim for ~25% rain coverage at any time
+const MIN_RAIN_DURATION_SECONDS: f32 = 180.0; // 3 minutes (reduced from 5 - shorter rain events)
+const MAX_RAIN_DURATION_SECONDS: f32 = 480.0; // 8 minutes (reduced from 15 - much shorter max duration)
+const RAIN_PROBABILITY_BASE: f32 = 0.15; // 15% base chance per day (reduced from 25% - less frequent rain)
+const RAIN_PROBABILITY_SEASONAL_MODIFIER: f32 = 0.10; // Additional variability (reduced from 0.15)
+const MIN_TIME_BETWEEN_RAIN_CYCLES: f32 = 1200.0; // 20 minutes minimum between rain events (increased from 15 - more clear time)
 
 // Weather variation constants
 // These values are tuned to create realistic weather fronts with good regional variation:
@@ -355,13 +355,14 @@ fn propagate_weather_to_nearby_chunks(
     mut rng: &mut impl Rng,
 ) -> Result<(), String> {
     // Base propagation probability based on weather intensity
-    // Lower values = weather fronts spread slower = more regional variation = more clear areas
+    // BALANCED: Clear weather now propagates to push back against rain fronts
+    // Lower rain propagation = more regional variation = more clear areas
     let base_propagation_chance = match source_weather {
-        WeatherType::Clear => 0.0,          // Clear weather doesn't propagate
-        WeatherType::LightRain => 0.05,     // 5% - spreads slowly, creates patchy rain
-        WeatherType::ModerateRain => 0.10,  // 10% - moderate spread
-        WeatherType::HeavyRain => 0.18,     // 18% - spreads more but not overwhelming
-        WeatherType::HeavyStorm => 0.30,    // 30% - storms spread noticeably but are rare
+        WeatherType::Clear => 0.15,         // 15% - clear weather actively pushes back rain (NEW!)
+        WeatherType::LightRain => 0.03,     // 3% - reduced from 5%, spreads very slowly
+        WeatherType::ModerateRain => 0.06,  // 6% - reduced from 10%, moderate spread
+        WeatherType::HeavyRain => 0.10,     // 10% - reduced from 18%, less aggressive
+        WeatherType::HeavyStorm => 0.18,    // 18% - reduced from 30%, storms still spread but slower
     };
     
     if base_propagation_chance == 0.0 {
@@ -380,43 +381,48 @@ fn propagate_weather_to_nearby_chunks(
         if rng.gen::<f32>() < propagation_chance {
             let mut nearby_weather = get_or_create_chunk_weather(ctx, nearby_index);
             
-            // Only propagate if the nearby chunk has Clear weather or weaker weather
+            // Determine if propagation should occur based on weather strength
             let should_propagate = match (&nearby_weather.current_weather, source_weather) {
-                (WeatherType::Clear, _) => true, // Always propagate to clear chunks
+                // Clear weather can clear out light rain (pushes back weak fronts)
+                (WeatherType::LightRain, WeatherType::Clear) => true,
+                // Any weather can spread to clear chunks
+                (WeatherType::Clear, _) => true,
+                // Stronger weather can overwrite weaker weather
                 (WeatherType::LightRain, WeatherType::ModerateRain | WeatherType::HeavyRain | WeatherType::HeavyStorm) => true,
                 (WeatherType::ModerateRain, WeatherType::HeavyRain | WeatherType::HeavyStorm) => true,
                 (WeatherType::HeavyRain, WeatherType::HeavyStorm) => true,
-                _ => false, // Don't overwrite stronger weather
+                _ => false, // Don't overwrite equal or stronger weather
             };
             
             if should_propagate {
-                // Propagate weather (but slightly weaker)
+                // Propagate weather (with appropriate transitions)
                 let propagated_weather = match source_weather {
+                    WeatherType::Clear => WeatherType::Clear, // Clear weather clears nearby chunks
                     WeatherType::HeavyStorm => {
-                        // 80% chance to stay HeavyStorm, 20% to become HeavyRain
-                        if rng.gen::<f32>() < 0.8 {
+                        // 70% chance to stay HeavyStorm, 30% to become HeavyRain (reduced from 80%)
+                        if rng.gen::<f32>() < 0.70 {
                             WeatherType::HeavyStorm
                         } else {
                             WeatherType::HeavyRain
                         }
                     }
                     WeatherType::HeavyRain => {
-                        // 70% chance to stay HeavyRain, 30% to become ModerateRain
-                        if rng.gen::<f32>() < 0.7 {
+                        // 60% chance to stay HeavyRain, 40% to become ModerateRain (reduced from 70%)
+                        if rng.gen::<f32>() < 0.60 {
                             WeatherType::HeavyRain
                         } else {
                             WeatherType::ModerateRain
                         }
                     }
                     WeatherType::ModerateRain => {
-                        // 60% chance to stay ModerateRain, 40% to become LightRain
-                        if rng.gen::<f32>() < 0.6 {
+                        // 50% chance to stay ModerateRain, 50% to become LightRain (reduced from 60%)
+                        if rng.gen::<f32>() < 0.50 {
                             WeatherType::ModerateRain
                         } else {
                             WeatherType::LightRain
                         }
                     }
-                    _ => source_weather.clone(), // LightRain propagates as-is
+                    WeatherType::LightRain => WeatherType::LightRain, // LightRain propagates as-is
                 };
                 
                 nearby_weather.current_weather = propagated_weather.clone();
