@@ -21,6 +21,7 @@ import SpeechBubbleManager from './SpeechBubbleManager';
 import TargetingReticle from './TargetingReticle';
 import FishingManager from './FishingManager';
 import MusicControlPanel from './MusicControlPanel';
+import DebugPanel from './DebugPanel';
 // Import menu components
 import GameMenuButton from './GameMenuButton';
 import GameMenu from './GameMenu';
@@ -273,7 +274,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
     }, []);
 
     // Debug context
-    const { showAutotileDebug, toggleAutotileDebug, showMusicDebug, toggleMusicDebug, showChunkBoundaries } = useDebug();
+    const { showAutotileDebug, toggleAutotileDebug, showMusicDebug, toggleMusicDebug, showChunkBoundaries, toggleChunkBoundaries } = useDebug();
 
 
 
@@ -522,226 +523,15 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 </div>
             )}
 
-            {/* Debug Controls - positioned beneath menu button in dev mode */}
-            {process.env.NODE_ENV === 'development' && (
-                <div style={{
-                    position: 'absolute',
-                    top: '70px', // Positioned below the menu button
-                    left: '15px',
-                    zIndex: 998, // Below menu button but above other elements
-                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                    color: 'white',
-                    padding: '8px',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px'
-                }}>
-
-                    <button
-                        onClick={(e) => {
-                            toggleAutotileDebug();
-                            e.currentTarget.blur(); // Remove focus immediately after clicking
-                        }}
-                        onFocus={(e) => {
-                            e.currentTarget.blur(); // Prevent the button from staying focused
-                        }}
-                        style={{
-                            backgroundColor: showAutotileDebug ? '#4CAF50' : '#f44336',
-                            color: 'white',
-                            border: 'none',
-                            padding: '4px 8px',
-                            borderRadius: '2px',
-                            fontSize: '12px',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        Tileset Overlay: {showAutotileDebug ? 'ON' : 'OFF'}
-                    </button>
-
-                    {/* Player World Coordinates */}
-                    {localPlayer && (
-                        <div style={{
-                            fontSize: '12px',
-                            opacity: 0.85,
-                            color: '#00ff88',
-                            textShadow: '0 0 6px rgba(0, 255, 136, 0.6)'
-                        }}>
-                            <div>📍 Position:</div>
-                            <div style={{ paddingLeft: '12px', marginTop: '2px' }}>
-                                <span>X: {Math.round(localPlayer.positionX)}</span>
-                                <span style={{ margin: '0 6px' }}>•</span>
-                                <span>Y: {Math.round(localPlayer.positionY)}</span>
-                            </div>
-                        </div>
-                    )}
-
-                    <button
-                        onClick={(e) => {
-                            // Cycle through all weather types
-                            const currentWeather = worldState?.currentWeather?.tag;
-                            const weatherTypes = ['Clear', 'LightRain', 'ModerateRain', 'HeavyRain', 'HeavyStorm'];
-                            const currentIndex = weatherTypes.indexOf(currentWeather || 'Clear');
-                            const nextIndex = (currentIndex + 1) % weatherTypes.length;
-                            const nextWeather = weatherTypes[nextIndex];
-
-                            if (connection) {
-                                try {
-                                    // Call reducer to set next weather type (only available in debug builds)
-                                    (connection.reducers as any).debugSetWeather(nextWeather);
-                                } catch (error) {
-                                    console.warn('Debug weather function not available (production build?):', error);
-                                }
-                            }
-                            e.currentTarget.blur(); // Remove focus immediately after clicking
-                        }}
-                        onFocus={(e) => {
-                            e.currentTarget.blur(); // Prevent the button from staying focused
-                        }}
-                        style={{
-                            backgroundColor: (() => {
-                                const weather = worldState?.currentWeather?.tag;
-                                switch (weather) {
-                                    case 'Clear': return '#4CAF50'; // Green
-                                    case 'LightRain': return '#03A9F4'; // Light Blue
-                                    case 'ModerateRain': return '#2196F3'; // Blue
-                                    case 'HeavyRain': return '#3F51B5'; // Indigo
-                                    case 'HeavyStorm': return '#9C27B0'; // Purple
-                                    default: return '#FF9800'; // Orange fallback
-                                }
-                            })(),
-                            color: 'white',
-                            border: 'none',
-                            padding: '4px 8px',
-                            borderRadius: '2px',
-                            fontSize: '12px',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        Weather: {(() => {
-                            const weather = worldState?.currentWeather?.tag;
-                            switch (weather) {
-                                case 'Clear': return 'CLEAR';
-                                case 'LightRain': return 'LIGHT RAIN';
-                                case 'ModerateRain': return 'MOD RAIN';
-                                case 'HeavyRain': return 'HEAVY RAIN';
-                                case 'HeavyStorm': return 'STORM';
-                                default: return 'UNKNOWN';
-                            }
-                        })()}
-                    </button>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                        <button
-                            onClick={(e) => {
-                                // Cycle forward through times
-                                // Correct cycle order: Night -> Midnight -> TwilightMorning -> Dawn -> Morning -> Noon -> Afternoon -> Dusk -> TwilightEvening -> Night
-                                const timeOrder = ['Night', 'Midnight', 'TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening'];
-                                const currentTimeOfDay = worldState?.timeOfDay?.tag || 'Noon';
-                                const currentIndex = timeOrder.indexOf(currentTimeOfDay);
-                                const nextIndex = (currentIndex + 1) % timeOrder.length;
-                                const nextTime = timeOrder[nextIndex];
-
-                                if (connection) {
-                                    try {
-                                        (connection.reducers as any).debugSetTime(nextTime);
-                                    } catch (error) {
-                                        console.warn('Debug time function not available (production build?):', error);
-                                    }
-                                }
-                                e.currentTarget.blur();
-                            }}
-                            onFocus={(e) => e.currentTarget.blur()}
-                            style={{
-                                backgroundColor: (() => {
-                                    const timeOfDay = worldState?.timeOfDay?.tag;
-                                    if (timeOfDay === 'Night' || timeOfDay === 'Midnight') return '#3F51B5';
-                                    if (timeOfDay === 'Dawn' || timeOfDay === 'Dusk') return '#FF9800';
-                                    if (timeOfDay === 'TwilightMorning' || timeOfDay === 'TwilightEvening') return '#9C27B0';
-                                    return '#9C27B0';
-                                })(),
-                                color: 'white',
-                                border: 'none',
-                                padding: '4px 8px',
-                                borderRadius: '2px',
-                                fontSize: '12px',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            Time: {worldState?.timeOfDay?.tag || 'UNKNOWN'}
-                        </button>
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                            <button
-                                onClick={(e) => {
-                                    // Cycle backward through times
-                                    // Correct cycle order: Night -> Midnight -> TwilightMorning -> Dawn -> Morning -> Noon -> Afternoon -> Dusk -> TwilightEvening -> Night
-                                    const timeOrder = ['Night', 'Midnight', 'TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening'];
-                                    const currentTimeOfDay = worldState?.timeOfDay?.tag || 'Noon';
-                                    const currentIndex = timeOrder.indexOf(currentTimeOfDay);
-                                    const prevIndex = (currentIndex - 1 + timeOrder.length) % timeOrder.length;
-                                    const prevTime = timeOrder[prevIndex];
-
-                                    if (connection) {
-                                        try {
-                                            (connection.reducers as any).debugSetTime(prevTime);
-                                        } catch (error) {
-                                            console.warn('Debug time function not available (production build?):', error);
-                                        }
-                                    }
-                                    e.currentTarget.blur();
-                                }}
-                                onFocus={(e) => e.currentTarget.blur()}
-                                style={{
-                                    backgroundColor: '#666',
-                                    color: 'white',
-                                    border: 'none',
-                                    padding: '2px 6px',
-                                    borderRadius: '2px',
-                                    fontSize: '10px',
-                                    cursor: 'pointer',
-                                    minWidth: '24px'
-                                }}
-                            >
-                                ←
-                            </button>
-                            <button
-                                onClick={(e) => {
-                                    // Cycle forward through times
-                                    // Correct cycle order: Night -> Midnight -> TwilightMorning -> Dawn -> Morning -> Noon -> Afternoon -> Dusk -> TwilightEvening -> Night
-                                    const timeOrder = ['Night', 'Midnight', 'TwilightMorning', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Dusk', 'TwilightEvening'];
-                                    const currentTimeOfDay = worldState?.timeOfDay?.tag || 'Noon';
-                                    const currentIndex = timeOrder.indexOf(currentTimeOfDay);
-                                    const nextIndex = (currentIndex + 1) % timeOrder.length;
-                                    const nextTime = timeOrder[nextIndex];
-
-                                    if (connection) {
-                                        try {
-                                            (connection.reducers as any).debugSetTime(nextTime);
-                                        } catch (error) {
-                                            console.warn('Debug time function not available (production build?):', error);
-                                        }
-                                    }
-                                    e.currentTarget.blur();
-                                }}
-                                onFocus={(e) => e.currentTarget.blur()}
-                                style={{
-                                    backgroundColor: '#666',
-                                    color: 'white',
-                                    border: 'none',
-                                    padding: '2px 6px',
-                                    borderRadius: '2px',
-                                    fontSize: '10px',
-                                    cursor: 'pointer',
-                                    minWidth: '24px'
-                                }}
-                            >
-                                →
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            {/* Debug Panel */}
+            {process.env.NODE_ENV === 'development' && localPlayer && (
+                <DebugPanel 
+                    localPlayer={localPlayer}
+                    worldState={worldState}
+                    connection={connection}
+                />
             )}
+
 
             {/* Game Menu Overlays */}
             {currentMenu === 'main' && (

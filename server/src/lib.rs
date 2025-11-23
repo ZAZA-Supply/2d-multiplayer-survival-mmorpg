@@ -388,8 +388,8 @@ pub fn get_effective_player_radius(is_crouching: bool) -> f32 {
 pub const WATER_SPEED_PENALTY: f32 = 0.5; // 50% speed reduction (50% of normal speed)
 
 // World Dimensions - UPDATED to 600x600 tiles
-pub const WORLD_WIDTH_TILES: u32 = 600;
-pub const WORLD_HEIGHT_TILES: u32 = 600;
+pub const WORLD_WIDTH_TILES: u32 = 400;
+pub const WORLD_HEIGHT_TILES: u32 = 400;
 // Change back to f32 as they are used in float calculations
 pub const WORLD_WIDTH_PX: f32 = (WORLD_WIDTH_TILES * TILE_SIZE_PX) as f32;
 pub const WORLD_HEIGHT_PX: f32 = (WORLD_HEIGHT_TILES * TILE_SIZE_PX) as f32;
