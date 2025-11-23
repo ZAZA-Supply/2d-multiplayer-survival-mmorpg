@@ -94,12 +94,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
     useEffect(() => {
         const interval = 3200;
         const duration = 700;
-        const shakeTimeouts: NodeJS.Timeout[] = [];
+        const shakeTimeouts: NodeJS.Timeout[] = []; 
         let mounted = true;
         
         function triggerShake() {
             if (!mounted) return;
-            setIsShaking(true);
+            setIsShaking(true); 
             shakeTimeouts.push(setTimeout(() => {
                 if (mounted) setIsShaking(false);
             }, duration));

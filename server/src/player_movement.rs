@@ -306,44 +306,10 @@ pub fn dodge_roll(ctx: &ReducerContext, move_x: f32, move_y: f32) -> Result<(), 
     let target_y = current_player.position_y + (dodge_dy * DODGE_ROLL_DISTANCE);
 
     // Clamp target to world bounds
+    // Note: Collision detection is handled client-side during interpolation
     let effective_radius = get_effective_player_radius(current_player.is_crouching);
-    let mut clamped_target_x = target_x.max(effective_radius).min(WORLD_WIDTH_PX - effective_radius);
-    let mut clamped_target_y = target_y.max(effective_radius).min(WORLD_HEIGHT_PX - effective_radius);
-
-    // OPTIMIZED: Use single-pass continuous collision detection instead of binary search
-    // This prevents tunneling through walls and reduces DB lookups from ~250 to ~5-10
-    if let Some((_wall_id, collision_x, collision_y)) = crate::building::check_entity_path_collision(
-        ctx,
-        current_player.position_x,
-        current_player.position_y,
-        clamped_target_x,
-        clamped_target_y,
-        effective_radius
-    ) {
-        // We hit a wall! Stop exactly at the collision point (minus a tiny epsilon to avoid sticking)
-        // collision_x/y from check_entity_path_collision is the center point of the player at impact
-        
-        // Move slightly back from the impact to be safe
-        let dx = collision_x - current_player.position_x;
-        let dy = collision_y - current_player.position_y;
-        let dist = (dx * dx + dy * dy).sqrt();
-        
-        if dist > 0.0 {
-            let back_off = 1.0; // 1 pixel back
-            let safe_dist = (dist - back_off).max(0.0);
-            let dir_x = dx / dist;
-            let dir_y = dy / dist;
-            
-            clamped_target_x = current_player.position_x + dir_x * safe_dist;
-            clamped_target_y = current_player.position_y + dir_y * safe_dist;
-            
-            log::debug!("Dodge roll wall collision! Stopped at ({:.1}, {:.1})", clamped_target_x, clamped_target_y);
-        } else {
-            // Already touching wall, don't move
-            clamped_target_x = current_player.position_x;
-            clamped_target_y = current_player.position_y;
-        }
-    }
+    let clamped_target_x = target_x.max(effective_radius).min(WORLD_WIDTH_PX - effective_radius);
+    let clamped_target_y = target_y.max(effective_radius).min(WORLD_HEIGHT_PX - effective_radius);
 
     // Determine direction string for 8-directional support
     let direction_string = if dodge_dx == 0.0 && dodge_dy < 0.0 {
