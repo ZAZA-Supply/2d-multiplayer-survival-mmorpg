@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ChatMessageHistory from './ChatMessageHistory';
 import ChatInput from './ChatInput';
-import { DbConnection, Message as SpacetimeDBMessage, Player as SpacetimeDBPlayer, PrivateMessage as SpacetimeDBPrivateMessage, EventContext } from '../generated'; // Assuming types
+import { DbConnection, Message as SpacetimeDBMessage, Player as SpacetimeDBPlayer, PrivateMessage as SpacetimeDBPrivateMessage, EventContext, LastWhisperFrom } from '../generated'; // Assuming types
+import { Identity } from 'spacetimedb';
 import styles from './Chat.module.css';
 import sovaIcon from '../assets/ui/sova.png';
 import { openaiService } from '../services/openaiService';
@@ -48,6 +49,7 @@ const Chat: React.FC<ChatProps> = ({ connection, messages, players, isChatting, 
   // console.log("[Chat Component Render] Props - Connection:", !!connection, "LocalPlayerIdentity:", localPlayerIdentity);
   const [inputValue, setInputValue] = useState('');
   const [privateMessages, setPrivateMessages] = useState<Map<string, SpacetimeDBPrivateMessage>>(new Map());
+  const [lastWhisperFrom, setLastWhisperFrom] = useState<LastWhisperFrom | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const [activeTab, setActiveTab] = useState<ChatTab>('global');
   const [sovaMessages, setSovaMessages] = useState<Array<{id: string, text: string, isUser: boolean, timestamp: Date}>>([]);
@@ -60,6 +62,7 @@ const Chat: React.FC<ChatProps> = ({ connection, messages, players, isChatting, 
   const sovaMessageEndRef = useRef<HTMLDivElement>(null);
   const lastMessageCountRef = useRef<number>(0);
   const privateMessageSubscriptionRef = useRef<any | null>(null); // Changed back to any for now
+  const lastWhisperSubscriptionRef = useRef<any | null>(null);
   const isAnimating = useRef(false);
 
   // Define handleCloseChat first for dependency ordering
@@ -292,6 +295,23 @@ const Chat: React.FC<ChatProps> = ({ connection, messages, players, isChatting, 
       .sort();
   }, [players]);
 
+  // Auto-expand /r command to /w <username> when user types it
+  useEffect(() => {
+    const trimmed = inputValue.trim();
+    
+    // Check if user just typed "/r " (with space after)
+    if ((trimmed === '/r' || trimmed === '/reply') && inputValue.endsWith(' ')) {
+      if (lastWhisperFrom) {
+        // Auto-expand to /w <username>
+        const expandedCommand = `/w ${lastWhisperFrom.lastWhisperFromUsername} `;
+        setInputValue(expandedCommand);
+        console.log(`[Chat] Auto-expanded /r to: ${expandedCommand}`);
+      } else {
+        console.log('[Chat] No one has whispered you yet - /r cannot be expanded');
+      }
+    }
+  }, [inputValue, lastWhisperFrom]);
+
   // Message sending handler
   const handleSendMessage = useCallback(() => {
     if (!connection?.reducers || !inputValue.trim()) return;
@@ -428,6 +448,68 @@ const Chat: React.FC<ChatProps> = ({ connection, messages, players, isChatting, 
       }
     };
   }, [connection, localPlayerIdentity]); // Dependencies: re-run if connection or identity changes
+
+  // Subscribe to LastWhisperFrom table to track who last whispered to us
+  useEffect(() => {
+    if (!connection || !localPlayerIdentity) {
+      if (lastWhisperSubscriptionRef.current) {
+        try {
+          lastWhisperSubscriptionRef.current.unsubscribe();
+        } catch (e) {
+          console.warn("[Chat] LastWhisperEffect: Error unsubscribing:", e);
+        }
+        lastWhisperSubscriptionRef.current = null;
+      }
+      setLastWhisperFrom(null);
+      return;
+    }
+
+    // Subscribe to our LastWhisperFrom record
+    const query = `SELECT * FROM last_whisper_from WHERE player_id = '${localPlayerIdentity}'`;
+    
+    const subHandle = connection.subscriptionBuilder()
+      .onError((errorContext) => console.error("[Chat] LastWhisperEffect: Subscription ERROR:", errorContext))
+      .subscribe([query]);
+    lastWhisperSubscriptionRef.current = subHandle;
+
+    const handleLastWhisperUpdate = (ctx: EventContext, oldRecord: LastWhisperFrom, newRecord: LastWhisperFrom) => {
+      setLastWhisperFrom(newRecord);
+    };
+
+    const handleLastWhisperInsert = (ctx: EventContext, record: LastWhisperFrom) => {
+      setLastWhisperFrom(record);
+    };
+
+    const lastWhisperTable = connection.db.lastWhisperFrom;
+    if (lastWhisperTable) {
+      lastWhisperTable.onInsert(handleLastWhisperInsert);
+      lastWhisperTable.onUpdate(handleLastWhisperUpdate);
+    }
+
+    // Load initial value if it exists
+    if (lastWhisperTable) {
+      const playerIdentity = Identity.fromString(localPlayerIdentity);
+      const existingRecord = lastWhisperTable.playerId.find(playerIdentity);
+      if (existingRecord) {
+        setLastWhisperFrom(existingRecord);
+      }
+    }
+
+    return () => {
+      if (lastWhisperSubscriptionRef.current) {
+        try {
+          lastWhisperSubscriptionRef.current.unsubscribe();
+        } catch (e) {
+          console.warn("[Chat] LastWhisperEffect: Error during cleanup:", e);
+        }
+        lastWhisperSubscriptionRef.current = null;
+      }
+      if (lastWhisperTable) {
+        lastWhisperTable.removeOnInsert(handleLastWhisperInsert);
+        lastWhisperTable.removeOnUpdate(handleLastWhisperUpdate);
+      }
+    };
+  }, [connection, localPlayerIdentity]);
 
   // Track new messages (public or private) and scroll to bottom
   useEffect(() => {

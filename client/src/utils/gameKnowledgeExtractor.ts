@@ -380,7 +380,8 @@ const tipSectionDefinitions = {
             // /r (reply) command
             'Type /r <message> to quickly reply to the last person who whispered you.',
             'Example: /r Thanks for the help!',
-            '/r automatically sends your message to the last person who whispered you.',
+            'When you type /r and press space, it auto-expands to /w <playername> so you can see who you\'re replying to.',
+            '/r automatically fills in the name of the last person who whispered you.',
             'You can use /reply instead of /r if you prefer the full command.',
             'If no one has whispered you yet, /r will show an error message.',
             
