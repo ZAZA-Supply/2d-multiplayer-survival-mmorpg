@@ -410,13 +410,13 @@ fn propagate_weather_to_nearby_chunks(
     mut rng: &mut impl Rng,
 ) -> Result<(), String> {
     // Base propagation probability based on weather intensity
-    // EMERGENT SYSTEM: Rain propagates to maintain fronts, but not too aggressively
+    // EMERGENT SYSTEM: Clear weather propagates MORE than rain to naturally erode fronts
     let base_propagation_chance = match source_weather {
-        WeatherType::Clear => 0.15,        // Clear weather spreads slowly
-        WeatherType::LightRain => 0.25,     // 25% - Moderate spread
-        WeatherType::ModerateRain => 0.35,  // 35% - Good spread to maintain fronts
-        WeatherType::HeavyRain => 0.45,     // 45% - Strong spread
-        WeatherType::HeavyStorm => 0.55,    // 55% - Aggressive spread for storms
+        WeatherType::Clear => 0.20,        // 20% - Clear weather spreads to erode rain fronts
+        WeatherType::LightRain => 0.05,     // 5% - Light rain spreads very slowly
+        WeatherType::ModerateRain => 0.08,  // 8% - Moderate spread
+        WeatherType::HeavyRain => 0.10,     // 10% - Good spread
+        WeatherType::HeavyStorm => 0.12,    // 12% - Strongest spread for storms
     };
     
     if base_propagation_chance == 0.0 {
@@ -914,11 +914,16 @@ fn update_chunk_weather_system(ctx: &ReducerContext, world_state: &WorldState, e
     let chunk_weather_table = ctx.db.chunk_weather();
     let all_chunk_weather: Vec<ChunkWeather> = chunk_weather_table.iter().collect();
     
-    // If no chunks have weather yet, initialize weather with 1-3 concentrated fronts
+    // If no chunks have weather yet, initialize weather with concentrated fronts
     // This creates localized weather systems that grow naturally, not scattered seeds
     if all_chunk_weather.is_empty() {
-        // Create 1-3 weather front centers (not scattered across the entire map)
-        let num_fronts = rng.gen_range(1..=3);
+        // Scale number of fronts based on map size
+        // Small maps (≤400×400 tiles): 1 front
+        // Medium maps (≤800×800 tiles): 2 fronts  
+        // Large maps (≤1200×1200 tiles): 3 fronts
+        // Very large maps (>1200×1200 tiles): 4+ fronts
+        let total_tiles = crate::WORLD_WIDTH_PX * crate::WORLD_HEIGHT_PX;
+        let num_fronts = ((total_tiles as f32 / (400.0 * 400.0)).sqrt().ceil() as u32).max(1).min(6);
         
         for front_idx in 0..num_fronts {
             // Pick a random center point for this weather front
@@ -933,8 +938,8 @@ fn update_chunk_weather_system(ctx: &ReducerContext, world_state: &WorldState, e
                 _ => WeatherType::HeavyStorm,                 // 5% storm
             };
             
-            // Create a small cluster of rainy chunks around the center (3x3 to 5x5 area)
-            let front_radius = rng.gen_range(1..=2); // 1 = 3x3, 2 = 5x5
+            // Create a VERY small cluster of rainy chunks around the center (3x3 area only)
+            let front_radius = 1; // Always 3x3 for minimal initial coverage
             
             for dy in -(front_radius as i32)..=(front_radius as i32) {
                 for dx in -(front_radius as i32)..=(front_radius as i32) {
@@ -945,7 +950,7 @@ fn update_chunk_weather_system(ctx: &ReducerContext, world_state: &WorldState, e
                     // Not all chunks in the radius get rain (creates more natural edges)
                     // Center chunks more likely to have rain than edge chunks
                     let distance_from_center = ((dx * dx + dy * dy) as f32).sqrt();
-                    let rain_chance = 1.0 - (distance_from_center / (front_radius as f32 + 1.0)) * 0.5;
+                    let rain_chance = 1.0 - (distance_from_center / (front_radius as f32 + 1.0)) * 0.7; // More aggressive falloff
                     
                     if rng.gen::<f32>() < rain_chance {
                         let mut chunk_weather = get_or_create_chunk_weather(ctx, chunk_index);
