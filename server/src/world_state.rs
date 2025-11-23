@@ -410,9 +410,9 @@ fn propagate_weather_to_nearby_chunks(
     mut rng: &mut impl Rng,
 ) -> Result<(), String> {
     // Base propagation probability based on weather intensity
-    // EMERGENT SYSTEM: Clear weather propagates MORE than rain to naturally erode fronts
+    // EMERGENT SYSTEM: Clear weather DOMINATES - propagates much faster than rain to naturally erode fronts
     let base_propagation_chance = match source_weather {
-        WeatherType::Clear => 0.20,        // 20% - Clear weather spreads to erode rain fronts
+        WeatherType::Clear => 0.30,        // 30% - Clear weather aggressively erodes rain fronts
         WeatherType::LightRain => 0.05,     // 5% - Light rain spreads very slowly
         WeatherType::ModerateRain => 0.08,  // 8% - Moderate spread
         WeatherType::HeavyRain => 0.10,     // 10% - Good spread
