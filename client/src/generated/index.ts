@@ -597,6 +597,8 @@ import { LanternTableHandle } from "./lantern_table.ts";
 export { LanternTableHandle };
 import { LanternProcessingScheduleTableHandle } from "./lantern_processing_schedule_table.ts";
 export { LanternProcessingScheduleTableHandle };
+import { LastWhisperFromTableHandle } from "./last_whisper_from_table.ts";
+export { LastWhisperFromTableHandle };
 import { MemoryGridProgressTableHandle } from "./memory_grid_progress_table.ts";
 export { MemoryGridProgressTableHandle };
 import { MemoryGridPurchasesTableHandle } from "./memory_grid_purchases_table.ts";
@@ -835,6 +837,8 @@ import { Lantern } from "./lantern_type.ts";
 export { Lantern };
 import { LanternProcessingSchedule } from "./lantern_processing_schedule_type.ts";
 export { LanternProcessingSchedule };
+import { LastWhisperFrom } from "./last_whisper_from_type.ts";
+export { LastWhisperFrom };
 import { MemoryGridProgress } from "./memory_grid_progress_type.ts";
 export { MemoryGridProgress };
 import { MemoryGridPurchase } from "./memory_grid_purchase_type.ts";
@@ -1382,6 +1386,15 @@ const REMOTE_MODULE = {
       primaryKeyInfo: {
         colName: "lanternId",
         colType: (LanternProcessingSchedule.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
+      },
+    },
+    last_whisper_from: {
+      tableName: "last_whisper_from" as const,
+      rowType: LastWhisperFrom.getTypeScriptAlgebraicType(),
+      primaryKey: "playerId",
+      primaryKeyInfo: {
+        colName: "playerId",
+        colType: (LastWhisperFrom.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
       },
     },
     memory_grid_progress: {
@@ -8110,6 +8123,11 @@ export class RemoteTables {
   get lanternProcessingSchedule(): LanternProcessingScheduleTableHandle<'lantern_processing_schedule'> {
     // clientCache is a private property
     return new LanternProcessingScheduleTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<LanternProcessingSchedule>(REMOTE_MODULE.tables.lantern_processing_schedule));
+  }
+
+  get lastWhisperFrom(): LastWhisperFromTableHandle<'last_whisper_from'> {
+    // clientCache is a private property
+    return new LastWhisperFromTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<LastWhisperFrom>(REMOTE_MODULE.tables.last_whisper_from));
   }
 
   get memoryGridProgress(): MemoryGridProgressTableHandle<'memory_grid_progress'> {

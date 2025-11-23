@@ -359,6 +359,9 @@ const tipSectionDefinitions = {
             'Press Enter to open the chat input and start typing a message.',
             'Press Enter again to send your message, or Escape to cancel.',
             'All messages are visible to everyone in the global chat by default.',
+            'Global chat messages appear as speech bubbles above your character for 8 seconds.',
+            'Whispers are completely private - they never appear as speech bubbles.',
+            'Commands (starting with /) don\'t show as speech bubbles either.',
             
             // /who command
             'Type /who to see a list of all currently online players.',

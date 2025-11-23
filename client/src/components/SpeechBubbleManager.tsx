@@ -10,7 +10,7 @@ interface SpeechBubbleData {
 }
 
 interface SpeechBubbleManagerProps {
-  messages: Map<string, SpacetimeDBMessage>;
+  messages: Map<string, SpacetimeDBMessage>; // Only global chat messages (whispers use PrivateMessage table)
   players: Map<string, SpacetimeDBPlayer>;
   cameraOffsetX: number;
   cameraOffsetY: number;
@@ -51,6 +51,11 @@ const SpeechBubbleManager: React.FC<SpeechBubbleManagerProps> = ({
         
         // Mark this message as processed
         processedMessageIds.add(messageId);
+        
+        // Skip commands (messages starting with /) - they shouldn't show as speech bubbles
+        if (message.text.trim().startsWith('/')) {
+          continue;
+        }
         
         // Convert SpacetimeDB timestamp to JavaScript timestamp
         const messageSentTime = Number(message.sent.microsSinceUnixEpoch / 1000n); // Convert microseconds to milliseconds
