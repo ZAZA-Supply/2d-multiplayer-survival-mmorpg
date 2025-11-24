@@ -1,12 +1,12 @@
 import React from 'react';
 import styles from './MenuComponents.module.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTree, faGripLines } from '@fortawesome/free-solid-svg-icons';
-import { useDebug } from '../contexts/DebugContext';
+import { faTree, faCloudRain } from '@fortawesome/free-solid-svg-icons';
 
 // Default visual settings based on optimal neural rendering thresholds
 export const DEFAULT_VISUAL_SETTINGS = {
     treeShadowsEnabled: true,        // Enable tree shadows
+    weatherOverlayEnabled: true,     // Enable weather overlay effects
 } as const;
 
 interface GameVisualSettingsMenuProps {
@@ -14,6 +14,8 @@ interface GameVisualSettingsMenuProps {
     onClose: () => void;
     treeShadowsEnabled: boolean;
     onTreeShadowsChange: (enabled: boolean) => void;
+    weatherOverlayEnabled: boolean;
+    onWeatherOverlayChange: (enabled: boolean) => void;
 }
 
 const GameVisualSettingsMenu: React.FC<GameVisualSettingsMenuProps> = ({
@@ -21,9 +23,9 @@ const GameVisualSettingsMenu: React.FC<GameVisualSettingsMenuProps> = ({
     onClose,
     treeShadowsEnabled,
     onTreeShadowsChange,
+    weatherOverlayEnabled,
+    onWeatherOverlayChange,
 }) => {
-    const { showChunkBoundaries, toggleChunkBoundaries } = useDebug();
-    
     const handleBackdropClick = (e: React.MouseEvent) => {
         if (e.target === e.currentTarget) {
             onBack();
@@ -172,41 +174,41 @@ const GameVisualSettingsMenu: React.FC<GameVisualSettingsMenuProps> = ({
                         </div>
                     </div>
 
-                    {/* Chunk Boundaries Debug Setting */}
+                    {/* Weather Overlay Setting */}
                     <div style={{ marginBottom: '25px' }}>
                         <div style={{
                             fontFamily: '"Press Start 2P", cursive',
                             fontSize: '16px',
-                            color: '#ff8844',
+                            color: '#44aaff',
                             marginBottom: '12px',
-                            textShadow: '0 0 8px #ff8844',
+                            textShadow: '0 0 8px #44aaff',
                             letterSpacing: '1px',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '12px',
                         }}>
                             <FontAwesomeIcon 
-                                icon={faGripLines} 
+                                icon={faCloudRain} 
                                 style={{
-                                    color: '#ff8844',
-                                    textShadow: '0 0 8px #ff8844',
+                                    color: '#44aaff',
+                                    textShadow: '0 0 8px #44aaff',
                                     fontSize: '14px',
                                 }}
                             />
-                            CHUNK BOUNDARIES: {showChunkBoundaries ? 'ENABLED' : 'DISABLED'}
+                            RAIN PARTICLES: {weatherOverlayEnabled ? 'ENABLED' : 'DISABLED'}
                         </div>
                         <div style={{
                             fontFamily: '"Press Start 2P", cursive',
                             fontSize: '12px',
-                            color: '#ffaa88',
+                            color: '#aaccff',
                             marginBottom: '8px',
                             opacity: 0.7,
                             letterSpacing: '0.5px',
                             textAlign: 'left',
                         }}>
-                            {showChunkBoundaries 
-                                ? 'Shows world chunk grid for debugging' 
-                                : 'Hidden for normal gameplay'
+                            {weatherOverlayEnabled 
+                                ? 'Rain particles may reduce performance' 
+                                : 'Rain disabled, atmosphere remains for feedback'
                             }
                         </div>
                         <div style={{
@@ -221,21 +223,21 @@ const GameVisualSettingsMenu: React.FC<GameVisualSettingsMenuProps> = ({
                                 cursor: 'pointer',
                                 fontFamily: '"Press Start 2P", cursive',
                                 fontSize: '14px',
-                                color: showChunkBoundaries ? '#ff8844' : '#666',
-                                textShadow: showChunkBoundaries ? '0 0 5px #ff8844' : 'none',
+                                color: weatherOverlayEnabled ? '#44aaff' : '#666',
+                                textShadow: weatherOverlayEnabled ? '0 0 5px #44aaff' : 'none',
                                 transition: 'all 0.3s ease',
                             }}>
                                 <input
                                     type="checkbox"
-                                    checked={showChunkBoundaries}
-                                    onChange={toggleChunkBoundaries}
+                                    checked={weatherOverlayEnabled}
+                                    onChange={(e) => onWeatherOverlayChange(e.target.checked)}
                                     style={{
                                         marginRight: '10px',
                                         transform: 'scale(1.5)',
-                                        accentColor: '#ff8844',
+                                        accentColor: '#44aaff',
                                     }}
                                 />
-                                SHOW BOUNDARIES
+                                ENABLE RAIN
                             </label>
                         </div>
                     </div>

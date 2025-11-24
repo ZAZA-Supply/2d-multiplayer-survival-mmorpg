@@ -168,6 +168,11 @@ function AppContent() {
         return saved ? saved === 'true' : true; // true by default
     });
     
+    const [weatherOverlayEnabled, setWeatherOverlayEnabled] = useState(() => {
+        const saved = localStorage.getItem('weatherOverlayEnabled');
+        return saved ? saved === 'true' : true; // true by default
+    });
+    
     // --- Volume Change Handlers ---
     const handleMusicVolumeChange = useCallback((volume: number) => {
         console.log(`[App] handleMusicVolumeChange called with: ${volume.toFixed(3)}`);
@@ -192,6 +197,12 @@ function AppContent() {
         console.log(`[App] handleTreeShadowsChange called with: ${enabled}`);
         setTreeShadowsEnabled(enabled);
         localStorage.setItem('treeShadowsEnabled', enabled.toString());
+    }, []);
+    
+    const handleWeatherOverlayChange = useCallback((enabled: boolean) => {
+        console.log(`[App] handleWeatherOverlayChange called with: ${enabled}`);
+        setWeatherOverlayEnabled(enabled);
+        localStorage.setItem('weatherOverlayEnabled', enabled.toString());
     }, []);
 
     // --- Viewport State & Refs ---
@@ -937,6 +948,8 @@ function AppContent() {
                             onEnvironmentalVolumeChange={handleEnvironmentalVolumeChange}
                             onTreeShadowsChange={handleTreeShadowsChange}
                             treeShadowsEnabled={treeShadowsEnabled}
+                            onWeatherOverlayChange={handleWeatherOverlayChange}
+                            weatherOverlayEnabled={weatherOverlayEnabled}
                             soundSystem={soundSystemState}
                             playerDrinkingCooldowns={playerDrinkingCooldowns}
                             rainCollectors={rainCollectors}

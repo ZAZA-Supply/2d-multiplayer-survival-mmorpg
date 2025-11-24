@@ -213,7 +213,7 @@ interface GameCanvasProps {
   treeShadowsEnabled?: boolean;
   // Chunk-based weather data
   chunkWeather: Map<string, any>;
-  // Weather overlay toggle
+  // Weather overlay toggle for main game canvas atmospheric effects
   showWeatherOverlay?: boolean;
 }
 
@@ -292,7 +292,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   localFacingDirection, // ADD: Destructure local facing direction for client-authoritative direction changes
   treeShadowsEnabled, // NEW: Destructure treeShadowsEnabled for visual cortex module setting
   chunkWeather, // Chunk-based weather data
-  showWeatherOverlay, // Weather overlay toggle (managed internally if not provided)
+  showWeatherOverlay, // Weather overlay toggle for main game canvas atmospheric effects (managed internally if not provided)
 }) => {
   // console.log('[GameCanvas IS RUNNING] showInventory:', showInventory);
 
@@ -309,14 +309,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   // Minimap canvas ref for the InterfaceContainer
   const minimapCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Weather overlay state (managed here, passed to InterfaceContainer)
-  const [internalShowWeatherOverlay, setInternalShowWeatherOverlay] = useState<boolean>(() => {
+  // Minimap weather overlay state (separate from game canvas weather overlay)
+  // This controls the informative weather display on the minimap (always available)
+  const [minimapShowWeatherOverlay, setMinimapShowWeatherOverlay] = useState<boolean>(() => {
     const saved = localStorage.getItem('minimap_show_weather_overlay');
     return saved !== null ? saved === 'true' : false;
   });
-
-  // Use prop if provided, otherwise use internal state
-  const effectiveShowWeatherOverlay = showWeatherOverlay !== undefined ? showWeatherOverlay : internalShowWeatherOverlay;
 
   // Particle system refs
   const campfireParticlesRef = useRef<Particle[]>([]);
@@ -2351,7 +2349,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       rainIntensity = worldState.rainIntensity;
     }
     
-    if (rainIntensity > 0) {
+    // Only render rain if weather overlay is enabled (performance toggle)
+    if (showWeatherOverlay && rainIntensity > 0) {
       renderRain(
         ctx,
         -cameraOffsetX, // Convert screen offset to world camera position
@@ -2368,6 +2367,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         // Darkens and desaturates the scene based on storm intensity
         // Renders BEFORE day/night overlay so both effects layer naturally
         // Smoothly fades in/out when moving between chunks with different weather
+        // Always render atmospheric overlay - it's lightweight and provides visual feedback
         renderWeatherOverlay(
           ctx,
           currentCanvasWidth,
@@ -2851,8 +2851,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       torchOnImage: torchOnImg,
       // Add grid coordinates visibility preference
       showGridCoordinates,
-      // Add weather overlay props
-      showWeatherOverlay: effectiveShowWeatherOverlay,
+      // Add minimap weather overlay props (separate from game canvas weather overlay)
+      showWeatherOverlay: minimapShowWeatherOverlay,
       chunkWeatherData: chunkWeatherForMinimap,
     });
   }, [
@@ -2879,8 +2879,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     pinMarkerImg,
     campfireWarmthImg,
     torchOnImg,
-    // Add weather overlay dependencies
-    effectiveShowWeatherOverlay,
+    // Add minimap weather overlay dependencies (separate from game canvas)
+    minimapShowWeatherOverlay,
     chunkWeather,
   ]);
 
@@ -2971,9 +2971,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
               zIndex: 1000,
             }}
             onClose={() => setIsMinimapOpen(false)}
-            showWeatherOverlay={effectiveShowWeatherOverlay}
+            showWeatherOverlay={minimapShowWeatherOverlay}
             onToggleWeatherOverlay={(checked) => {
-              setInternalShowWeatherOverlay(checked);
+              setMinimapShowWeatherOverlay(checked);
               localStorage.setItem('minimap_show_weather_overlay', checked.toString());
             }}
           >

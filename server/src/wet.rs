@@ -7,6 +7,8 @@ use crate::shelter::shelter;
 // Import armor module for immunity checks
 use crate::armor;
 use crate::models::ImmunityType;
+// Import chunk calculation for chunk-based weather
+use crate::environment::calculate_chunk_index;
 
 // Constants for wet effect
 pub const WET_COLD_DAMAGE_MULTIPLIER: f32 = 2.0; // Double cold damage when wet
@@ -102,10 +104,20 @@ pub fn player_has_wet_effect(ctx: &ReducerContext, player_id: Identity) -> bool 
         .any(|effect| effect.player_id == player_id && effect.effect_type == EffectType::Wet)
 }
 
-/// Checks if it's currently raining (any intensity > 0)
-fn is_raining(ctx: &ReducerContext) -> bool {
-    use crate::world_state::world_state as WorldStateTableTrait;
+/// Checks if it's currently raining at a specific position (any intensity > 0)
+fn is_raining_at_position(ctx: &ReducerContext, pos_x: f32, pos_y: f32) -> bool {
+    use crate::world_state::chunk_weather as ChunkWeatherTableTrait;
     
+    // Calculate chunk index for the player's position
+    let chunk_index = calculate_chunk_index(pos_x, pos_y);
+    
+    // Check chunk-based weather first
+    if let Some(chunk_weather) = ctx.db.chunk_weather().chunk_index().find(&chunk_index) {
+        return chunk_weather.rain_intensity > 0.0;
+    }
+    
+    // Fallback to global weather if chunk weather not found (backward compatibility)
+    use crate::world_state::world_state as WorldStateTableTrait;
     if let Some(world_state) = ctx.db.world_state().iter().next() {
         world_state.rain_intensity > 0.0
     } else {
@@ -121,8 +133,8 @@ pub fn should_player_be_wet(ctx: &ReducerContext, player_id: Identity, player: &
         return (true, "standing in water".to_string());
     }
     
-    // Check if it's raining and player is not protected
-    if is_raining(ctx) && !is_player_protected_from_rain(ctx, player) {
+    // Check if it's raining at player's position and player is not protected
+    if is_raining_at_position(ctx, player.position_x, player.position_y) && !is_player_protected_from_rain(ctx, player) {
         return (true, "exposed to rain".to_string());
     }
     
@@ -270,7 +282,7 @@ pub fn check_and_remove_wet_from_environment(ctx: &ReducerContext) -> Result<(),
         let player_id = effect.player_id;
         
         if let Some(player) = ctx.db.player().identity().find(&player_id) {
-            let is_raining_now = is_raining(ctx);
+            let is_raining_now = is_raining_at_position(ctx, player.position_x, player.position_y);
             let is_protected_from_rain = is_player_protected_from_rain(ctx, &player);
             let is_in_water = crate::is_player_on_water(ctx, player.position_x, player.position_y);
             let has_cozy_effect = crate::active_effects::player_has_cozy_effect(ctx, player_id);

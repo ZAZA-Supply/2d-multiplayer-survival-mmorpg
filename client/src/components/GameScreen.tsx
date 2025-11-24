@@ -220,6 +220,8 @@ interface GameScreenProps {
     // Visual settings for menu controls
     treeShadowsEnabled: boolean;
     onTreeShadowsChange: (enabled: boolean) => void;
+    weatherOverlayEnabled: boolean;
+    onWeatherOverlayChange: (enabled: boolean) => void;
 
     // Sound system for immediate sound effects
     soundSystem: ReturnType<typeof import('../hooks/useSoundSystem').useSoundSystem>;
@@ -322,6 +324,8 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
         onEnvironmentalVolumeChange,
         treeShadowsEnabled,
         onTreeShadowsChange,
+        weatherOverlayEnabled,
+        onWeatherOverlayChange,
         soundSystem,
         playerDrinkingCooldowns,
         playerDodgeRollStates,
@@ -574,6 +578,8 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                     onClose={handleMenuClose}
                     treeShadowsEnabled={treeShadowsEnabled}
                     onTreeShadowsChange={onTreeShadowsChange}
+                    weatherOverlayEnabled={weatherOverlayEnabled}
+                    onWeatherOverlayChange={onWeatherOverlayChange}
                 />
             )}
 
@@ -771,6 +777,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 playerDodgeRollStates={props.playerDodgeRollStates}
                 treeShadowsEnabled={treeShadowsEnabled}
                 chunkWeather={chunkWeather}
+                showWeatherOverlay={weatherOverlayEnabled}
             />
 
             {/* Use our camera offsets for SpeechBubbleManager */}
