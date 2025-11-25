@@ -12,6 +12,7 @@ use crate::{
     models::{BuildingEdge, ItemLocation, InventoryLocationData},
     environment::calculate_chunk_index,
     building::{FOUNDATION_TILE_SIZE_PX, BUILDING_PLACEMENT_MAX_DISTANCE_SQUARED, BUILDING_PLACEMENT_MAX_DISTANCE, DOOR_WOOD_MAX_HEALTH, DOOR_METAL_MAX_HEALTH},
+    homestead_hearth::homestead_hearth, // Import the trait for accessing homestead_hearth table
 };
 use crate::player as PlayerTableTrait;
 use crate::items::{item_definition as ItemDefinitionTableTrait, inventory_item as InventoryItemTableTrait};
@@ -27,8 +28,8 @@ pub const DOOR_TYPE_METAL: u8 = 1;
 /// Door collision thickness (same as walls)
 pub const DOOR_COLLISION_THICKNESS: f32 = 6.0;
 
-/// Door interaction distance (slightly larger than walls for easier E interaction)
-pub const DOOR_INTERACTION_DISTANCE: f32 = 64.0;
+/// Door interaction distance (increased significantly for flawless E interaction)
+pub const DOOR_INTERACTION_DISTANCE: f32 = 180.0; // Increased from 96px to 180px (generous for visual offset)
 pub const DOOR_INTERACTION_DISTANCE_SQUARED: f32 = DOOR_INTERACTION_DISTANCE * DOOR_INTERACTION_DISTANCE;
 
 // --- Door Table ---
@@ -163,6 +164,46 @@ pub fn calculate_door_position(cell_x: i32, cell_y: i32, edge: BuildingEdge) -> 
     }
 }
 
+/// Apply damage to a door and handle destruction
+pub fn damage_door(
+    ctx: &ReducerContext,
+    attacker_id: Identity,
+    door_id: u64,
+    damage: f32,
+    current_time: Timestamp,
+) -> Result<(), String> {
+    let doors = ctx.db.door();
+    
+    let mut door = doors.id().find(door_id)
+        .ok_or_else(|| format!("Door {} not found", door_id))?;
+    
+    if door.is_destroyed {
+        return Err(format!("Door {} is already destroyed", door_id));
+    }
+    
+    // Apply damage
+    door.health = (door.health - damage).max(0.0);
+    door.last_hit_time = Some(current_time);
+    door.last_damaged_by = Some(attacker_id);
+    
+    log::info!(
+        "[DoorDamage] Door {} took {:.1} damage from {:?}. Health: {:.1}/{:.1}",
+        door_id, damage, attacker_id, door.health, door.max_health
+    );
+    
+    // Check if door is destroyed
+    if door.health <= 0.0 {
+        door.is_destroyed = true;
+        door.destroyed_at = Some(current_time);
+        log::info!("[DoorDamage] Door {} destroyed by {:?}", door_id, attacker_id);
+    }
+    
+    // Update door in database
+    ctx.db.door().id().update(door);
+    
+    Ok(())
+}
+
 /// Check if a world position collides with any closed door
 /// Returns pushback vector if collision detected
 /// Uses circle-AABB collision detection (like walls)
@@ -199,12 +240,16 @@ pub fn check_door_collision(
                 let tile_bottom = tile_top + FOUNDATION_TILE_SIZE_PX as f32;
                 
                 // Determine door edge bounds (similar to wall collision)
+                // South doors have collision positioned higher to prevent visual clipping through bottom half
                 let (door_min_x, door_max_x, door_min_y, door_max_y) = match door.edge {
-                    0 => { // North edge
+                    0 => { // North edge - perfect as is
                         (tile_left, tile_right, tile_top - DOOR_COLLISION_THICKNESS / 2.0, tile_top + DOOR_COLLISION_THICKNESS / 2.0)
                     },
-                    2 => { // South edge
-                        (tile_left, tile_right, tile_bottom - DOOR_COLLISION_THICKNESS / 2.0, tile_bottom + DOOR_COLLISION_THICKNESS / 2.0)
+                    2 => { // South edge - positioned higher to cover more of door visually
+                        // Move collision up by 24px from bottom edge to prevent visual clipping
+                        const SOUTH_DOOR_COLLISION_OFFSET: f32 = 24.0;
+                        let collision_y = tile_bottom - SOUTH_DOOR_COLLISION_OFFSET;
+                        (tile_left, tile_right, collision_y - DOOR_COLLISION_THICKNESS / 2.0, collision_y + DOOR_COLLISION_THICKNESS / 2.0)
                     },
                     _ => continue, // Invalid edge for door
                 };
@@ -256,14 +301,14 @@ pub fn check_door_collision(
 }
 
 /// Check if a line segment intersects any closed door (for projectile collision)
-/// Returns true if the projectile should be blocked
+/// Returns Some((door_id, collision_x, collision_y)) if collision occurs
 pub fn check_door_projectile_collision(
     ctx: &ReducerContext,
     start_x: f32,
     start_y: f32,
     end_x: f32,
     end_y: f32,
-) -> bool {
+) -> Option<(u64, f32, f32)> {
     const CHECK_RADIUS_TILES: i32 = 3;
     
     // Get center point for spatial query
@@ -296,8 +341,10 @@ pub fn check_door_projectile_collision(
                     0 => { // North edge
                         (tile_left, tile_right, tile_top - DOOR_COLLISION_THICKNESS / 2.0, tile_top + DOOR_COLLISION_THICKNESS / 2.0)
                     },
-                    2 => { // South edge
-                        (tile_left, tile_right, tile_bottom - DOOR_COLLISION_THICKNESS / 2.0, tile_bottom + DOOR_COLLISION_THICKNESS / 2.0)
+                    2 => { // South edge - positioned higher to match player collision offset
+                        const SOUTH_DOOR_COLLISION_OFFSET: f32 = 24.0;
+                        let collision_y = tile_bottom - SOUTH_DOOR_COLLISION_OFFSET;
+                        (tile_left, tile_right, collision_y - DOOR_COLLISION_THICKNESS / 2.0, collision_y + DOOR_COLLISION_THICKNESS / 2.0)
                     },
                     _ => continue,
                 };
@@ -305,13 +352,22 @@ pub fn check_door_projectile_collision(
                 // Simple AABB vs line segment intersection check
                 if line_intersects_aabb(start_x, start_y, end_x, end_y, 
                                        door_min_x, door_min_y, door_max_x, door_max_y) {
-                    return true;
+                    // Calculate approximate collision point
+                    let collision_x = end_x.max(door_min_x).min(door_max_x);
+                    let collision_y = end_y.max(door_min_y).min(door_max_y);
+                    
+                    log::info!(
+                        "[DoorProjectileCollision] Projectile path from ({:.1}, {:.1}) to ({:.1}, {:.1}) hits Door {} at ({:.1}, {:.1})",
+                        start_x, start_y, end_x, end_y, door.id, collision_x, collision_y
+                    );
+                    
+                    return Some((door.id, collision_x, collision_y));
                 }
             }
         }
     }
     
-    false
+    None
 }
 
 /// Simple line segment vs AABB intersection test
@@ -513,7 +569,7 @@ pub fn place_door(
     }
 }
 
-/// Toggle door open/closed state (owner only)
+/// Toggle door open/closed state (requires building privilege)
 #[spacetimedb::reducer]
 pub fn interact_door(ctx: &ReducerContext, door_id: u64) -> Result<(), String> {
     let sender_id = ctx.sender;
@@ -542,9 +598,15 @@ pub fn interact_door(ctx: &ReducerContext, door_id: u64) -> Result<(), String> {
         return Err("Door is destroyed.".to_string());
     }
     
-    // 3. Check ownership - only owner can open/close
-    if door.owner_id != sender_id {
-        return Err("Only the owner can open/close this door.".to_string());
+    // 3. Check building privilege - anyone with privilege can open/close doors
+    // EARLY GAME: If no hearths exist, allow anyone to use doors (pre-privilege phase)
+    // LATE GAME: Once hearths exist, require building privilege (prevents former owner abuse)
+    use crate::homestead_hearth::player_has_building_privilege;
+    let hearths = ctx.db.homestead_hearth();
+    let any_hearth_exists = hearths.iter().any(|h| !h.is_destroyed);
+    
+    if any_hearth_exists && !player_has_building_privilege(ctx, sender_id) {
+        return Err("Building privilege required to open/close doors.".to_string());
     }
     
     // 4. Check distance
@@ -567,7 +629,7 @@ pub fn interact_door(ctx: &ReducerContext, door_id: u64) -> Result<(), String> {
     Ok(())
 }
 
-/// Pick up a door and return it to inventory (owner only)
+/// Pick up a door and return it to inventory (requires building privilege)
 #[spacetimedb::reducer]
 pub fn pickup_door(ctx: &ReducerContext, door_id: u64) -> Result<(), String> {
     let sender_id = ctx.sender;
@@ -597,9 +659,15 @@ pub fn pickup_door(ctx: &ReducerContext, door_id: u64) -> Result<(), String> {
         return Err("Door is destroyed.".to_string());
     }
     
-    // 3. Check ownership - only owner can pickup
-    if door.owner_id != sender_id {
-        return Err("Only the owner can pickup this door.".to_string());
+    // 3. Check building privilege - anyone with privilege can pickup doors
+    // EARLY GAME: If no hearths exist, allow anyone to pickup doors (pre-privilege phase)
+    // LATE GAME: Once hearths exist, require building privilege (prevents former owner abuse)
+    use crate::homestead_hearth::player_has_building_privilege;
+    let hearths = ctx.db.homestead_hearth();
+    let any_hearth_exists = hearths.iter().any(|h| !h.is_destroyed);
+    
+    if any_hearth_exists && !player_has_building_privilege(ctx, sender_id) {
+        return Err("Building privilege required to pickup doors.".to_string());
     }
     
     // 4. Check distance

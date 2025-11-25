@@ -664,17 +664,26 @@ function getCollisionCandidates(
       let doorMinX: number, doorMaxX: number, doorMinY: number, doorMaxY: number;
       
       switch (door.edge) {
-        case 0: // North edge - horizontal line at top of foundation
+        case 0: // North edge - match north wall collision offset for smooth walking
+          // Use same logic as north walls: position collision box so expanded AABB ends at top edge
+          // This matches the north wall collision positioning for smooth movement
+          const topEdge = door.cellY * FOUNDATION_TILE_SIZE;
+          const NORTH_DOOR_COLLISION_EXTENT = SOUTH_WALL_NORTH_EXTENT; // Same as north walls (3.5px)
+          // Calculate bounds to match north wall: wallY = topEdge - PLAYER_RADIUS - EXTENT/2, height = EXTENT
+          // So: minY = topEdge - PLAYER_RADIUS - EXTENT, maxY = topEdge - PLAYER_RADIUS
           doorMinX = tileLeft;
           doorMaxX = tileRight;
-          doorMinY = tileTop - DOOR_COLLISION_THICKNESS / 2;
-          doorMaxY = tileTop + DOOR_COLLISION_THICKNESS / 2;
+          doorMinY = topEdge - PLAYER_RADIUS - NORTH_DOOR_COLLISION_EXTENT;
+          doorMaxY = topEdge - PLAYER_RADIUS;
           break;
-        case 2: // South edge - horizontal line at bottom of foundation
+        case 2: // South edge - positioned higher to prevent visual clipping through bottom half
+          // Move collision up by 24px from bottom edge to match server-side
+          const SOUTH_DOOR_COLLISION_OFFSET = 24;
+          const collisionY = tileBottom - SOUTH_DOOR_COLLISION_OFFSET;
           doorMinX = tileLeft;
           doorMaxX = tileRight;
-          doorMinY = tileBottom - DOOR_COLLISION_THICKNESS / 2;
-          doorMaxY = tileBottom + DOOR_COLLISION_THICKNESS / 2;
+          doorMinY = collisionY - DOOR_COLLISION_THICKNESS / 2;
+          doorMaxY = collisionY + DOOR_COLLISION_THICKNESS / 2;
           break;
         default:
           continue; // Skip invalid edges (doors only on North/South)

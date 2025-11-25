@@ -375,6 +375,8 @@ import { RespawnRandomly } from "./respawn_randomly_reducer.ts";
 export { RespawnRandomly };
 import { ReviveKnockedOutPlayer } from "./revive_knocked_out_player_reducer.ts";
 export { ReviveKnockedOutPlayer };
+import { RevokePlayerBuildingPrivilege } from "./revoke_player_building_privilege_reducer.ts";
+export { RevokePlayerBuildingPrivilege };
 import { ScheduleNextBrothPotProcessing } from "./schedule_next_broth_pot_processing_reducer.ts";
 export { ScheduleNextBrothPotProcessing };
 import { ScheduleNextCampfireProcessing } from "./schedule_next_campfire_processing_reducer.ts";
@@ -541,6 +543,8 @@ import { UseEquippedItem } from "./use_equipped_item_reducer.ts";
 export { UseEquippedItem };
 import { WaterCrops } from "./water_crops_reducer.ts";
 export { WaterCrops };
+import { WipeAllBuildingPrivileges } from "./wipe_all_building_privileges_reducer.ts";
+export { WipeAllBuildingPrivileges };
 
 // Import and reexport all table handle types
 import { ActiveConnectionTableHandle } from "./active_connection_table.ts";
@@ -2651,6 +2655,10 @@ const REMOTE_MODULE = {
       reducerName: "revive_knocked_out_player",
       argsType: ReviveKnockedOutPlayer.getTypeScriptAlgebraicType(),
     },
+    revoke_player_building_privilege: {
+      reducerName: "revoke_player_building_privilege",
+      argsType: RevokePlayerBuildingPrivilege.getTypeScriptAlgebraicType(),
+    },
     schedule_next_broth_pot_processing: {
       reducerName: "schedule_next_broth_pot_processing",
       argsType: ScheduleNextBrothPotProcessing.getTypeScriptAlgebraicType(),
@@ -2983,6 +2991,10 @@ const REMOTE_MODULE = {
       reducerName: "water_crops",
       argsType: WaterCrops.getTypeScriptAlgebraicType(),
     },
+    wipe_all_building_privileges: {
+      reducerName: "wipe_all_building_privileges",
+      argsType: WipeAllBuildingPrivileges.getTypeScriptAlgebraicType(),
+    },
   },
   versionInfo: {
     cliVersion: "1.6.0",
@@ -3185,6 +3197,7 @@ export type Reducer = never
 | { name: "RespawnDestroyedBarrels", args: RespawnDestroyedBarrels }
 | { name: "RespawnRandomly", args: RespawnRandomly }
 | { name: "ReviveKnockedOutPlayer", args: ReviveKnockedOutPlayer }
+| { name: "RevokePlayerBuildingPrivilege", args: RevokePlayerBuildingPrivilege }
 | { name: "ScheduleNextBrothPotProcessing", args: ScheduleNextBrothPotProcessing }
 | { name: "ScheduleNextCampfireProcessing", args: ScheduleNextCampfireProcessing }
 | { name: "ScheduleNextFumaroleProcessing", args: ScheduleNextFumaroleProcessing }
@@ -3268,6 +3281,7 @@ export type Reducer = never
 | { name: "UpgradeWall", args: UpgradeWall }
 | { name: "UseEquippedItem", args: UseEquippedItem }
 | { name: "WaterCrops", args: WaterCrops }
+| { name: "WipeAllBuildingPrivileges", args: WipeAllBuildingPrivileges }
 ;
 
 export class RemoteReducers {
@@ -5945,6 +5959,22 @@ export class RemoteReducers {
     this.connection.offReducer("revive_knocked_out_player", callback);
   }
 
+  revokePlayerBuildingPrivilege(hearthId: number, targetPlayerId: __Identity) {
+    const __args = { hearthId, targetPlayerId };
+    let __writer = new __BinaryWriter(1024);
+    RevokePlayerBuildingPrivilege.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("revoke_player_building_privilege", __argsBuffer, this.setCallReducerFlags.revokePlayerBuildingPrivilegeFlags);
+  }
+
+  onRevokePlayerBuildingPrivilege(callback: (ctx: ReducerEventContext, hearthId: number, targetPlayerId: __Identity) => void) {
+    this.connection.onReducer("revoke_player_building_privilege", callback);
+  }
+
+  removeOnRevokePlayerBuildingPrivilege(callback: (ctx: ReducerEventContext, hearthId: number, targetPlayerId: __Identity) => void) {
+    this.connection.offReducer("revoke_player_building_privilege", callback);
+  }
+
   scheduleNextBrothPotProcessing(brothPotId: number) {
     const __args = { brothPotId };
     let __writer = new __BinaryWriter(1024);
@@ -7221,6 +7251,22 @@ export class RemoteReducers {
     this.connection.offReducer("water_crops", callback);
   }
 
+  wipeAllBuildingPrivileges(hearthId: number) {
+    const __args = { hearthId };
+    let __writer = new __BinaryWriter(1024);
+    WipeAllBuildingPrivileges.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("wipe_all_building_privileges", __argsBuffer, this.setCallReducerFlags.wipeAllBuildingPrivilegesFlags);
+  }
+
+  onWipeAllBuildingPrivileges(callback: (ctx: ReducerEventContext, hearthId: number) => void) {
+    this.connection.onReducer("wipe_all_building_privileges", callback);
+  }
+
+  removeOnWipeAllBuildingPrivileges(callback: (ctx: ReducerEventContext, hearthId: number) => void) {
+    this.connection.offReducer("wipe_all_building_privileges", callback);
+  }
+
 }
 
 export class SetReducerFlags {
@@ -8074,6 +8120,11 @@ export class SetReducerFlags {
     this.reviveKnockedOutPlayerFlags = flags;
   }
 
+  revokePlayerBuildingPrivilegeFlags: __CallReducerFlags = 'FullUpdate';
+  revokePlayerBuildingPrivilege(flags: __CallReducerFlags) {
+    this.revokePlayerBuildingPrivilegeFlags = flags;
+  }
+
   scheduleNextBrothPotProcessingFlags: __CallReducerFlags = 'FullUpdate';
   scheduleNextBrothPotProcessing(flags: __CallReducerFlags) {
     this.scheduleNextBrothPotProcessingFlags = flags;
@@ -8487,6 +8538,11 @@ export class SetReducerFlags {
   waterCropsFlags: __CallReducerFlags = 'FullUpdate';
   waterCrops(flags: __CallReducerFlags) {
     this.waterCropsFlags = flags;
+  }
+
+  wipeAllBuildingPrivilegesFlags: __CallReducerFlags = 'FullUpdate';
+  wipeAllBuildingPrivileges(flags: __CallReducerFlags) {
+    this.wipeAllBuildingPrivilegesFlags = flags;
   }
 
 }

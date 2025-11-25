@@ -228,9 +228,16 @@ const getEntityY = (item: YSortedEntityType, timestamp: number): number => {
       return centerY;
     }
     case 'door': {
-      // Doors render at their edge position - use posY directly
       const door = entity as SpacetimeDBDoor;
-      return door.posY;
+      const FOUNDATION_TILE_SIZE = 96;
+      const foundationTopY = door.cellY * FOUNDATION_TILE_SIZE;
+      if (door.edge === 0) {
+        // North door: use foundation top - WORKING PERFECTLY
+        return foundationTopY;
+      } else {
+        // South door: use foundation bottom + player sprite height (matches comparator)
+        return foundationTopY + FOUNDATION_TILE_SIZE + 48;
+      }
     }
     case 'wall_cell': {
       const wall = entity as SpacetimeDBWallCell;
@@ -239,27 +246,19 @@ const getEntityY = (item: YSortedEntityType, timestamp: number): number => {
       const isTriangle = wall.foundationShape >= 2 && wall.foundationShape <= 5;
       
       if (isTriangle) {
-        // Triangle walls extend upward (top triangle B is moved up one tile) and are slanted
-        // Use foundation CENTER for base Y-sorting, comparator will handle direction-based sorting
-        // This allows proper sorting from both north and south approaches
-        return baseY + FOUNDATION_TILE_SIZE / 2; // Center of foundation cell
+        // Triangle walls: use foundation center
+        return baseY + FOUNDATION_TILE_SIZE / 2;
       } else if (wall.edge === 0) {
-        // North walls: Use bottom edge position (same as south walls) for consistent Y-sorting
-        // When player approaches from south (below), their Y is higher, so wall renders before (below) player
-        // Special case handling in comparator ensures correct rendering when player is north of wall
-        const bottomEdgeY = baseY + FOUNDATION_TILE_SIZE;
-        return bottomEdgeY; // Bottom edge of foundation cell (same as south walls)
+        // North wall: use foundation top - WORKING PERFECTLY
+        return baseY;
       } else if (wall.edge === 2) {
-        // South walls: Use actual bottom edge position for proper Y-sorting
-        // When player approaches from below (south), wall should render below player based on Y position
-        // Special case handling in comparator will ensure correct rendering when player is on tile
-        const bottomEdgeY = baseY + FOUNDATION_TILE_SIZE;
-        return bottomEdgeY; // Bottom edge of foundation cell
+        // South wall: use foundation BOTTOM + player sprite height
+        // This matches the comparator which checks playerHeadY >= foundationBottomY
+        // playerHeadY = playerFeetY - 48, so threshold is foundationBottomY + 48
+        return baseY + FOUNDATION_TILE_SIZE + 48;
       } else {
-        // East/west walls: render ABOVE north walls (closer to viewer in 3/4 perspective)
-        // Use higher Y value to ensure they render after north walls
-        const bottomEdgeY = baseY + FOUNDATION_TILE_SIZE;
-        return bottomEdgeY + 20000; // Higher than north walls to render on top
+        // East/west walls: use foundation top
+        return baseY;
       }
     }
     case 'grass':
@@ -365,7 +364,6 @@ const isPlayerNearWall = (
   wall: SpacetimeDBWallCell
 ): boolean => {
   const TILE_SIZE = 48;
-  const FOUNDATION_TILE_SIZE = 96;
   const playerTileX = Math.floor(player.positionX / TILE_SIZE);
   const playerTileY = Math.floor(player.positionY / TILE_SIZE);
   
@@ -374,37 +372,20 @@ const isPlayerNearWall = (
   const foundationCellWorldTileMinY = wall.cellY * 2;
   const foundationCellWorldTileMaxY = wall.cellY * 2 + 1;
   
-  // Check if player is on the foundation tile
-  const isOnSameTile = playerTileX >= foundationCellWorldTileMinX && 
-                       playerTileX <= foundationCellWorldTileMaxX &&
-                       playerTileY >= foundationCellWorldTileMinY && 
-                       playerTileY <= foundationCellWorldTileMaxY;
+  // Check if player is within X range of the wall (same column +/- 1 tile for margin)
+  const isInXRange = playerTileX >= foundationCellWorldTileMinX - 1 && 
+                     playerTileX <= foundationCellWorldTileMaxX + 1;
   
-  if (isOnSameTile) return true;
+  if (!isInXRange) return false;
   
-  // For north walls (edge 0): check if player is on the tile directly south of foundation
-  // The wall foundation is one tile north of where the player is standing
-  if (wall.edge === 0) {
-    // Player is south of foundation: check if player is on tiles south of foundation's bottom edge
-    const southTileMinY = foundationCellWorldTileMaxY + 1;
-    const southTileMaxY = foundationCellWorldTileMaxY + 2; // Foundation is 2 tiles tall
-    return playerTileX >= foundationCellWorldTileMinX && 
-           playerTileX <= foundationCellWorldTileMaxX &&
-           playerTileY >= southTileMinY && 
-           playerTileY <= southTileMaxY;
-  }
+  // Check if player is within Y range: from 2 tiles north to 3 tiles south of foundation
+  // This covers all approach directions
+  const northBound = foundationCellWorldTileMinY - 2;
+  const southBound = foundationCellWorldTileMaxY + 3; // Extended south range for approaching from below
   
-  // For south walls (edge 2): check if player is on the tile directly north of foundation
-  if (wall.edge === 2) {
-    const northTileMinY = foundationCellWorldTileMinY - 2; // Foundation is 2 tiles tall
-    const northTileMaxY = foundationCellWorldTileMinY - 1;
-    return playerTileX >= foundationCellWorldTileMinX && 
-           playerTileX <= foundationCellWorldTileMaxX &&
-           playerTileY >= northTileMinY && 
-           playerTileY <= northTileMaxY;
-  }
+  const isInYRange = playerTileY >= northBound && playerTileY <= southBound;
   
-  return false;
+  return isInYRange;
 };
 
 
@@ -1613,23 +1594,26 @@ export function useEntityFiltering(
                 }
               }
 
-              // Detect entrance way foundations (foundations on perimeter without walls on exposed edges)
+              // Detect entrance way foundations (foundations on perimeter without walls OR doors on exposed edges)
               const entranceWayFoundations = detectEntranceWayFoundations(
                 clusterFoundations,
                 wallCells || new Map(),
-                cluster.cellCoords
+                cluster.cellCoords,
+                doors // Pass doors so they count as edge coverage (not entrance ways)
               );
 
-              // Detect foundations with north walls (for ceiling extension to cover north wall interiors)
+              // Detect foundations with north walls OR north doors (for ceiling extension to cover their interiors)
               const northWallFoundations = detectNorthWallFoundations(
                 clusterFoundations,
-                wallCells || new Map()
+                wallCells || new Map(),
+                doors // Pass doors so north doors also get ceiling extension
               );
 
-              // Detect foundations with south walls (to prevent ceiling from covering them)
+              // Detect foundations with south walls OR south doors (to prevent ceiling from covering them)
               const southWallFoundations = detectSouthWallFoundations(
                 clusterFoundations,
-                wallCells || new Map()
+                wallCells || new Map(),
+                doors // Pass doors so south doors also prevent ceiling coverage
               );
 
               allEntities[index++] = {
@@ -1779,33 +1763,31 @@ export function useEntityFiltering(
             }
           }
         } else if (wall.edge === 0) {
-          // North wall (cardinal): Check if player is near the wall
-          if (isPlayerNearWall(player, wall)) {
-            // When player is south of foundation (positionY > foundationBottomY):
-            // Player is closer to camera, so player should render above wall (player in front)
-            // Return -1 means player (a) renders before wall (b), so player is above wall
-            if (player.positionY > foundationBottomY) {
-              return -1; // Player renders before wall, so player is above wall
-            }
-            // When player is north of foundation (positionY < foundationBottomY):
-            // Wall is closer to camera, so wall should render above player (wall in front)
-            // Return 1 means player (a) renders after wall (b), so wall is above player
-            if (player.positionY < foundationBottomY) {
-              return 1; // Player renders after wall, so wall is above player
-            }
+          // North wall: use foundation TOP as threshold - WORKING PERFECTLY
+          if (player.positionY >= foundationTopY) {
+            return 1; // Player renders after wall (player in front)
+          } else {
+            return -1; // Player renders before wall (wall in front)
           }
         } else if (wall.edge === 2) {
-          // South wall (cardinal): Check if player is on same tile or adjacent
-          if (isPlayerNearWall(player, wall)) {
-            // South wall: wall renders after (above) player ONLY if player is south of the wall
-            // Check if player Y is greater than the foundation center (player is south of wall)
-            const foundationCenterY = foundationTopY + FOUNDATION_TILE_SIZE / 2;
-            if (player.positionY > foundationCenterY) {
-              return -1; // Wall renders after (above) player
-            }
+          // South wall: Check player's HEAD position (not feet) against foundation bottom
+          // Player's head is 48px above their feet (positionY)
+          // Player renders on top when their HEAD is at or below foundation bottom
+          const PLAYER_SPRITE_HEIGHT = 48;
+          const playerHeadY = player.positionY - PLAYER_SPRITE_HEIGHT;
+          if (playerHeadY >= foundationBottomY) {
+            return 1; // Player renders after wall (player in front)
+          } else {
+            return -1; // Player renders before wall (wall in front)
+          }
+        } else if (wall.edge === 1 || wall.edge === 3) {
+          // East/west walls: use foundation top
+          if (player.positionY >= foundationTopY) {
+            return 1; // Player renders after wall (player in front)
+          } else {
+            return -1; // Player renders before wall (wall in front)
           }
         }
-        // East/west walls and other cases: let normal Y-sorting handle it
       }
       if (b.type === 'player' && a.type === 'wall_cell') {
         const player = b.entity as SpacetimeDBPlayer;
@@ -1860,32 +1842,29 @@ export function useEntityFiltering(
             }
           }
         } else if (wall.edge === 0) {
-          // North wall (cardinal): Check if player is near the wall (inverted comparator)
-          if (isPlayerNearWall(player, wall)) {
-            // When player is south of foundation (positionY > foundationBottomY):
-            // Player is closer to camera, so player should render above wall (player in front)
-            // In this comparator, a is wall and b is player, so return 1 means wall renders after player (player above)
-            if (player.positionY > foundationBottomY) {
-              return 1; // Wall renders after player, so player is above wall
-            }
-            // When player is north of foundation (positionY < foundationBottomY):
-            // Wall is closer to camera, so wall should render above player (wall in front)
-            // Return -1 means wall (a) renders before player (b), so wall is above player
-            if (player.positionY < foundationBottomY) {
-              return -1; // Wall renders before player, so wall is above player
-            }
+          // North wall: use foundation TOP as threshold - WORKING PERFECTLY - inverted
+          if (player.positionY >= foundationTopY) {
+            return -1; // Player renders after wall (player in front) - inverted
+          } else {
+            return 1; // Player renders before wall (wall in front) - inverted
           }
         } else if (wall.edge === 2) {
-          // South wall (cardinal): Check if player is on same tile or adjacent
-          if (isPlayerNearWall(player, wall)) {
-            // South wall: wall renders after (above) player ONLY if player is south of the wall
-            const foundationCenterY = foundationTopY + FOUNDATION_TILE_SIZE / 2;
-            if (player.positionY > foundationCenterY) {
-              return 1; // Wall renders after (above) player
-            }
+          // South wall: Check player's HEAD position - inverted
+          const PLAYER_SPRITE_HEIGHT = 48;
+          const playerHeadY = player.positionY - PLAYER_SPRITE_HEIGHT;
+          if (playerHeadY >= foundationBottomY) {
+            return -1; // Player renders after wall (player in front) - inverted
+          } else {
+            return 1; // Player renders before wall (wall in front) - inverted
+          }
+        } else if (wall.edge === 1 || wall.edge === 3) {
+          // East/west walls: use foundation top - inverted
+          if (player.positionY >= foundationTopY) {
+            return -1; // Player renders after wall (player in front) - inverted
+          } else {
+            return 1; // Player renders before wall (wall in front) - inverted
           }
         }
-        // East/west walls and other cases: let normal Y-sorting handle it
       }
       // Ensure east/west walls render above north walls (3/4 perspective)
       if (a.type === 'wall_cell' && b.type === 'wall_cell') {
@@ -1908,6 +1887,59 @@ export function useEntityFiltering(
           }
         }
       }
+      
+      // DOOR vs PLAYER Y-sorting
+      if (a.type === 'player' && b.type === 'door') {
+        const player = a.entity as SpacetimeDBPlayer;
+        const door = b.entity as SpacetimeDBDoor;
+        const FOUNDATION_TILE_SIZE = 96;
+        const foundationTopY = door.cellY * FOUNDATION_TILE_SIZE;
+        const foundationBottomY = foundationTopY + FOUNDATION_TILE_SIZE;
+        
+        if (door.edge === 0) {
+          // North door: use foundation top - WORKING PERFECTLY
+          if (player.positionY >= foundationTopY) {
+            return 1; // Player renders after door (player in front)
+          } else {
+            return -1; // Player renders before door (door in front)
+          }
+        } else {
+          // South door: Check player's HEAD position against foundation bottom
+          const PLAYER_SPRITE_HEIGHT = 48;
+          const playerHeadY = player.positionY - PLAYER_SPRITE_HEIGHT;
+          if (playerHeadY >= foundationBottomY) {
+            return 1; // Player renders after door (player in front)
+          } else {
+            return -1; // Player renders before door (door in front)
+          }
+        }
+      }
+      if (b.type === 'player' && a.type === 'door') {
+        const player = b.entity as SpacetimeDBPlayer;
+        const door = a.entity as SpacetimeDBDoor;
+        const FOUNDATION_TILE_SIZE = 96;
+        const foundationTopY = door.cellY * FOUNDATION_TILE_SIZE;
+        const foundationBottomY = foundationTopY + FOUNDATION_TILE_SIZE;
+        
+        if (door.edge === 0) {
+          // North door: use foundation top - WORKING PERFECTLY - inverted
+          if (player.positionY >= foundationTopY) {
+            return -1; // Player renders after door (player in front) - inverted
+          } else {
+            return 1; // Player renders before door (door in front) - inverted
+          }
+        } else {
+          // South door: Check player's HEAD position - inverted
+          const PLAYER_SPRITE_HEIGHT = 48;
+          const playerHeadY = player.positionY - PLAYER_SPRITE_HEIGHT;
+          if (playerHeadY >= foundationBottomY) {
+            return -1; // Player renders after door (player in front) - inverted
+          } else {
+            return 1; // Player renders before door (door in front) - inverted
+          }
+        }
+      }
+      
       if (a.type === 'player' && b.type === 'foundation_cell') {
         const player = a.entity as SpacetimeDBPlayer;
         const foundation = b.entity as SpacetimeDBFoundationCell;

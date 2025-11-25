@@ -19,28 +19,56 @@ const RUNE_STONE_IMAGES: Record<RuneStoneTypeKey, string> = {
     'Blue': monumentBlueImage,
 };
 
-// Night lighting configuration
-const NIGHT_LIGHT_RADIUS = 200; // Radius of the colored light effect
-const NIGHT_LIGHT_INTENSITY = 0.6; // Intensity of the light (0-1)
+// Night lighting configuration - AAA quality mythical effects
+const NIGHT_LIGHT_RADIUS = 220; // Radius of the colored light effect (slightly larger)
+const NIGHT_LIGHT_INTENSITY = 0.7; // Intensity of the light (0-1)
 const TWILIGHT_EVENING_START = 0.76; // Start of twilight evening (76% through day)
 const TWILIGHT_MORNING_END = 1.0; // End of twilight morning (100% through day, wraps around)
 
-// Rune stone colors for night lighting
+// Rune stone colors for night lighting - richer, more vibrant mythical colors
 const RUNE_STONE_COLORS: Record<RuneStoneTypeKey, { r: number; g: number; b: number }> = {
-    'Green': { r: 50, g: 200, b: 50 },
-    'Red': { r: 200, g: 50, b: 50 },
-    'Blue': { r: 50, g: 100, b: 200 },
+    'Green': { r: 80, g: 220, b: 100 }, // Verdant life magic
+    'Red': { r: 240, g: 80, b: 60 }, // Forge ember magic
+    'Blue': { r: 100, g: 160, b: 255 }, // Arcane crystal magic
 };
 
-// Rising particle configuration (Sea of Stars style)
-const PARTICLE_COUNT = 12; // Number of rising particles per runestone
-const PARTICLE_RISE_SPEED = 15; // Pixels per second upward movement
-const PARTICLE_DRIFT_SPEED = 8; // Pixels per second horizontal drift
-const PARTICLE_LIFETIME_SECONDS = 4.0; // How long each particle lives
-const PARTICLE_SPAWN_RADIUS = 60; // Radius around runestone where particles spawn
+// Secondary accent colors for chromatic effects
+const RUNE_STONE_ACCENT_COLORS: Record<RuneStoneTypeKey, { r: number; g: number; b: number }> = {
+    'Green': { r: 180, g: 255, b: 180 }, // Bright life essence
+    'Red': { r: 255, g: 200, b: 120 }, // Golden ember glow
+    'Blue': { r: 200, g: 220, b: 255 }, // Ethereal ice shimmer
+};
+
+// Tertiary deep colors for outer mystical halo
+const RUNE_STONE_DEEP_COLORS: Record<RuneStoneTypeKey, { r: number; g: number; b: number }> = {
+    'Green': { r: 20, g: 80, b: 40 }, // Deep forest shadow
+    'Red': { r: 120, g: 20, b: 30 }, // Deep crimson ember
+    'Blue': { r: 30, g: 60, b: 140 }, // Deep ocean arcane
+};
+
+// Rising particle configuration (AAA Sea of Stars / Hyper Light Drifter quality)
+const PARTICLE_COUNT = 18; // More particles for denser magical atmosphere
+const PARTICLE_RISE_SPEED = 12; // Slightly slower for more ethereal feel
+const PARTICLE_DRIFT_SPEED = 10; // More horizontal drift for mystical movement
+const PARTICLE_LIFETIME_SECONDS = 5.0; // Longer lifetime for smoother transitions
+const PARTICLE_SPAWN_RADIUS = 70; // Wider spawn radius
 const PARTICLE_MIN_SIZE = 2; // Minimum particle size
-const PARTICLE_MAX_SIZE = 5; // Maximum particle size
-const PARTICLE_GLOW_INTENSITY = 0.8; // Glow intensity multiplier
+const PARTICLE_MAX_SIZE = 6; // Larger max for more variation
+const PARTICLE_GLOW_INTENSITY = 0.9; // Brighter glow
+
+// Magical ray configuration (vertical light beams)
+const RAY_COUNT = 5; // Number of light rays emanating from runestone
+const RAY_WIDTH_BASE = 8; // Base width of rays in pixels
+const RAY_HEIGHT = 120; // Height of the light rays
+const RAY_SWAY_AMOUNT = 3; // Horizontal sway amount
+const RAY_SWAY_SPEED = 0.8; // Sway animation speed
+
+// Ground pool configuration (light reflection on ground)
+const GROUND_POOL_RADIUS = 90; // Radius of ground light pool
+const GROUND_POOL_INTENSITY = 0.4; // Intensity of ground pool
+
+// Light center vertical offset (push light up to center around runestone visual mass)
+const LIGHT_CENTER_Y_OFFSET = 70; // Pixels to offset light center upward from base
 
 /**
  * Get the image source for a rune stone based on its type
@@ -94,12 +122,15 @@ function generateRisingParticles(
     // Use runestone ID as seed for deterministic positioning
     let seed = stoneId * 1000;
     
+    // Light center is offset upward from base position
+    const lightCenterY = runeStone.posY - LIGHT_CENTER_Y_OFFSET;
+    
     for (let i = 0; i < PARTICLE_COUNT; i++) {
-        // Generate deterministic spawn position around runestone
+        // Generate deterministic spawn position around light center
         const angle = seededRandom(seed++) * Math.PI * 2;
         const distance = seededRandom(seed++) * PARTICLE_SPAWN_RADIUS;
         const baseX = runeStone.posX + Math.cos(angle) * distance;
-        const baseY = runeStone.posY + Math.sin(angle) * distance - 40;
+        const baseY = lightCenterY + Math.sin(angle) * distance * 0.6; // Flattened vertically
         
         // Stagger spawn times for continuous effect
         const spawnOffset = seededRandom(seed++) * PARTICLE_LIFETIME_SECONDS;
@@ -124,8 +155,130 @@ function generateRisingParticles(
 }
 
 /**
- * Render rising glowing particles around runestones (Sea of Stars style)
+ * Render magical light rays emanating upward from the runestone
+ * Creates ethereal vertical beams that sway gently
+ */
+function renderMagicalRays(
+    ctx: CanvasRenderingContext2D,
+    runeStone: RuneStone,
+    runeType: RuneStoneTypeKey,
+    cameraOffsetX: number,
+    cameraOffsetY: number,
+    nowMs: number,
+    timeIntensity: number
+): void {
+    const color = RUNE_STONE_COLORS[runeType];
+    const accentColor = RUNE_STONE_ACCENT_COLORS[runeType];
+    const currentTimeSeconds = nowMs / 1000;
+    const stoneId = Number(runeStone.id) || 0;
+    
+    ctx.save();
+    
+    // Render rays with slight offset from runestone center
+    for (let i = 0; i < RAY_COUNT; i++) {
+        // Deterministic positioning based on stone ID and ray index
+        const seed = stoneId * 100 + i;
+        const baseAngle = (i / RAY_COUNT) * Math.PI - Math.PI / 2; // Spread across top half
+        const angleOffset = (seededRandom(seed) - 0.5) * 0.8;
+        const distanceFromCenter = 20 + seededRandom(seed + 1) * 30;
+        
+        const rayBaseX = runeStone.posX + Math.cos(baseAngle + angleOffset) * distanceFromCenter;
+        const rayBaseY = runeStone.posY - LIGHT_CENTER_Y_OFFSET - 20; // Start above the light center
+        
+        // Sway animation - each ray has different phase
+        const swayPhase = currentTimeSeconds * RAY_SWAY_SPEED + i * 1.2;
+        const swayOffset = Math.sin(swayPhase) * RAY_SWAY_AMOUNT;
+        
+        // Intensity pulsing - staggered per ray
+        const pulsePhase = currentTimeSeconds * 1.5 + i * 0.7;
+        const pulseIntensity = 0.6 + Math.sin(pulsePhase) * 0.4;
+        
+        const screenX = rayBaseX + cameraOffsetX + swayOffset;
+        const screenY = rayBaseY + cameraOffsetY;
+        
+        // Ray width varies along height (wider at bottom, narrower at top)
+        const rayWidth = RAY_WIDTH_BASE * (0.5 + seededRandom(seed + 2) * 0.5);
+        
+        // Create vertical gradient for the ray
+        const rayGradient = ctx.createLinearGradient(
+            screenX, screenY,
+            screenX, screenY - RAY_HEIGHT
+        );
+        
+        const rayAlpha = timeIntensity * pulseIntensity * 0.25;
+        rayGradient.addColorStop(0, `rgba(${accentColor.r}, ${accentColor.g}, ${accentColor.b}, ${rayAlpha})`);
+        rayGradient.addColorStop(0.3, `rgba(${color.r}, ${color.g}, ${color.b}, ${rayAlpha * 0.6})`);
+        rayGradient.addColorStop(0.7, `rgba(${color.r}, ${color.g}, ${color.b}, ${rayAlpha * 0.3})`);
+        rayGradient.addColorStop(1, `rgba(${color.r}, ${color.g}, ${color.b}, 0)`);
+        
+        // Draw tapered ray shape
+        ctx.fillStyle = rayGradient;
+        ctx.beginPath();
+        ctx.moveTo(screenX - rayWidth / 2, screenY);
+        ctx.lineTo(screenX + rayWidth / 2, screenY);
+        ctx.lineTo(screenX + rayWidth / 6, screenY - RAY_HEIGHT);
+        ctx.lineTo(screenX - rayWidth / 6, screenY - RAY_HEIGHT);
+        ctx.closePath();
+        ctx.fill();
+    }
+    
+    ctx.restore();
+}
+
+/**
+ * Render ground light pool - the magical glow reflecting on the ground
+ * Note: This stays at the base position (not offset up) since it's ground reflection
+ */
+function renderGroundLightPool(
+    ctx: CanvasRenderingContext2D,
+    runeStone: RuneStone,
+    runeType: RuneStoneTypeKey,
+    cameraOffsetX: number,
+    cameraOffsetY: number,
+    nowMs: number,
+    timeIntensity: number
+): void {
+    const color = RUNE_STONE_COLORS[runeType];
+    const deepColor = RUNE_STONE_DEEP_COLORS[runeType];
+    const currentTimeSeconds = nowMs / 1000;
+    
+    const poolCenterX = runeStone.posX + cameraOffsetX;
+    const poolCenterY = runeStone.posY + cameraOffsetY + 5; // At runestone base (ground level)
+    
+    // Subtle pulsing for ground pool
+    const pulsePhase = currentTimeSeconds * 0.8;
+    const pulseScale = 1.0 + Math.sin(pulsePhase) * 0.05;
+    const poolRadius = GROUND_POOL_RADIUS * pulseScale;
+    
+    ctx.save();
+    
+    // Create elliptical ground pool (flattened vertically for perspective)
+    ctx.scale(1, 0.4);
+    const scaledY = poolCenterY / 0.4;
+    
+    const poolGradient = ctx.createRadialGradient(
+        poolCenterX, scaledY, 0,
+        poolCenterX, scaledY, poolRadius
+    );
+    
+    const poolAlpha = timeIntensity * GROUND_POOL_INTENSITY;
+    poolGradient.addColorStop(0, `rgba(${color.r}, ${color.g}, ${color.b}, ${poolAlpha * 0.5})`);
+    poolGradient.addColorStop(0.3, `rgba(${color.r}, ${color.g}, ${color.b}, ${poolAlpha * 0.35})`);
+    poolGradient.addColorStop(0.6, `rgba(${deepColor.r}, ${deepColor.g}, ${deepColor.b}, ${poolAlpha * 0.2})`);
+    poolGradient.addColorStop(1, `rgba(${deepColor.r}, ${deepColor.g}, ${deepColor.b}, 0)`);
+    
+    ctx.fillStyle = poolGradient;
+    ctx.beginPath();
+    ctx.arc(poolCenterX, scaledY, poolRadius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.restore();
+}
+
+/**
+ * Render rising glowing particles around runestones (AAA quality)
  * Creates mystical floating particles that rise and glow within the light area
+ * Enhanced with trails, chromatic effects, and multi-layered rendering
  */
 function renderRisingParticles(
     ctx: CanvasRenderingContext2D,
@@ -143,6 +296,7 @@ function renderRisingParticles(
     
     const particles = generateRisingParticles(runeStone, runeType, nowMs);
     const currentTimeSeconds = nowMs / 1000;
+    const accentColor = RUNE_STONE_ACCENT_COLORS[runeType];
     
     ctx.save();
     
@@ -150,53 +304,69 @@ function renderRisingParticles(
         // Calculate particle age (0-1, loops)
         const particleAge = ((currentTimeSeconds + particle.spawnOffset) / PARTICLE_LIFETIME_SECONDS) % 1.0;
         
-        // Calculate vertical position (rises from baseY upward)
-        const riseDistance = particleAge * PARTICLE_RISE_SPEED * PARTICLE_LIFETIME_SECONDS;
+        // Calculate vertical position (rises from baseY upward) - with slight acceleration
+        const riseProgress = particleAge * particleAge * 0.5 + particleAge * 0.5; // Eased rise
+        const riseDistance = riseProgress * PARTICLE_RISE_SPEED * PARTICLE_LIFETIME_SECONDS;
         const currentY = particle.baseY - riseDistance;
         
-        // Horizontal drift (gentle swaying motion)
-        const driftAmount = Math.sin(currentTimeSeconds * 0.5 + particle.driftPhase) * PARTICLE_DRIFT_SPEED * 0.5;
-        const currentX = particle.baseX + driftAmount;
+        // Horizontal drift (more complex spiral-like motion)
+        const driftPrimary = Math.sin(currentTimeSeconds * 0.6 + particle.driftPhase) * PARTICLE_DRIFT_SPEED * 0.5;
+        const driftSecondary = Math.cos(currentTimeSeconds * 0.9 + particle.driftPhase * 1.5) * PARTICLE_DRIFT_SPEED * 0.25;
+        const currentX = particle.baseX + driftPrimary + driftSecondary;
         
         // Apply camera offset
         const screenX = currentX + cameraOffsetX;
         const screenY = currentY + cameraOffsetY;
         
-        // Alpha: Fade in at start, fade out at end, peak in middle
+        // Alpha: Smooth fade in/out with longer visible period
         let alpha = 1.0;
-        if (particleAge < 0.15) {
-            // Fade in
-            alpha = particleAge / 0.15;
-        } else if (particleAge > 0.85) {
-            // Fade out
-            alpha = (1.0 - particleAge) / 0.15;
+        if (particleAge < 0.12) {
+            // Smooth fade in
+            alpha = Math.pow(particleAge / 0.12, 0.7);
+        } else if (particleAge > 0.8) {
+            // Smooth fade out
+            alpha = Math.pow((1.0 - particleAge) / 0.2, 0.7);
         }
         alpha *= timeIntensity * PARTICLE_GLOW_INTENSITY;
         
-        // Size pulsing (gentle breathing effect)
-        const pulsePhase = currentTimeSeconds * 2 + particle.driftPhase;
-        const pulseFactor = 1.0 + Math.sin(pulsePhase) * 0.15; // ±15% size variation
+        // Size pulsing (layered breathing effect)
+        const pulsePhase1 = currentTimeSeconds * 2.5 + particle.driftPhase;
+        const pulsePhase2 = currentTimeSeconds * 1.2 + particle.driftPhase * 0.7;
+        const pulseFactor = 1.0 + Math.sin(pulsePhase1) * 0.12 + Math.sin(pulsePhase2) * 0.08;
         const currentSize = particle.size * pulseFactor;
         
-        // Only render if visible and within light radius
+        // Only render if visible and within extended light radius (from light center, not base)
+        const lightCenterY = runeStone.posY - LIGHT_CENTER_Y_OFFSET;
         const distanceFromCenter = Math.sqrt(
             Math.pow(currentX - runeStone.posX, 2) + 
-            Math.pow(currentY - runeStone.posY, 2)
+            Math.pow(currentY - lightCenterY, 2)
         );
         
-        if (distanceFromCenter > NIGHT_LIGHT_RADIUS || alpha < 0.05) {
+        if (distanceFromCenter > NIGHT_LIGHT_RADIUS * 1.2 || alpha < 0.03) {
             return; // Skip particles outside light radius or too faint
         }
         
-        // AAA Sea of Stars quality: Multi-layered glowing particle
-        // LAYER 1: Outer soft glow halo
-        const glowRadius = currentSize * 2.5;
+        // LAYER 0: Trailing afterglow (motion blur effect)
+        const trailLength = 8;
+        const trailAlpha = alpha * 0.15;
+        for (let t = 1; t <= 3; t++) {
+            const trailY = screenY + t * (trailLength / 3);
+            const trailSize = currentSize * (1 - t * 0.15);
+            ctx.fillStyle = `rgba(${particle.color.r}, ${particle.color.g}, ${particle.color.b}, ${trailAlpha * (1 - t * 0.3)})`;
+            ctx.beginPath();
+            ctx.arc(screenX, trailY, trailSize * 0.8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // LAYER 1: Outer soft glow halo (larger, more ethereal)
+        const glowRadius = currentSize * 3.5;
         const outerGlow = ctx.createRadialGradient(
             screenX, screenY, 0,
             screenX, screenY, glowRadius
         );
-        outerGlow.addColorStop(0, `rgba(${particle.color.r}, ${particle.color.g}, ${particle.color.b}, ${alpha * 0.3})`);
-        outerGlow.addColorStop(0.5, `rgba(${particle.color.r}, ${particle.color.g}, ${particle.color.b}, ${alpha * 0.15})`);
+        outerGlow.addColorStop(0, `rgba(${particle.color.r}, ${particle.color.g}, ${particle.color.b}, ${alpha * 0.35})`);
+        outerGlow.addColorStop(0.3, `rgba(${particle.color.r}, ${particle.color.g}, ${particle.color.b}, ${alpha * 0.2})`);
+        outerGlow.addColorStop(0.6, `rgba(${particle.color.r}, ${particle.color.g}, ${particle.color.b}, ${alpha * 0.08})`);
         outerGlow.addColorStop(1, `rgba(${particle.color.r}, ${particle.color.g}, ${particle.color.b}, 0)`);
         
         ctx.fillStyle = outerGlow;
@@ -204,27 +374,42 @@ function renderRisingParticles(
         ctx.arc(screenX, screenY, glowRadius, 0, Math.PI * 2);
         ctx.fill();
         
-        // LAYER 2: Bright core particle (offset upward slightly)
-        const coreRadius = currentSize * 0.6;
-        const coreY = screenY - 6; // Move core glow up by 6px
-        const coreGlow = ctx.createRadialGradient(
-            screenX, coreY, 0,
-            screenX, coreY, currentSize
+        // LAYER 2: Accent color halo (chromatic effect)
+        const accentRadius = currentSize * 2.0;
+        const accentGlow = ctx.createRadialGradient(
+            screenX, screenY - 2, 0,
+            screenX, screenY - 2, accentRadius
         );
-        coreGlow.addColorStop(0, `rgba(${Math.min(255, particle.color.r + 100)}, ${Math.min(255, particle.color.g + 100)}, ${Math.min(255, particle.color.b + 100)}, ${alpha * 0.9})`);
-        coreGlow.addColorStop(0.6, `rgba(${particle.color.r}, ${particle.color.g}, ${particle.color.b}, ${alpha * 0.6})`);
+        accentGlow.addColorStop(0, `rgba(${accentColor.r}, ${accentColor.g}, ${accentColor.b}, ${alpha * 0.25})`);
+        accentGlow.addColorStop(0.5, `rgba(${accentColor.r}, ${accentColor.g}, ${accentColor.b}, ${alpha * 0.1})`);
+        accentGlow.addColorStop(1, `rgba(${accentColor.r}, ${accentColor.g}, ${accentColor.b}, 0)`);
+        
+        ctx.fillStyle = accentGlow;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY - 2, accentRadius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // LAYER 3: Bright core particle
+        const coreGlow = ctx.createRadialGradient(
+            screenX, screenY - 4, 0,
+            screenX, screenY - 4, currentSize * 1.2
+        );
+        coreGlow.addColorStop(0, `rgba(${Math.min(255, particle.color.r + 120)}, ${Math.min(255, particle.color.g + 120)}, ${Math.min(255, particle.color.b + 120)}, ${alpha * 0.95})`);
+        coreGlow.addColorStop(0.4, `rgba(${Math.min(255, particle.color.r + 60)}, ${Math.min(255, particle.color.g + 60)}, ${Math.min(255, particle.color.b + 60)}, ${alpha * 0.7})`);
+        coreGlow.addColorStop(0.7, `rgba(${particle.color.r}, ${particle.color.g}, ${particle.color.b}, ${alpha * 0.4})`);
         coreGlow.addColorStop(1, `rgba(${particle.color.r}, ${particle.color.g}, ${particle.color.b}, 0)`);
         
         ctx.fillStyle = coreGlow;
         ctx.beginPath();
-        ctx.arc(screenX, coreY, currentSize, 0, Math.PI * 2);
+        ctx.arc(screenX, screenY - 4, currentSize * 1.2, 0, Math.PI * 2);
         ctx.fill();
         
-        // LAYER 3: Tiny bright sparkle at center (offset upward slightly)
-        const sparkleY = screenY - 6; // Move sparkle up by 6px
-        ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.8})`;
+        // LAYER 4: Brilliant white sparkle at center
+        const sparkleSize = currentSize * 0.35;
+        const sparkleAlpha = alpha * (0.7 + Math.sin(currentTimeSeconds * 8 + particle.driftPhase) * 0.3);
+        ctx.fillStyle = `rgba(255, 255, 255, ${sparkleAlpha})`;
         ctx.beginPath();
-        ctx.arc(screenX, sparkleY, coreRadius, 0, Math.PI * 2);
+        ctx.arc(screenX, screenY - 5, sparkleSize, 0, Math.PI * 2);
         ctx.fill();
     });
     
@@ -232,9 +417,13 @@ function renderRisingParticles(
 }
 
 /**
- * Render night lighting effect for rune stones
- * Creates a colored cutout lighting effect similar to campfires
- * Uses drawRadialLightCutout for proper light rendering
+ * Render night lighting effect for rune stones - AAA Quality
+ * Creates a multi-layered mystical lighting effect with:
+ * - Outer ethereal halo
+ * - Inner core radiance with color-specific characteristics
+ * - Ground light pool reflection
+ * - Magical rising rays
+ * - Enhanced particle effects
  */
 export function renderRuneStoneNightLight(
     ctx: CanvasRenderingContext2D,
@@ -250,70 +439,111 @@ export function renderRuneStoneNightLight(
 
     const runeType = (runeStone.runeType?.tag || 'Blue') as RuneStoneTypeKey;
     const color = RUNE_STONE_COLORS[runeType] || RUNE_STONE_COLORS['Blue'];
+    const accentColor = RUNE_STONE_ACCENT_COLORS[runeType] || RUNE_STONE_ACCENT_COLORS['Blue'];
+    const deepColor = RUNE_STONE_DEEP_COLORS[runeType] || RUNE_STONE_DEEP_COLORS['Blue'];
 
     // Calculate light intensity based on how deep into night we are
     let timeIntensity = NIGHT_LIGHT_INTENSITY;
     if (cycleProgress >= TWILIGHT_EVENING_START) {
-        // Fade in quickly during twilight evening, then maintain full intensity
+        // Fade in during twilight evening, then maintain full intensity
         if (cycleProgress < 0.80) {
-            // Twilight evening (0.76-0.80) - fade in
-            timeIntensity = NIGHT_LIGHT_INTENSITY * ((cycleProgress - TWILIGHT_EVENING_START) / (0.80 - TWILIGHT_EVENING_START));
+            // Twilight evening (0.76-0.80) - fade in with easing
+            const fadeProgress = (cycleProgress - TWILIGHT_EVENING_START) / (0.80 - TWILIGHT_EVENING_START);
+            timeIntensity = NIGHT_LIGHT_INTENSITY * Math.pow(fadeProgress, 0.7); // Ease-out
         } else if (cycleProgress >= 0.97) {
-            // Twilight morning (0.97-1.0) - fade out
-            timeIntensity = NIGHT_LIGHT_INTENSITY * ((TWILIGHT_MORNING_END - cycleProgress) / (TWILIGHT_MORNING_END - 0.97));
+            // Twilight morning (0.97-1.0) - fade out with easing
+            const fadeProgress = (TWILIGHT_MORNING_END - cycleProgress) / (TWILIGHT_MORNING_END - 0.97);
+            timeIntensity = NIGHT_LIGHT_INTENSITY * Math.pow(fadeProgress, 0.7); // Ease-in
         }
         // Full night (0.80-0.97) uses full NIGHT_LIGHT_INTENSITY
     }
     
-    // Add subtle breathing/pulsing effect (very gentle, mystical)
-    const breathingPhase = (Date.now() / 3000) % (Math.PI * 2); // 3 second cycle
-    const breathingIntensity = 1.0 + Math.sin(breathingPhase) * 0.08; // ±8% gentle pulse
+    const currentTime = nowMs ?? Date.now();
+    const currentTimeSeconds = currentTime / 1000;
+    
+    // Multi-layered breathing effect for mystical feel
+    const breathingPhase1 = (currentTimeSeconds * 0.4) % (Math.PI * 2); // Slow 15.7s cycle
+    const breathingPhase2 = (currentTimeSeconds * 0.7) % (Math.PI * 2); // Medium 9s cycle
+    const breathingPhase3 = (currentTimeSeconds * 1.2) % (Math.PI * 2); // Fast 5.2s cycle
+    
+    const breathingIntensity = 1.0 
+        + Math.sin(breathingPhase1) * 0.06 
+        + Math.sin(breathingPhase2) * 0.04 
+        + Math.sin(breathingPhase3) * 0.02;
+    
     const finalIntensity = timeIntensity * breathingIntensity;
 
-    // Apply camera offset to world coordinates
+    // Apply camera offset to world coordinates - centered on runestone visual mass (pushed up)
     const lightScreenX = runeStone.posX + cameraOffsetX;
-    const lightScreenY = runeStone.posY + cameraOffsetY;
+    const lightScreenY = runeStone.posY + cameraOffsetY - LIGHT_CENTER_Y_OFFSET; // Offset upward
+    
+    // Slight position drift for ethereal feel
+    const driftX = Math.sin(currentTimeSeconds * 0.3) * 2;
+    const driftY = Math.cos(currentTimeSeconds * 0.25) * 1.5;
 
     ctx.save();
 
-    // AAA Sea of Stars quality: Multi-layered diffuse atmospheric glow
-    // LAYER 1: Large ambient atmospheric glow - fills entire area with soft color tint
-    const ambientRadius = NIGHT_LIGHT_RADIUS * 1.0; // Full radius
+    // ═══════════════════════════════════════════════════════════════════════
+    // LAYER 1: OUTER ETHEREAL HALO - Very large, soft, mystical outer glow
+    // ═══════════════════════════════════════════════════════════════════════
+    const outerHaloRadius = NIGHT_LIGHT_RADIUS * 1.4;
+    const outerHaloGradient = ctx.createRadialGradient(
+        lightScreenX + driftX, lightScreenY + driftY, 0,
+        lightScreenX + driftX, lightScreenY + driftY, outerHaloRadius
+    );
+    
+    // Deep color for outer ethereal boundary
+    outerHaloGradient.addColorStop(0, `rgba(${deepColor.r}, ${deepColor.g}, ${deepColor.b}, ${0.15 * finalIntensity})`);
+    outerHaloGradient.addColorStop(0.3, `rgba(${deepColor.r}, ${deepColor.g}, ${deepColor.b}, ${0.10 * finalIntensity})`);
+    outerHaloGradient.addColorStop(0.6, `rgba(${deepColor.r}, ${deepColor.g}, ${deepColor.b}, ${0.05 * finalIntensity})`);
+    outerHaloGradient.addColorStop(0.85, `rgba(${deepColor.r}, ${deepColor.g}, ${deepColor.b}, ${0.02 * finalIntensity})`);
+    outerHaloGradient.addColorStop(1, `rgba(${deepColor.r}, ${deepColor.g}, ${deepColor.b}, 0)`);
+    
+    ctx.fillStyle = outerHaloGradient;
+    ctx.beginPath();
+    ctx.arc(lightScreenX + driftX, lightScreenY + driftY, outerHaloRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // LAYER 2: MAIN AMBIENT GLOW - Primary colored atmospheric glow
+    // ═══════════════════════════════════════════════════════════════════════
+    const ambientRadius = NIGHT_LIGHT_RADIUS * 1.0;
     const ambientGradient = ctx.createRadialGradient(
-        lightScreenX,
-        lightScreenY,
-        0,
-        lightScreenX,
-        lightScreenY,
-        ambientRadius
+        lightScreenX, lightScreenY, 0,
+        lightScreenX, lightScreenY, ambientRadius
     );
 
-    // Create diffuse, atmospheric glow that fills the entire area
-    // Color values are tuned for each rune type to feel magical and ethereal
+    // Create diffuse, atmospheric glow with rune-specific characteristics
     if (runeType === 'Green') {
-        // Emerald - Mystical agrarian magic: soft, organic, life-giving
-        ambientGradient.addColorStop(0, `rgba(40, 140, 50, ${0.20 * finalIntensity})`);
-        ambientGradient.addColorStop(0.2, `rgba(35, 120, 45, ${0.18 * finalIntensity})`);
-        ambientGradient.addColorStop(0.4, `rgba(30, 100, 40, ${0.15 * finalIntensity})`);
-        ambientGradient.addColorStop(0.6, `rgba(25, 85, 35, ${0.12 * finalIntensity})`);
-        ambientGradient.addColorStop(0.8, `rgba(20, 70, 30, ${0.08 * finalIntensity})`);
-        ambientGradient.addColorStop(1, 'rgba(15, 55, 25, 0)');
+        // Verdant Life Magic - organic, pulsing, nature-essence glow
+        const leafPulse = 1.0 + Math.sin(currentTimeSeconds * 1.8) * 0.08;
+        ambientGradient.addColorStop(0, `rgba(60, 180, 80, ${0.28 * finalIntensity * leafPulse})`);
+        ambientGradient.addColorStop(0.15, `rgba(50, 160, 70, ${0.24 * finalIntensity})`);
+        ambientGradient.addColorStop(0.3, `rgba(45, 140, 60, ${0.20 * finalIntensity})`);
+        ambientGradient.addColorStop(0.5, `rgba(35, 120, 50, ${0.15 * finalIntensity})`);
+        ambientGradient.addColorStop(0.7, `rgba(28, 100, 42, ${0.10 * finalIntensity})`);
+        ambientGradient.addColorStop(0.85, `rgba(22, 80, 35, ${0.05 * finalIntensity})`);
+        ambientGradient.addColorStop(1, 'rgba(18, 60, 28, 0)');
     } else if (runeType === 'Red') {
-        // Crimson - Forge fire magic: warm, intense, transformative
-        ambientGradient.addColorStop(0, `rgba(200, 50, 50, ${0.22 * finalIntensity})`);
-        ambientGradient.addColorStop(0.2, `rgba(180, 45, 45, ${0.19 * finalIntensity})`);
-        ambientGradient.addColorStop(0.4, `rgba(160, 40, 40, ${0.16 * finalIntensity})`);
-        ambientGradient.addColorStop(0.6, `rgba(140, 35, 35, ${0.13 * finalIntensity})`);
-        ambientGradient.addColorStop(0.8, `rgba(120, 30, 30, ${0.09 * finalIntensity})`);
-        ambientGradient.addColorStop(1, 'rgba(100, 25, 25, 0)');
+        // Forge Ember Magic - warm, flickering, transformative heat
+        const emberFlicker = 1.0 + (Math.sin(currentTimeSeconds * 3.5) * 0.05 + Math.sin(currentTimeSeconds * 7.2) * 0.03);
+        ambientGradient.addColorStop(0, `rgba(240, 100, 60, ${0.30 * finalIntensity * emberFlicker})`);
+        ambientGradient.addColorStop(0.12, `rgba(220, 80, 50, ${0.26 * finalIntensity})`);
+        ambientGradient.addColorStop(0.25, `rgba(200, 65, 45, ${0.22 * finalIntensity})`);
+        ambientGradient.addColorStop(0.45, `rgba(170, 50, 40, ${0.16 * finalIntensity})`);
+        ambientGradient.addColorStop(0.65, `rgba(140, 40, 35, ${0.10 * finalIntensity})`);
+        ambientGradient.addColorStop(0.82, `rgba(110, 30, 30, ${0.05 * finalIntensity})`);
+        ambientGradient.addColorStop(1, 'rgba(80, 20, 25, 0)');
     } else {
-        // Azure - Memory shard magic: ethereal, dreamlike, otherworldly
-        ambientGradient.addColorStop(0, `rgba(60, 140, 220, ${0.21 * finalIntensity})`);
-        ambientGradient.addColorStop(0.2, `rgba(55, 120, 200, ${0.18 * finalIntensity})`);
-        ambientGradient.addColorStop(0.4, `rgba(50, 100, 180, ${0.15 * finalIntensity})`);
-        ambientGradient.addColorStop(0.6, `rgba(45, 85, 160, ${0.12 * finalIntensity})`);
-        ambientGradient.addColorStop(0.8, `rgba(40, 70, 140, ${0.08 * finalIntensity})`);
-        ambientGradient.addColorStop(1, 'rgba(35, 55, 120, 0)');
+        // Arcane Crystal Magic - ethereal, shimmering, otherworldly
+        const crystalShimmer = 1.0 + Math.sin(currentTimeSeconds * 2.2) * 0.06;
+        ambientGradient.addColorStop(0, `rgba(100, 160, 255, ${0.28 * finalIntensity * crystalShimmer})`);
+        ambientGradient.addColorStop(0.15, `rgba(85, 145, 235, ${0.24 * finalIntensity})`);
+        ambientGradient.addColorStop(0.3, `rgba(70, 125, 215, ${0.20 * finalIntensity})`);
+        ambientGradient.addColorStop(0.5, `rgba(55, 105, 190, ${0.15 * finalIntensity})`);
+        ambientGradient.addColorStop(0.7, `rgba(45, 85, 165, ${0.09 * finalIntensity})`);
+        ambientGradient.addColorStop(0.85, `rgba(38, 70, 140, ${0.04 * finalIntensity})`);
+        ambientGradient.addColorStop(1, 'rgba(30, 55, 115, 0)');
     }
 
     ctx.fillStyle = ambientGradient;
@@ -321,9 +551,86 @@ export function renderRuneStoneNightLight(
     ctx.arc(lightScreenX, lightScreenY, ambientRadius, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.restore();
+    // ═══════════════════════════════════════════════════════════════════════
+    // LAYER 3: INNER CORE RADIANCE - Bright, intense core glow
+    // ═══════════════════════════════════════════════════════════════════════
+    const coreRadius = NIGHT_LIGHT_RADIUS * 0.5;
+    const corePulse = 1.0 + Math.sin(currentTimeSeconds * 1.5) * 0.1;
+    const coreGradient = ctx.createRadialGradient(
+        lightScreenX, lightScreenY - 10, 0, // Slight offset toward runestone top
+        lightScreenX, lightScreenY - 10, coreRadius
+    );
     
-    // Render rising glowing particles (Sea of Stars style)
+    // Bright accent color core with white-hot center
+    coreGradient.addColorStop(0, `rgba(${Math.min(255, accentColor.r + 50)}, ${Math.min(255, accentColor.g + 50)}, ${Math.min(255, accentColor.b + 50)}, ${0.35 * finalIntensity * corePulse})`);
+    coreGradient.addColorStop(0.2, `rgba(${accentColor.r}, ${accentColor.g}, ${accentColor.b}, ${0.28 * finalIntensity})`);
+    coreGradient.addColorStop(0.4, `rgba(${color.r}, ${color.g}, ${color.b}, ${0.20 * finalIntensity})`);
+    coreGradient.addColorStop(0.7, `rgba(${color.r}, ${color.g}, ${color.b}, ${0.10 * finalIntensity})`);
+    coreGradient.addColorStop(1, `rgba(${color.r}, ${color.g}, ${color.b}, 0)`);
+    
+    ctx.fillStyle = coreGradient;
+    ctx.beginPath();
+    ctx.arc(lightScreenX, lightScreenY - 30, coreRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // LAYER 4: ACCENT SHIMMER RING - Chromatic ring effect
+    // ═══════════════════════════════════════════════════════════════════════
+    const ringRadius = NIGHT_LIGHT_RADIUS * 0.65;
+    const ringWidth = 25;
+    const ringPulse = Math.sin(currentTimeSeconds * 0.8) * 0.5 + 0.5; // 0 to 1
+    
+    const ringGradient = ctx.createRadialGradient(
+        lightScreenX, lightScreenY, ringRadius - ringWidth,
+        lightScreenX, lightScreenY, ringRadius + ringWidth
+    );
+    
+    ringGradient.addColorStop(0, `rgba(${accentColor.r}, ${accentColor.g}, ${accentColor.b}, 0)`);
+    ringGradient.addColorStop(0.3, `rgba(${accentColor.r}, ${accentColor.g}, ${accentColor.b}, ${0.08 * finalIntensity * ringPulse})`);
+    ringGradient.addColorStop(0.5, `rgba(${accentColor.r}, ${accentColor.g}, ${accentColor.b}, ${0.12 * finalIntensity * ringPulse})`);
+    ringGradient.addColorStop(0.7, `rgba(${accentColor.r}, ${accentColor.g}, ${accentColor.b}, ${0.08 * finalIntensity * ringPulse})`);
+    ringGradient.addColorStop(1, `rgba(${accentColor.r}, ${accentColor.g}, ${accentColor.b}, 0)`);
+    
+    ctx.fillStyle = ringGradient;
+    ctx.beginPath();
+    ctx.arc(lightScreenX, lightScreenY, ringRadius + ringWidth, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // LAYER 5: GROUND LIGHT POOL - Reflection on ground surface
+    // ═══════════════════════════════════════════════════════════════════════
+    if (nowMs !== undefined) {
+        renderGroundLightPool(
+            ctx,
+            runeStone,
+            runeType,
+            cameraOffsetX,
+            cameraOffsetY,
+            nowMs,
+            finalIntensity
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // LAYER 6: MAGICAL RISING RAYS - Vertical light beams
+    // ═══════════════════════════════════════════════════════════════════════
+    if (nowMs !== undefined) {
+        renderMagicalRays(
+            ctx,
+            runeStone,
+            runeType,
+            cameraOffsetX,
+            cameraOffsetY,
+            nowMs,
+            finalIntensity
+        );
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // LAYER 7: RISING GLOWING PARTICLES - Mystical floating motes
+    // ═══════════════════════════════════════════════════════════════════════
     if (nowMs !== undefined) {
         renderRisingParticles(
             ctx,

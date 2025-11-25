@@ -1190,6 +1190,61 @@ pub fn grant_building_privilege_from_hearth(
     Ok(())
 }
 
+/// Revoke building privilege from a specific player (UI button action)
+/// Can be called by anyone with building privilege (team management)
+#[spacetimedb::reducer]
+pub fn revoke_player_building_privilege(
+    ctx: &ReducerContext,
+    hearth_id: u32,
+    target_player_id: Identity,
+) -> Result<(), String> {
+    let sender_id = ctx.sender;
+    let (_player, _hearth) = validate_hearth_interaction(ctx, hearth_id)?;
+
+    // Only players with building privilege can revoke others' privileges
+    if !player_has_building_privilege(ctx, sender_id) {
+        return Err("You must have building privilege to revoke others' privileges.".to_string());
+    }
+
+    // Remove the target player's privilege
+    remove_building_privilege(ctx, target_player_id);
+    log::info!("Player {:?} revoked building privilege from player {:?} via hearth {}", sender_id, target_player_id, hearth_id);
+
+    Ok(())
+}
+
+/// Wipe all building privileges (emergency reset)
+/// Can be called by anyone with building privilege (team management)
+#[spacetimedb::reducer]
+pub fn wipe_all_building_privileges(
+    ctx: &ReducerContext,
+    hearth_id: u32,
+) -> Result<(), String> {
+    let sender_id = ctx.sender;
+    let (_player, _hearth) = validate_hearth_interaction(ctx, hearth_id)?;
+
+    // Only players with building privilege can wipe all privileges
+    if !player_has_building_privilege(ctx, sender_id) {
+        return Err("You must have building privilege to wipe all privileges.".to_string());
+    }
+
+    // Remove all building privilege effects
+    let mut effects_to_remove = Vec::new();
+    for effect in ctx.db.active_consumable_effect().iter() {
+        if effect.effect_type == EffectType::BuildingPrivilege {
+            effects_to_remove.push(effect.effect_id);
+        }
+    }
+    
+    for effect_id in effects_to_remove {
+        ctx.db.active_consumable_effect().effect_id().delete(&effect_id);
+    }
+    
+    log::info!("Player {:?} wiped all building privileges via hearth {}", sender_id, hearth_id);
+
+    Ok(())
+}
+
 /// Move item to hearth (with item restriction check)
 #[spacetimedb::reducer]
 pub fn move_item_to_hearth(

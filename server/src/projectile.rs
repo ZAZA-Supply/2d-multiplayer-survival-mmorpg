@@ -324,9 +324,13 @@ pub fn fire_projectile(ctx: &ReducerContext, target_world_x: f32, target_world_y
     }
     
     // --- Check if projectile path would immediately hit a closed door very close to player ---
-    if crate::door::check_door_projectile_collision(ctx, player.position_x, player.position_y, target_world_x, target_world_y) {
-        // Check distance to door - can't just use the target position, need to estimate
-        return Err("Cannot fire projectile - closed door blocking path".to_string());
+    if let Some((door_id, collision_x, collision_y)) = crate::door::check_door_projectile_collision(ctx, player.position_x, player.position_y, target_world_x, target_world_y) {
+        let collision_distance = ((collision_x - player.position_x).powi(2) + (collision_y - player.position_y).powi(2)).sqrt();
+        const MIN_FIRING_DISTANCE: f32 = 80.0;
+        
+        if collision_distance < MIN_FIRING_DISTANCE {
+            return Err(format!("Cannot fire projectile - closed door too close ({:.1} units)", collision_distance));
+        }
     }
     
     // --- Check if projectile path would immediately hit a shelter wall very close to player ---
@@ -824,19 +828,47 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
         }
         
         // Check for door collision (closed doors block projectiles)
-        if crate::door::check_door_projectile_collision(ctx, prev_x, prev_y, current_x, current_y) {
+        if let Some((door_id, collision_x, collision_y)) = crate::door::check_door_projectile_collision(ctx, prev_x, prev_y, current_x, current_y) {
             log::info!(
-                "[ProjectileUpdate] Projectile {} from owner {:?} hit a closed Door at ({:.1}, {:.1})",
-                projectile.id, projectile.owner_id, current_x, current_y
+                "[ProjectileUpdate] Projectile {} from owner {:?} hit Door {} at ({:.1}, {:.1})",
+                projectile.id, projectile.owner_id, door_id, collision_x, collision_y
             );
             
-            // Create fire patch if this is a fire arrow (100% chance)
-            if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
-                create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, current_x, current_y, projectile.owner_id);
+            // Apply damage to the door
+            if let Some(weapon_item_def) = item_defs_table.id().find(projectile.item_def_id) {
+                if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                    let final_damage = calculate_projectile_damage(&weapon_item_def, &ammo_item_def, &projectile, &mut rng);
+                    
+                    if final_damage > 0.0 {
+                        match crate::door::damage_door(
+                            ctx,
+                            projectile.owner_id,
+                            door_id,
+                            final_damage,
+                            current_time,
+                        ) {
+                            Ok(_) => {
+                                log::info!(
+                                    "[ProjectileUpdate] Projectile {} (weapon: {} + ammo: {}) dealt {:.1} damage to Door {}",
+                                    projectile.id, weapon_item_def.name, ammo_item_def.name, final_damage, door_id
+                                );
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "[ProjectileUpdate] Error applying projectile damage to Door {}: {}",
+                                    door_id, e
+                                );
+                            }
+                        }
+                    }
+                    
+                    // Create fire patch if this is a fire arrow (100% chance)
+                    create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, collision_x, collision_y, projectile.owner_id);
+                }
             }
             
             // Projectile hit door - stop it and create dropped item
-            missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
+            missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, collision_x, collision_y));
             projectiles_to_delete.push(projectile.id);
             continue;
         }
@@ -2170,6 +2202,16 @@ pub fn throw_item(ctx: &ReducerContext, target_world_x: f32, target_world_y: f32
         
         if collision_distance < MIN_THROWING_DISTANCE {
             return Err(format!("Cannot throw item - wall too close ({:.1} units)", collision_distance));
+        }
+    }
+    
+    // --- Check if projectile path would immediately hit a closed door very close to player ---
+    if let Some((door_id, collision_x, collision_y)) = crate::door::check_door_projectile_collision(ctx, player.position_x, player.position_y, target_world_x, target_world_y) {
+        let collision_distance = ((collision_x - player.position_x).powi(2) + (collision_y - player.position_y).powi(2)).sqrt();
+        const MIN_THROWING_DISTANCE: f32 = 80.0;
+        
+        if collision_distance < MIN_THROWING_DISTANCE {
+            return Err(format!("Cannot throw item - closed door too close ({:.1} units)", collision_distance));
         }
     }
     

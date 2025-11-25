@@ -21,6 +21,7 @@ import {
 import { CAMPFIRE_HEIGHT, CAMPFIRE_RENDER_Y_OFFSET } from './campfireRenderingUtils';
 import { FURNACE_HEIGHT, FURNACE_RENDER_Y_OFFSET } from './furnaceRenderingUtils'; // ADDED: Furnace constants
 import { BOX_HEIGHT } from './woodenStorageBoxRenderingUtils';
+import { DOOR_RENDER_Y_OFFSET } from './doorRenderingUtils'; // ADDED: Door render offset
 
 // Define Sleeping Bag dimensions locally for label positioning
 const SLEEPING_BAG_HEIGHT = 64;
@@ -439,8 +440,9 @@ export function renderInteractionLabels({
             const door = doors.get(closestInteractableTarget.id.toString());
             if (door) {
                 textX = door.posX;
-                // Position label above the door (doors are placed on foundation edges)
-                textY = door.posY - 50;
+                // Position label above the door's visual position (doors are rendered 44px higher)
+                const visualDoorY = door.posY - DOOR_RENDER_Y_OFFSET;
+                textY = visualDoorY - 50;
                 renderStyledInteractionLabel(ctx, text, textX, textY);
             }
             break;

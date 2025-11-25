@@ -1161,6 +1161,46 @@ export const renderYSortedEntities = ({
         }
     });
 
+    // PASS 2.5: Render north doors (edge 0) BEFORE ceiling tiles
+    // North doors need to be covered by ceiling tiles to hide the interior
+    ySortedEntities.forEach(({ type, entity }) => {
+        if (type === 'door') {
+            const door = entity as SpacetimeDBDoor;
+            
+            // Only render north doors (edge 0) in this pass - they render before ceiling tiles
+            if (door.edge !== 0) {
+                return;
+            }
+            
+            // Get door sprite images based on type and edge (North)
+            const doorType = door.doorType;
+            
+            // Select correct image based on door type
+            let woodDoorImage: HTMLImageElement | null = null;
+            let metalDoorImage: HTMLImageElement | null = null;
+            
+            if (doorType === 0) {
+                // Wood door (north)
+                woodDoorImage = doodadImagesRef?.current?.get('wood_door_north.png') || null;
+            } else {
+                // Metal door (north)
+                metalDoorImage = doodadImagesRef?.current?.get('metal_door_north.png') || null;
+            }
+            
+            // Check if this door is highlighted (closest interactable)
+            const isHighlighted = closestInteractableDoorId !== null && closestInteractableDoorId !== undefined &&
+                door.id.toString() === closestInteractableDoorId.toString();
+            
+            renderDoor({
+                ctx,
+                door,
+                woodDoorImage,
+                metalDoorImage,
+                isHighlighted,
+            });
+        }
+    });
+
     // PASS 3: Render east/west walls and diagonal walls FIRST (before ceiling tiles)
     // These walls will be covered by ceiling tiles in PASS 5
     ySortedEntities.forEach(({ type, entity }) => {
@@ -1274,27 +1314,31 @@ export const renderYSortedEntities = ({
         }
     });
 
-    // PASS 7: Render doors (after south walls, so they appear ON TOP)
+    // PASS 7: Render south doors (edge 2) AFTER ceiling tiles (so they appear ON TOP)
+    // South doors need to render above ceiling tiles to be visible
+    // NOTE: North doors (edge 0) were already rendered in PASS 2.5 before ceiling tiles
     ySortedEntities.forEach(({ type, entity }) => {
         if (type === 'door') {
             const door = entity as SpacetimeDBDoor;
             
-            // Get door sprite images based on type and edge (North vs South)
-            const doorType = door.doorType;
-            const isNorthEdge = door.edge === 0; // 0 = North, 2 = South
+            // Only render south doors (edge 2) in this pass - north doors were rendered in PASS 2.5
+            if (door.edge !== 2) {
+                return;
+            }
             
-            // Select correct image based on door type and edge
+            // Get door sprite images based on type (South)
+            const doorType = door.doorType;
+            
+            // Select correct image based on door type
             let woodDoorImage: HTMLImageElement | null = null;
             let metalDoorImage: HTMLImageElement | null = null;
             
             if (doorType === 0) {
-                // Wood door
-                const imageKey = isNorthEdge ? 'wood_door_north.png' : 'wood_door.png';
-                woodDoorImage = doodadImagesRef?.current?.get(imageKey) || null;
+                // Wood door (south)
+                woodDoorImage = doodadImagesRef?.current?.get('wood_door.png') || null;
             } else {
-                // Metal door
-                const imageKey = isNorthEdge ? 'metal_door_north.png' : 'metal_door.png';
-                metalDoorImage = doodadImagesRef?.current?.get(imageKey) || null;
+                // Metal door (south)
+                metalDoorImage = doodadImagesRef?.current?.get('metal_door.png') || null;
             }
             
             // Check if this door is highlighted (closest interactable)

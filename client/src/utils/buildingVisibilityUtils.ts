@@ -6,7 +6,7 @@
  * When inside a building, you can see both inside and outside.
  */
 
-import { FoundationCell, WallCell, Player } from '../generated';
+import { FoundationCell, WallCell, Player, Door } from '../generated';
 import { FOUNDATION_TILE_SIZE } from '../config/gameConfig';
 
 // Minimum wall coverage to consider a building "enclosed" (70% = server-side ENCLOSURE_THRESHOLD)
@@ -272,20 +272,23 @@ export function shouldMaskFoundation(
 }
 
 /**
- * Detect entrance way foundations (foundations on the perimeter without walls on exposed edges)
+ * Detect entrance way foundations (foundations on the perimeter without walls OR doors on exposed edges)
  * Returns a Set of foundation cell coordinates (e.g., "cellX,cellY") that are entrance ways
  * 
  * A foundation is considered an entrance way if:
  * - It's on the perimeter (has at least one exposed edge)
- * - ALL of its exposed edges lack walls (true doorway/opening)
+ * - ALL of its exposed edges lack walls AND doors (true opening with no coverage)
  * 
- * This prevents ceiling tiles from being skipped for foundations that have some walls
+ * This prevents ceiling tiles from being skipped for foundations that have some walls/doors
  * but one open edge (which are still part of the enclosed structure).
+ * 
+ * IMPORTANT: Doors count as coverage for an edge, so foundations with doors are NOT entrance ways.
  */
 export function detectEntranceWayFoundations(
   cluster: FoundationCell[],
   allWalls: Map<string, WallCell>,
-  foundationCoords: Set<string>
+  foundationCoords: Set<string>,
+  allDoors?: Map<string, Door>
 ): Set<string> {
   const entranceWays = new Set<string>();
 
@@ -299,7 +302,7 @@ export function detectEntranceWayFoundations(
     ];
 
     let exposedEdgeCount = 0;
-    let exposedEdgesWithoutWallCount = 0;
+    let exposedEdgesWithoutCoverageCount = 0;
 
     for (const dir of directions) {
       const adjacentX = foundation.cellX + dir.dx;
@@ -322,16 +325,29 @@ export function detectEntranceWayFoundations(
           }
         }
 
-        // Count exposed edges without walls
-        if (!hasWallOnThisEdge) {
-          exposedEdgesWithoutWallCount++;
+        // Check if there's a door on this exposed edge (doors also count as coverage)
+        let hasDoorOnThisEdge = false;
+        if (allDoors) {
+          for (const [_, door] of allDoors) {
+            if (door.cellX === foundation.cellX && 
+                door.cellY === foundation.cellY && 
+                door.edge === dir.edge) {
+              hasDoorOnThisEdge = true;
+              break;
+            }
+          }
+        }
+
+        // Count exposed edges without any coverage (no wall AND no door)
+        if (!hasWallOnThisEdge && !hasDoorOnThisEdge) {
+          exposedEdgesWithoutCoverageCount++;
         }
       }
     }
 
-    // Only mark as entrance way if ALL exposed edges lack walls
-    // This means it's a true opening/doorway, not a partially walled foundation
-    if (exposedEdgeCount > 0 && exposedEdgesWithoutWallCount === exposedEdgeCount) {
+    // Only mark as entrance way if ALL exposed edges lack walls AND doors
+    // This means it's a true opening with no coverage at all
+    if (exposedEdgeCount > 0 && exposedEdgesWithoutCoverageCount === exposedEdgeCount) {
       const foundationKey = getFoundationCellKey(foundation.cellX, foundation.cellY);
       entranceWays.add(foundationKey);
     }
@@ -341,27 +357,50 @@ export function detectEntranceWayFoundations(
 }
 
 /**
- * Detect foundations that have north walls (edge 0)
- * Returns a Set of foundation cell coordinates (e.g., "cellX,cellY") that have north walls
- * Used to extend ceiling tiles upward to cover north wall interiors
+ * Detect foundations that have north walls OR north doors (edge 0)
+ * Returns a Set of foundation cell coordinates (e.g., "cellX,cellY") that have north walls or doors
+ * Used to extend ceiling tiles upward to cover north wall/door interiors
+ * 
+ * IMPORTANT: North doors also need ceiling tiles extended above them to hide the interior
  */
 export function detectNorthWallFoundations(
   cluster: FoundationCell[],
-  allWalls: Map<string, WallCell>
+  allWalls: Map<string, WallCell>,
+  allDoors?: Map<string, Door>
 ): Set<string> {
   const northWallFoundations = new Set<string>();
 
   for (const foundation of cluster) {
+    const foundationKey = getFoundationCellKey(foundation.cellX, foundation.cellY);
+    
     // Check if this foundation has a north wall (edge 0)
+    let hasNorthWall = false;
     for (const [_, wall] of allWalls) {
       if (wall.isDestroyed) continue;
       if (wall.cellX === foundation.cellX && 
           wall.cellY === foundation.cellY && 
           wall.edge === 0) { // North wall
-        const foundationKey = getFoundationCellKey(foundation.cellX, foundation.cellY);
-        northWallFoundations.add(foundationKey);
+        hasNorthWall = true;
         break;
       }
+    }
+
+    // Check if this foundation has a north door (edge 0)
+    let hasNorthDoor = false;
+    if (allDoors) {
+      for (const [_, door] of allDoors) {
+        if (door.cellX === foundation.cellX && 
+            door.cellY === foundation.cellY && 
+            door.edge === 0) { // North door
+          hasNorthDoor = true;
+          break;
+        }
+      }
+    }
+
+    // Add to set if foundation has north wall OR north door
+    if (hasNorthWall || hasNorthDoor) {
+      northWallFoundations.add(foundationKey);
     }
   }
 
@@ -369,27 +408,51 @@ export function detectNorthWallFoundations(
 }
 
 /**
- * Detect foundations that have south walls (edge 2)
- * Returns a Set of foundation cell coordinates (e.g., "cellX,cellY") that have south walls
- * Used to prevent ceiling tiles from covering south walls
+ * Detect foundations that have south walls OR south doors (edge 2)
+ * Returns a Set of foundation cell coordinates (e.g., "cellX,cellY") that have south walls or doors
+ * Used to prevent ceiling tiles from covering south walls/doors
+ * 
+ * IMPORTANT: South doors also need to render above ceiling tiles, so foundations with south doors
+ * should not have ceiling tiles covering them
  */
 export function detectSouthWallFoundations(
   cluster: FoundationCell[],
-  allWalls: Map<string, WallCell>
+  allWalls: Map<string, WallCell>,
+  allDoors?: Map<string, Door>
 ): Set<string> {
   const southWallFoundations = new Set<string>();
 
   for (const foundation of cluster) {
+    const foundationKey = getFoundationCellKey(foundation.cellX, foundation.cellY);
+    
     // Check if this foundation has a south wall (edge 2)
+    let hasSouthWall = false;
     for (const [_, wall] of allWalls) {
       if (wall.isDestroyed) continue;
       if (wall.cellX === foundation.cellX && 
           wall.cellY === foundation.cellY && 
           wall.edge === 2) { // South wall
-        const foundationKey = getFoundationCellKey(foundation.cellX, foundation.cellY);
-        southWallFoundations.add(foundationKey);
+        hasSouthWall = true;
         break;
       }
+    }
+
+    // Check if this foundation has a south door (edge 2)
+    let hasSouthDoor = false;
+    if (allDoors) {
+      for (const [_, door] of allDoors) {
+        if (door.cellX === foundation.cellX && 
+            door.cellY === foundation.cellY && 
+            door.edge === 2) { // South door
+          hasSouthDoor = true;
+          break;
+        }
+      }
+    }
+
+    // Add to set if foundation has south wall OR south door
+    if (hasSouthWall || hasSouthDoor) {
+      southWallFoundations.add(foundationKey);
     }
   }
 

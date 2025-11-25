@@ -13,6 +13,13 @@ export const DOOR_TYPE_METAL = 1;
 export const DOOR_EDGE_NORTH = 0;
 export const DOOR_EDGE_SOUTH = 2;
 
+// Door interaction distance (matches server-side for flawless interaction)
+export const PLAYER_DOOR_INTERACTION_DISTANCE = 180.0; // Matches server-side 180px for generous interaction range
+export const PLAYER_DOOR_INTERACTION_DISTANCE_SQUARED = PLAYER_DOOR_INTERACTION_DISTANCE * PLAYER_DOOR_INTERACTION_DISTANCE;
+
+// Door rendering offset (doors are rendered 44px higher than their actual position)
+export const DOOR_RENDER_Y_OFFSET = 44;
+
 // Interaction highlight colors
 const HIGHLIGHT_COLOR = 'rgba(100, 180, 255, 0.4)'; // Blue tint for interactable
 const HIGHLIGHT_BORDER_COLOR = 'rgba(100, 180, 255, 0.8)';
@@ -64,22 +71,17 @@ export const renderDoor = ({
     return;
   }
 
-  // If door is open, don't render it (invisible)
-  if (door.isOpen) {
-    return;
-  }
-
   ctx.save();
 
   // Calculate draw position - door is centered on the edge
-  const drawWidth = DOOR_RENDER_WIDTH * 0.9; // Slightly smaller than full tile
-  const drawHeight = DOOR_RENDER_HEIGHT * 0.9;
+  const drawWidth = DOOR_RENDER_WIDTH; // Full foundation width (96px) to match walls
+  const drawHeight = DOOR_RENDER_HEIGHT; // Full foundation height (96px)
   
   // Door position is at the edge center, but offset 64px up to align with foundation
   let drawX = door.posX - drawWidth / 2;
   let drawY = door.posY - drawHeight / 2 - 44; // Offset 44px up to align with foundation
 
-  // Draw highlight box if interactable
+  // Draw highlight box if interactable (always draw, even when door is open/invisible)
   if (isHighlighted) {
     ctx.fillStyle = HIGHLIGHT_COLOR;
     ctx.strokeStyle = HIGHLIGHT_BORDER_COLOR;
@@ -99,6 +101,12 @@ export const renderDoor = ({
       drawWidth + highlightPadding * 2,
       drawHeight + highlightPadding * 2
     );
+  }
+
+  // If door is open, don't render the sprite (invisible), but still show highlight
+  if (door.isOpen) {
+    ctx.restore();
+    return;
   }
 
   // Closed door - draw normally

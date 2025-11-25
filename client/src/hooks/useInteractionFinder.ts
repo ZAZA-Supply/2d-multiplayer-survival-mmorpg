@@ -50,6 +50,7 @@ import {
 } from '../utils/renderers/hearthRenderingUtils'; // ADDED: Hearth interaction constants
 import { PLAYER_CORPSE_INTERACTION_DISTANCE_SQUARED } from '../utils/renderers/playerCorpseRenderingUtils';
 import { PLAYER_BOX_INTERACTION_DISTANCE_SQUARED, BOX_HEIGHT } from '../utils/renderers/woodenStorageBoxRenderingUtils';
+import { PLAYER_DOOR_INTERACTION_DISTANCE_SQUARED, DOOR_RENDER_Y_OFFSET } from '../utils/renderers/doorRenderingUtils'; // ADDED: Door interaction distance and render offset
 import { getResourceConfig } from '../utils/renderers/resourceConfigurations';
 import type { ResourceType } from '../types/resourceTypes';
 
@@ -291,7 +292,7 @@ export function useInteractionFinder({
         let closestBrothPotDistSq = PLAYER_RAIN_COLLECTOR_INTERACTION_DISTANCE_SQUARED; // Use same distance as rain collectors
 
         let closestDoorId: bigint | null = null;
-        let closestDoorDistSq = PLAYER_BOX_INTERACTION_DISTANCE_SQUARED; // ADDED: Door interaction uses box distance
+        let closestDoorDistSq = PLAYER_DOOR_INTERACTION_DISTANCE_SQUARED; // Increased interaction distance for doors
 
         let closestSleepingBagId: number | null = null;
         let closestSleepingBagDistSq = PLAYER_SLEEPING_BAG_INTERACTION_DISTANCE_SQUARED;
@@ -619,12 +620,15 @@ export function useInteractionFinder({
             // Find closest door
             if (doors) {
                 doors.forEach((door) => {
+                    // Doors are rendered 44px higher than their actual position
+                    // Use the visual position for interaction checks
+                    const visualDoorY = door.posY - DOOR_RENDER_Y_OFFSET;
                     const dx = playerX - door.posX;
-                    const dy = playerY - door.posY;
+                    const dy = playerY - visualDoorY; // Use visual Y position
                     const distSq = dx * dx + dy * dy;
                     
                     if (distSq < closestDoorDistSq) {
-                        // Check shelter access control
+                        // Check shelter access control (use actual position for shelter check)
                         if (canPlayerInteractWithObjectInShelter(
                             playerX, playerY, localPlayer.identity.toHexString(),
                             door.posX, door.posY, shelters

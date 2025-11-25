@@ -1708,18 +1708,113 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
                                     </button>
                                 </div>
                                 
-                                {/* Right column: Players list */}
+                                {/* Right column: Players list with revoke buttons */}
                                 <div style={{ flex: '1', minWidth: '0' }}>
                                     {playersWithPrivilege.length > 0 ? (
                                         <div style={{ fontSize: '12px', color: '#ffffff' }}>
-                                            <div style={{ marginBottom: '6px', fontWeight: 'bold', color: '#87CEEB' }}>Players with privilege:</div>
+                                            <div style={{ 
+                                                marginBottom: '6px', 
+                                                fontWeight: 'bold', 
+                                                color: '#87CEEB',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center'
+                                            }}>
+                                                <span>Players with privilege:</span>
+                                                {/* Wipe All button */}
+                                                {playersWithPrivilege.length > 1 && currentPlayerHasPrivilege && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (!connection?.reducers || container.containerId === null) return;
+                                                            const hearthIdNum = typeof container.containerId === 'bigint' ? Number(container.containerId) : container.containerId;
+                                                            if (window.confirm(`⚠️ Wipe ALL ${playersWithPrivilege.length} building privileges?\n\nThis will revoke access for everyone (including yourself).\n\nThis action cannot be undone.`)) {
+                                                                try {
+                                                                    (connection.reducers as any).wipeAllBuildingPrivileges(hearthIdNum);
+                                                                } catch (e: any) {
+                                                                    console.error("Error wiping privileges:", e);
+                                                                }
+                                                            }
+                                                        }}
+                                                        style={{
+                                                            fontSize: '10px',
+                                                            padding: '2px 6px',
+                                                            background: 'rgba(255, 50, 50, 0.3)',
+                                                            border: '1px solid rgba(255, 100, 100, 0.6)',
+                                                            borderRadius: '3px',
+                                                            color: '#ff6666',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s'
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            e.currentTarget.style.background = 'rgba(255, 50, 50, 0.5)';
+                                                            e.currentTarget.style.borderColor = 'rgba(255, 100, 100, 0.9)';
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            e.currentTarget.style.background = 'rgba(255, 50, 50, 0.3)';
+                                                            e.currentTarget.style.borderColor = 'rgba(255, 100, 100, 0.6)';
+                                                        }}
+                                                    >
+                                                        Wipe All
+                                                    </button>
+                                                )}
+                                            </div>
                                             {playersWithPrivilege.map((p) => (
                                                 <div key={p.id} style={{ 
                                                     marginBottom: '4px', 
-                                                    color: p.id === playerId ? '#00ff88' : '#cccccc',
-                                                    fontSize: '13px'
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    gap: '8px'
                                                 }}>
-                                                    • {p.name || p.id.substring(0, 8)} {p.id === playerId && '(You)'}
+                                                    <span style={{
+                                                        color: p.id === playerId ? '#00ff88' : '#cccccc',
+                                                        fontSize: '13px',
+                                                        flex: 1,
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap'
+                                                    }}>
+                                                        • {p.name || p.id.substring(0, 8)} {p.id === playerId && '(You)'}
+                                                    </span>
+                                                    {/* Individual revoke button - only show if current player has privilege */}
+                                                    {currentPlayerHasPrivilege && (
+                                                        <button
+                                                            onClick={() => {
+                                                                if (!connection?.reducers || container.containerId === null) return;
+                                                                const hearthIdNum = typeof container.containerId === 'bigint' ? Number(container.containerId) : container.containerId;
+                                                                try {
+                                                                    // Convert hex string to Identity
+                                                                    const { Identity } = require('../generated');
+                                                                    const targetIdentity = Identity.fromString(p.id);
+                                                                    (connection.reducers as any).revokePlayerBuildingPrivilege(hearthIdNum, targetIdentity);
+                                                                } catch (e: any) {
+                                                                    console.error("Error revoking privilege:", e);
+                                                                }
+                                                            }}
+                                                            style={{
+                                                                fontSize: '11px',
+                                                                padding: '2px 6px',
+                                                                background: 'rgba(255, 100, 100, 0.2)',
+                                                                border: '1px solid rgba(255, 100, 100, 0.4)',
+                                                                borderRadius: '3px',
+                                                                color: '#ff8888',
+                                                                cursor: 'pointer',
+                                                                transition: 'all 0.2s',
+                                                                minWidth: '20px'
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                e.currentTarget.style.background = 'rgba(255, 100, 100, 0.4)';
+                                                                e.currentTarget.style.borderColor = 'rgba(255, 100, 100, 0.7)';
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                e.currentTarget.style.background = 'rgba(255, 100, 100, 0.2)';
+                                                                e.currentTarget.style.borderColor = 'rgba(255, 100, 100, 0.4)';
+                                                            }}
+                                                            title={`Revoke building privilege from ${p.name || p.id.substring(0, 8)}`}
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
