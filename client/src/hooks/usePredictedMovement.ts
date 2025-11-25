@@ -202,9 +202,12 @@ export const usePredictedMovement = ({ connection, localPlayer, inputState, isUI
       
       // Check for active dodge roll and use server-authoritative interpolation
       const playerId = localPlayer.identity.toHexString();
-      const dodgeRollState = playerDodgeRollStates?.get(playerId);
-      const dodgeRollElapsedMs = dodgeRollState ? (Date.now() - Number(dodgeRollState.startTimeMs)) : 0;
-      const isDodgeRolling = dodgeRollState && dodgeRollElapsedMs < 500; // 500ms dodge roll duration
+      const dodgeRollState = playerDodgeRollStates?.get(playerId) as any; // Cast to any for clientReceptionTimeMs access
+      // CRITICAL FIX: Use clientReceptionTimeMs (when CLIENT received the state) instead of startTimeMs (SERVER timestamp)
+      // This fixes production time drift issues where server time != client time
+      const dodgeRollStartTime = dodgeRollState?.clientReceptionTimeMs ?? (dodgeRollState ? Number(dodgeRollState.startTimeMs) : 0);
+      const dodgeRollElapsedMs = dodgeRollState ? (Date.now() - dodgeRollStartTime) : 0;
+      const isDodgeRolling = dodgeRollState && dodgeRollElapsedMs >= 0 && dodgeRollElapsedMs < 500; // 500ms dodge roll duration
       
       if (isDodgeRolling && dodgeRollState) {
         // SERVER-AUTHORITATIVE DODGE ROLL with SMOOTH COLLISION
@@ -218,9 +221,9 @@ export const usePredictedMovement = ({ connection, localPlayer, inputState, isUI
         const interpolatedY = dodgeRollState.startY + (dodgeRollState.targetY - dodgeRollState.startY) * easedProgress;
         
         // Check if we already hit something during this dodge roll
-        if (dodgeRollCollisionRef.current && dodgeRollCollisionRef.current.hitAt === Number(dodgeRollState.startTimeMs)) {
+        if (dodgeRollCollisionRef.current && dodgeRollCollisionRef.current.hitAt === dodgeRollStartTime) {
           // We already collided - smoothly decelerate to stop position
-          const timeSinceCollision = dodgeRollElapsedMs - (dodgeRollCollisionRef.current.hitAt - Number(dodgeRollState.startTimeMs));
+          const timeSinceCollision = dodgeRollElapsedMs - (dodgeRollCollisionRef.current.hitAt - dodgeRollStartTime);
           const decelerationDuration = 150; // 150ms smooth stop
           const decelerationProgress = Math.min(timeSinceCollision / decelerationDuration, 1.0);
           
@@ -250,7 +253,7 @@ export const usePredictedMovement = ({ connection, localPlayer, inputState, isUI
           if (collisionResult.collided) {
             // First collision - record it and start smooth deceleration
             dodgeRollCollisionRef.current = {
-              hitAt: Number(dodgeRollState.startTimeMs),
+              hitAt: dodgeRollStartTime,
               stopPosition: { x: collisionResult.x, y: collisionResult.y }
             };
             // Use collision position for this frame
