@@ -580,6 +580,30 @@ const InventoryUI: React.FC<InventoryUIProps> = ({
                     case 'furnace':
                         connection.reducers.quickMoveToFurnace(containerId, itemInstanceId);
                         break;
+                    case 'fumarole':
+                        // Special handling: If water container and fumarole has attached broth pot with empty water slot, use water container slot
+                        const fumaroleEntity = fumaroles.get(containerId.toString());
+                        if (fumaroleEntity?.attachedBrothPotId && isWaterContainer(itemInfo.definition.name)) {
+                            const attachedPot = brothPots.get(fumaroleEntity.attachedBrothPotId.toString());
+                            // Type assertion until bindings regenerated
+                            const pot = attachedPot as any;
+                            if (attachedPot && !pot?.waterContainerInstanceId) {
+                                // Water container slot is empty, use it
+                                try {
+                                    (connection.reducers as any).quickMoveToBrothPotWaterContainer(
+                                        fumaroleEntity.attachedBrothPotId,
+                                        itemInstanceId
+                                    );
+                                    return; // Successfully handled
+                                } catch (e: any) {
+                                    console.error(`[Inv CtxMenu] Error moving to water container slot:`, e);
+                                    return;
+                                }
+                            }
+                        }
+                        // Default: move to fumarole incineration slots
+                        (connection.reducers as any).quickMoveToFumarole(containerId, itemInstanceId);
+                        break;
                     case 'lantern':
                         connection.reducers.quickMoveToLantern(containerId, itemInstanceId);
                         break;

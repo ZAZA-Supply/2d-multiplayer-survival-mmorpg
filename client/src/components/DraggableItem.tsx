@@ -145,7 +145,13 @@ const DraggableItem: React.FC<DraggableItemProps> = ({
                 const targetParentIdAttr = droppableSlot.getAttribute('data-slot-parent-id'); 
 
                 if (targetType && targetIndexAttr !== null) {
-                    const targetIndex: number | string = (targetType === 'inventory' || targetType === 'hotbar' || targetType === 'campfire_fuel' || targetType === 'wooden_storage_box') 
+                    // Parse index as number for all container types that use numeric indices
+                    const numericIndexTypes = [
+                        'inventory', 'hotbar', 'campfire_fuel', 'furnace_fuel', 'fumarole',
+                        'lantern_fuel', 'wooden_storage_box', 'player_corpse', 'stash', 
+                        'rain_collector', 'homestead_hearth', 'broth_pot', 'broth_pot_water_container', 'broth_pot_output'
+                    ];
+                    const targetIndex: number | string = numericIndexTypes.includes(targetType)
                                                     ? parseInt(targetIndexAttr, 10) 
                                                     : targetIndexAttr; 
                     

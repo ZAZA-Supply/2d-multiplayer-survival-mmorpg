@@ -272,6 +272,30 @@ const tipSectionDefinitions = {
         ]
     },
 
+    fumaroles: {
+        title: '🌋 Fumaroles & Incineration',
+        tips: [
+            'Fumaroles are geothermal vents found in quarry areas - natural sources of heat and destruction.',
+            'Fumaroles are always active and provide passive warmth in a 200px radius around them.',
+            'Unlike campfires, fumaroles never go out - they are permanent geothermal features.',
+            'Each fumarole has 6 container slots for placing items you want to incinerate.',
+            'Items placed in fumaroles are automatically destroyed every 2 seconds - very fast incineration.',
+            'Every item incinerated produces 3 pieces of charcoal - valuable for crafting ammunition.',
+            'Charcoal is essential for gunpowder production and advanced crafting recipes.',
+            'Burnt food can be incinerated in fumaroles to convert it into useful charcoal.',
+            'Use fumaroles to dispose of unwanted items while gaining valuable charcoal resources.',
+            'Fumaroles are PvP hotspots - other players will contest control of these valuable resources.',
+            'The constant warmth from fumaroles helps prevent freezing during cold nights.',
+            'You can place a Field Cauldron on top of a fumarole just like a campfire.',
+            'Fumaroles provide free, unlimited heat for cooking and boiling water in cauldrons.',
+            'Quarry areas with multiple fumaroles are strategic locations worth controlling.',
+            'Fumaroles spawn in clusters of 2-4 within quarry biomes - look for volcanic activity.',
+            'The charcoal production rate makes fumaroles incredibly valuable for ammunition crafting.',
+            'Consider building near fumaroles for free warmth and charcoal production.',
+            'Defend your fumaroles - they are contested resources that other players will want.',
+        ]
+    },
+
     foodCooking: {
         title: '🍖 Food & Cooking',
         tips: [
@@ -420,6 +444,7 @@ const tipSectionOrder = [
     'waterContainers',
     'campfires',
     'fieldCauldron',
+    'fumaroles',
     'foodCooking',
     'fishing',
     'buildingCrafting',

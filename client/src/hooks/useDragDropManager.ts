@@ -234,9 +234,12 @@ export const useDragDropManager = ({
                 // Only try player to container move if source is actually from player
                 if (sourceInfo.sourceSlot.type === 'inventory' || sourceInfo.sourceSlot.type === 'hotbar') {
                     // Try pattern-based player to container move
+                    console.log(`[useDragDropManager Drop] Attempting player to container move: targetSlot.type=${targetSlot.type}, interactingWith=`, interactingWith);
                     if (handlePlayerToContainerMove(connection, itemInstanceId, targetSlot, interactingWith, setDropError)) {
+                        console.log(`[useDragDropManager Drop] handlePlayerToContainerMove returned true`);
                         return; // Successfully handled by pattern-based system
                     }
+                    console.log(`[useDragDropManager Drop] handlePlayerToContainerMove returned false`);
                 }
                 
                 // If we get here, it's an unsupported operation

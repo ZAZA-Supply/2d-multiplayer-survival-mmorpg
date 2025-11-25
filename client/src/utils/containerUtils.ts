@@ -25,7 +25,7 @@ export const CONTAINER_CONFIGS = {
     // Fuel containers
     campfire: { slots: 5, slotType: 'campfire_fuel', fieldPrefix: 'fuelInstanceId', hasToggle: true, hasLightExtinguish: false, special: false, gridCols: 1 },
     furnace: { slots: 5, slotType: 'furnace_fuel', fieldPrefix: 'fuelInstanceId', hasToggle: true, hasLightExtinguish: false, special: false, gridCols: 1 },
-    fumarole: { slots: 6, slotType: 'fumarole', fieldPrefix: 'slotInstanceId', hasToggle: false, hasLightExtinguish: false, special: false, gridCols: 2 }, // Fumaroles: 6 slots for incineration (3x2 grid)
+    fumarole: { slots: 6, slotType: 'fumarole', fieldPrefix: 'slotInstanceId', hasToggle: false, hasLightExtinguish: false, special: false, gridCols: 1 }, // Fumaroles: 6 slots for incineration (single row)
     lantern: { slots: 1, slotType: 'lantern_fuel', fieldPrefix: 'fuelInstanceId', hasToggle: true, hasLightExtinguish: false, special: false, gridCols: 1 },
     
     // Storage containers
@@ -117,6 +117,7 @@ export function getContainerTypeFromSlotType(slotType: string): ContainerType | 
     const mapping: Record<string, ContainerType> = {
         'campfire_fuel': 'campfire',
         'furnace_fuel': 'furnace',
+        'fumarole': 'fumarole',
         'lantern_fuel': 'lantern',
         'wooden_storage_box': 'wooden_storage_box',
         'player_corpse': 'player_corpse',
@@ -318,8 +319,15 @@ export function handlePlayerToContainerMove(
     interactingWith: { type: string; id: number | bigint } | null,
     setDropError: (error: string | null) => void
 ): boolean {
+    console.log(`[handlePlayerToContainerMove] targetSlot.type: ${targetSlot.type}, parentId: ${targetSlot.parentId}, interactingWith:`, interactingWith);
+    
     const containerType = getContainerTypeFromSlotType(targetSlot.type);
-    if (!containerType) return false;
+    console.log(`[handlePlayerToContainerMove] containerType from slot type: ${containerType}`);
+    
+    if (!containerType) {
+        console.log(`[handlePlayerToContainerMove] No containerType found, returning false`);
+        return false;
+    }
     
     const reducers = getDragDropReducerNames(containerType);
     
@@ -364,6 +372,8 @@ export function handlePlayerToContainerMove(
             reducerName = reducers.moveFromPlayer;
         }
         
+        console.log(`[PlayerToContainer] Trying reducer: ${reducerName}, exists: ${!!connection.reducers[reducerName]}, containerIdNum: ${containerIdNum}, targetIndexNum: ${targetIndexNum}`);
+        
         if (connection.reducers[reducerName]) {
             if (containerType === 'rain_collector') {
                 connection.reducers[reducerName](containerIdNum, itemInstanceId, targetIndexNum);
@@ -373,10 +383,11 @@ export function handlePlayerToContainerMove(
             } else {
                 // Standard pattern: (container_id, slot_index, item_instance_id)
                 // This works for broth_pot ingredient slots too: moveItemToBrothPot(broth_pot_id, slot_index, item_instance_id)
+                console.log(`[PlayerToContainer] Calling ${reducerName}(${containerIdNum}, ${targetIndexNum}, ${itemInstanceId})`);
                 connection.reducers[reducerName](containerIdNum, targetIndexNum, itemInstanceId);
             }
         } else {
-            // Silently reject - reducer not available
+            console.warn(`[PlayerToContainer] Reducer ${reducerName} NOT FOUND!`);
         }
         
         return true;
