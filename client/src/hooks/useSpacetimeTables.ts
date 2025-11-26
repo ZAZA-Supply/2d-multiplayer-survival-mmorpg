@@ -1297,14 +1297,17 @@ export const useSpacetimeTables = ({
                 
                 // CRITICAL: Always update for chunk changes (prevents disappearing animals)
                 const chunkIndexChanged = oldAnimal.chunkIndex !== newAnimal.chunkIndex;
+                const healthChanged = Math.abs(oldAnimal.health - newAnimal.health) > 0.1;
+                const speciesChanged = oldAnimal.species !== newAnimal.species;
                 
                 // Critical changes that must render immediately
-                const criticalChange = 
-                    chunkIndexChanged ||
-                    Math.abs(oldAnimal.health - newAnimal.health) > 0.1 ||
-                    oldAnimal.species !== newAnimal.species;
+                const criticalChange = chunkIndexChanged || healthChanged || speciesChanged;
                 
                 if (criticalChange) {
+                    // Track WHY it's critical for debugging
+                    if (chunkIndexChanged) trackSubUpdate('wildAnimal_critical_chunk');
+                    if (healthChanged) trackSubUpdate('wildAnimal_critical_health');
+                    if (speciesChanged) trackSubUpdate('wildAnimal_critical_species');
                     trackSubUpdate('wildAnimal_render');
                     setWildAnimals(prev => new Map(prev).set(newAnimal.id.toString(), newAnimal));
                     lastWildAnimalRenderRef.current = performance.now();
@@ -1314,7 +1317,7 @@ export const useSpacetimeTables = ({
                 // Position/state/direction changes: throttle to WILD_ANIMAL_THROTTLE_MS
                 const now = performance.now();
                 if (now - lastWildAnimalRenderRef.current > WILD_ANIMAL_THROTTLE_MS) {
-                    trackSubUpdate('wildAnimal_render');
+                    trackSubUpdate('wildAnimal_render_throttled');
                     setWildAnimals(prev => new Map(prev).set(newAnimal.id.toString(), newAnimal));
                     lastWildAnimalRenderRef.current = now;
                 }
