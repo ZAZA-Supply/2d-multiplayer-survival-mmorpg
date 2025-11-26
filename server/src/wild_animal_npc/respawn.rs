@@ -19,26 +19,30 @@ pub fn maintain_wild_animal_population(ctx: &ReducerContext) -> Result<(), Strin
     let wild_animals = ctx.db.wild_animal();
     let current_animal_count = wild_animals.iter().count();
     
-    // Population thresholds - REDUCED for better performance (matching environment.rs)
-    const MIN_POPULATION_THRESHOLD: usize = 50; // When to start respawning (1/3 of target ~147)
-    const TARGET_POPULATION: usize = 147; // Target population (~0.07% of world tiles, reduced 30%)
+    // Population thresholds - SCALED with map size for consistency
+    // Same density as initial seeding in environment.rs (0.0002 = 0.02% of tiles)
+    const WILD_ANIMAL_DENSITY: f32 = 0.00025; // Slightly higher than seeding to maintain population
+    let total_tiles = (WORLD_WIDTH_TILES * WORLD_HEIGHT_TILES) as f32;
+    let target_population = (total_tiles * WILD_ANIMAL_DENSITY) as usize;
+    let min_population_threshold = target_population / 2; // Start respawning when below 50% of target
     const MAX_RESPAWN_PER_CYCLE: usize = 3; // Max animals to spawn per respawn cycle (reduced for gradual growth)
     
     // Only respawn if population is below minimum threshold
-    if current_animal_count >= MIN_POPULATION_THRESHOLD {
+    if current_animal_count >= min_population_threshold {
         log::debug!("Wild animal population ({}) above minimum threshold ({}). No respawn needed.", 
-                   current_animal_count, MIN_POPULATION_THRESHOLD);
+                   current_animal_count, min_population_threshold);
         return Ok(());
     }
     
-    let animals_needed = (TARGET_POPULATION - current_animal_count).min(MAX_RESPAWN_PER_CYCLE);
+    let animals_needed = (target_population - current_animal_count).min(MAX_RESPAWN_PER_CYCLE);
     log::info!("Wild animal population low ({}/{}). Attempting to spawn {} animals.", 
-               current_animal_count, TARGET_POPULATION, animals_needed);
+               current_animal_count, target_population, animals_needed);
     
     // Species distribution (same as initial seeding)
     let species_weights = [
-        (AnimalSpecies::CinderFox, 45),    // 45% - Most common
-        (AnimalSpecies::ArcticWalrus, 25), // 25% - More common (beaches only)
+        (AnimalSpecies::CinderFox, 40),    // 40% - Most common
+        (AnimalSpecies::ArcticWalrus, 20), // 20% - Common (beaches only)
+        (AnimalSpecies::BeachCrab, 30),    // 30% - Common beach creature
         // TundraWolf removed - no wolves spawning
         // (AnimalSpecies::TundraWolf, 30),   // 30% - Moderately common  
         // CableViper removed - no snakes spawning
@@ -94,7 +98,7 @@ pub fn maintain_wild_animal_population(ctx: &ReducerContext) -> Result<(), Strin
                 animals_per_chunk_map.insert(chunk_idx, current_animals_in_chunk + 1);
                 log::info!("Respawned {:?} #{} at ({:.1}, {:.1}) in chunk {} [population: {}/{}]", 
                           chosen_species, inserted_animal.id, pos_x, pos_y, chunk_idx, 
-                          current_animal_count + spawned_count, TARGET_POPULATION);
+                          current_animal_count + spawned_count, target_population);
             }
             Err(e) => {
                 log::warn!("Failed to respawn wild animal (attempt {}): {}. Continuing.", spawn_attempts, e);
@@ -104,7 +108,7 @@ pub fn maintain_wild_animal_population(ctx: &ReducerContext) -> Result<(), Strin
     
     if spawned_count > 0 {
         log::info!("Wild animal respawn cycle complete: spawned {} animals in {} attempts (population: {}/{})", 
-                   spawned_count, spawn_attempts, current_animal_count + spawned_count, TARGET_POPULATION);
+                   spawned_count, spawn_attempts, current_animal_count + spawned_count, target_population);
         
         // CRITICAL FIX: Restart AI schedule if it was stopped (e.g., after database clear)
         // This ensures animals will actually move and function after spawning
@@ -115,7 +119,7 @@ pub fn maintain_wild_animal_population(ctx: &ReducerContext) -> Result<(), Strin
         }
     } else if animals_needed > 0 {
         log::warn!("Failed to spawn any animals this cycle despite low population ({}/{}). Will retry next cycle.", 
-                   current_animal_count, TARGET_POPULATION);
+                   current_animal_count, target_population);
     }
 
     Ok(())

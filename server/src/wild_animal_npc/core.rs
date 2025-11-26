@@ -108,6 +108,7 @@ pub enum AnimalSpecies {
     TundraWolf,
     CableViper,
     ArcticWalrus,
+    BeachCrab,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, spacetimedb::SpacetimeType)]
@@ -294,6 +295,7 @@ pub enum AnimalBehaviorEnum {
     TundraWolf(crate::wild_animal_npc::wolf::TundraWolfBehavior),
     CableViper(crate::wild_animal_npc::viper::CableViperBehavior),
     ArcticWalrus(crate::wild_animal_npc::walrus::ArcticWalrusBehavior),
+    BeachCrab(crate::wild_animal_npc::crab::BeachCrabBehavior),
 }
 
 impl AnimalBehavior for AnimalBehaviorEnum {
@@ -303,6 +305,7 @@ impl AnimalBehavior for AnimalBehaviorEnum {
             AnimalBehaviorEnum::TundraWolf(behavior) => behavior.get_stats(),
             AnimalBehaviorEnum::CableViper(behavior) => behavior.get_stats(),
             AnimalBehaviorEnum::ArcticWalrus(behavior) => behavior.get_stats(),
+            AnimalBehaviorEnum::BeachCrab(behavior) => behavior.get_stats(),
         }
     }
 
@@ -312,6 +315,7 @@ impl AnimalBehavior for AnimalBehaviorEnum {
             AnimalBehaviorEnum::TundraWolf(behavior) => behavior.get_movement_pattern(),
             AnimalBehaviorEnum::CableViper(behavior) => behavior.get_movement_pattern(),
             AnimalBehaviorEnum::ArcticWalrus(behavior) => behavior.get_movement_pattern(),
+            AnimalBehaviorEnum::BeachCrab(behavior) => behavior.get_movement_pattern(),
         }
     }
 
@@ -329,6 +333,7 @@ impl AnimalBehavior for AnimalBehaviorEnum {
             AnimalBehaviorEnum::TundraWolf(behavior) => behavior.execute_attack_effects(ctx, animal, target_player, stats, current_time, rng),
             AnimalBehaviorEnum::CableViper(behavior) => behavior.execute_attack_effects(ctx, animal, target_player, stats, current_time, rng),
             AnimalBehaviorEnum::ArcticWalrus(behavior) => behavior.execute_attack_effects(ctx, animal, target_player, stats, current_time, rng),
+            AnimalBehaviorEnum::BeachCrab(behavior) => behavior.execute_attack_effects(ctx, animal, target_player, stats, current_time, rng),
         }
     }
 
@@ -346,6 +351,7 @@ impl AnimalBehavior for AnimalBehaviorEnum {
             AnimalBehaviorEnum::TundraWolf(behavior) => behavior.update_ai_state_logic(ctx, animal, stats, detected_player, current_time, rng),
             AnimalBehaviorEnum::CableViper(behavior) => behavior.update_ai_state_logic(ctx, animal, stats, detected_player, current_time, rng),
             AnimalBehaviorEnum::ArcticWalrus(behavior) => behavior.update_ai_state_logic(ctx, animal, stats, detected_player, current_time, rng),
+            AnimalBehaviorEnum::BeachCrab(behavior) => behavior.update_ai_state_logic(ctx, animal, stats, detected_player, current_time, rng),
         }
     }
 
@@ -363,6 +369,7 @@ impl AnimalBehavior for AnimalBehaviorEnum {
             AnimalBehaviorEnum::TundraWolf(behavior) => behavior.execute_flee_logic(ctx, animal, stats, dt, current_time, rng),
             AnimalBehaviorEnum::CableViper(behavior) => behavior.execute_flee_logic(ctx, animal, stats, dt, current_time, rng),
             AnimalBehaviorEnum::ArcticWalrus(behavior) => behavior.execute_flee_logic(ctx, animal, stats, dt, current_time, rng),
+            AnimalBehaviorEnum::BeachCrab(behavior) => behavior.execute_flee_logic(ctx, animal, stats, dt, current_time, rng),
         }
     }
 
@@ -379,6 +386,7 @@ impl AnimalBehavior for AnimalBehaviorEnum {
             AnimalBehaviorEnum::TundraWolf(behavior) => behavior.execute_patrol_logic(ctx, animal, stats, dt, rng),
             AnimalBehaviorEnum::CableViper(behavior) => behavior.execute_patrol_logic(ctx, animal, stats, dt, rng),
             AnimalBehaviorEnum::ArcticWalrus(behavior) => behavior.execute_patrol_logic(ctx, animal, stats, dt, rng),
+            AnimalBehaviorEnum::BeachCrab(behavior) => behavior.execute_patrol_logic(ctx, animal, stats, dt, rng),
         }
     }
 
@@ -388,6 +396,7 @@ impl AnimalBehavior for AnimalBehaviorEnum {
             AnimalBehaviorEnum::TundraWolf(behavior) => behavior.should_chase_player(ctx, animal, stats, player),
             AnimalBehaviorEnum::CableViper(behavior) => behavior.should_chase_player(ctx, animal, stats, player),
             AnimalBehaviorEnum::ArcticWalrus(behavior) => behavior.should_chase_player(ctx, animal, stats, player),
+            AnimalBehaviorEnum::BeachCrab(behavior) => behavior.should_chase_player(ctx, animal, stats, player),
         }
     }
 
@@ -405,6 +414,7 @@ impl AnimalBehavior for AnimalBehaviorEnum {
             AnimalBehaviorEnum::TundraWolf(behavior) => behavior.handle_damage_response(ctx, animal, attacker, stats, current_time, rng),
             AnimalBehaviorEnum::CableViper(behavior) => behavior.handle_damage_response(ctx, animal, attacker, stats, current_time, rng),
             AnimalBehaviorEnum::ArcticWalrus(behavior) => behavior.handle_damage_response(ctx, animal, attacker, stats, current_time, rng),
+            AnimalBehaviorEnum::BeachCrab(behavior) => behavior.handle_damage_response(ctx, animal, attacker, stats, current_time, rng),
         }
     }
 
@@ -414,6 +424,7 @@ impl AnimalBehavior for AnimalBehaviorEnum {
             AnimalBehaviorEnum::TundraWolf(behavior) => behavior.can_be_tamed(),
             AnimalBehaviorEnum::CableViper(behavior) => behavior.can_be_tamed(),
             AnimalBehaviorEnum::ArcticWalrus(behavior) => behavior.can_be_tamed(),
+            AnimalBehaviorEnum::BeachCrab(behavior) => behavior.can_be_tamed(),
         }
     }
 
@@ -423,6 +434,7 @@ impl AnimalBehavior for AnimalBehaviorEnum {
             AnimalBehaviorEnum::TundraWolf(behavior) => behavior.get_taming_foods(),
             AnimalBehaviorEnum::CableViper(behavior) => behavior.get_taming_foods(),
             AnimalBehaviorEnum::ArcticWalrus(behavior) => behavior.get_taming_foods(),
+            AnimalBehaviorEnum::BeachCrab(behavior) => behavior.get_taming_foods(),
         }
     }
 
@@ -432,6 +444,7 @@ impl AnimalBehavior for AnimalBehaviorEnum {
             AnimalBehaviorEnum::TundraWolf(behavior) => behavior.get_chase_abandonment_multiplier(),
             AnimalBehaviorEnum::CableViper(behavior) => behavior.get_chase_abandonment_multiplier(),
             AnimalBehaviorEnum::ArcticWalrus(behavior) => behavior.get_chase_abandonment_multiplier(),
+            AnimalBehaviorEnum::BeachCrab(behavior) => behavior.get_chase_abandonment_multiplier(),
         }
     }
 }
@@ -443,6 +456,7 @@ impl AnimalSpecies {
             AnimalSpecies::TundraWolf => AnimalBehaviorEnum::TundraWolf(crate::wild_animal_npc::wolf::TundraWolfBehavior),
             AnimalSpecies::CableViper => AnimalBehaviorEnum::CableViper(crate::wild_animal_npc::viper::CableViperBehavior),
             AnimalSpecies::ArcticWalrus => AnimalBehaviorEnum::ArcticWalrus(crate::wild_animal_npc::walrus::ArcticWalrusBehavior),
+            AnimalSpecies::BeachCrab => AnimalBehaviorEnum::BeachCrab(crate::wild_animal_npc::crab::BeachCrabBehavior),
         }
     }
 
@@ -616,6 +630,7 @@ fn update_animal_ai_state(
                 AnimalSpecies::CinderFox => 320.0,
                 AnimalSpecies::CableViper => 300.0,
                 AnimalSpecies::ArcticWalrus => 300.0, // Walruses also fear foundations
+                AnimalSpecies::BeachCrab => 200.0, // Crabs are small and scuttle away from buildings
             };
             
             set_flee_destination_away_from_threat(animal, foundation_x, foundation_y, flee_distance, rng);
@@ -649,6 +664,7 @@ fn update_animal_ai_state(
                         AnimalSpecies::CinderFox => 640.0,    // INCREASED: Proportional to new 240px chase range  
                         AnimalSpecies::CableViper => 500.0,   // 350 + 150 buffer
                         AnimalSpecies::ArcticWalrus => unreachable!(), // Already handled above
+                        AnimalSpecies::BeachCrab => 300.0,    // Crabs scuttle away from fire
                     };
                     
                     set_flee_destination_away_from_threat(animal, player.position_x, player.position_y, flee_distance, rng);
@@ -692,6 +708,7 @@ fn update_animal_ai_state(
                     AnimalSpecies::CinderFox => 640.0,
                     AnimalSpecies::CableViper => 500.0,
                     AnimalSpecies::ArcticWalrus => unreachable!(), // Already handled above
+                    AnimalSpecies::BeachCrab => 300.0, // Crabs scuttle away from campfires
                 };
                 
                 set_flee_destination_away_from_threat(animal, fire_x, fire_y, flee_distance, rng);
@@ -1083,6 +1100,7 @@ fn apply_knockback_to_player(animal: &WildAnimal, target: &mut Player, current_t
             AnimalSpecies::CinderFox => 32.0,
             AnimalSpecies::CableViper => 24.0,
             AnimalSpecies::ArcticWalrus => 64.0, // Strongest knockback - massive walrus attack
+            AnimalSpecies::BeachCrab => 16.0, // Small knockback - crab pinch
         };
         
         let knockback_dx = (dx_target_from_animal / distance) * knockback_distance;
@@ -1119,6 +1137,7 @@ fn handle_player_death(ctx: &ReducerContext, target: &mut Player, animal: &WildA
         AnimalSpecies::TundraWolf => "Tundra Wolf", 
         AnimalSpecies::CableViper => "Cable Viper",
         AnimalSpecies::ArcticWalrus => "Arctic Walrus",
+        AnimalSpecies::BeachCrab => "Beach Crab",
     };
     
     let new_death_marker = crate::death_marker::DeathMarker {
@@ -2143,6 +2162,7 @@ pub fn handle_fire_detection_and_flee(
         AnimalSpecies::CinderFox => 320.0,                               // Fixed distance for foxes
         AnimalSpecies::CableViper => stats.chase_trigger_range + 150.0,  // 350 + 150 = 500px
         AnimalSpecies::ArcticWalrus => unreachable!(), // Already handled above
+        AnimalSpecies::BeachCrab => 250.0,             // Crabs scuttle away from fire
     };
     
     // Special handling for cornered foxes (don't flee if too close)
@@ -2204,6 +2224,9 @@ pub fn emit_species_sound(
         },
         AnimalSpecies::ArcticWalrus => {
             crate::sound_events::emit_walrus_growl_sound(ctx, animal.pos_x, animal.pos_y, player_identity);
+        },
+        AnimalSpecies::BeachCrab => {
+            crate::sound_events::emit_crab_growl_sound(ctx, animal.pos_x, animal.pos_y, player_identity);
         },
     }
     
@@ -2349,6 +2372,7 @@ pub fn maybe_change_patrol_direction(
         AnimalSpecies::TundraWolf => 0.12,    // Wolves are more purposeful (solo) or 0.08 (alpha)
         AnimalSpecies::CableViper => 0.15,    // Vipers are moderate
         AnimalSpecies::ArcticWalrus => 0.06,  // Walruses are very slow and deliberate
+        AnimalSpecies::BeachCrab => 0.10,     // Crabs scuttle but are fairly predictable
     };
     
     // Adjust for pack wolves (alphas change direction less frequently)
@@ -2419,6 +2443,7 @@ pub fn execute_standard_flee(
             AnimalSpecies::TundraWolf => 400.0 + (rng.gen::<f32>() * 300.0), // 8-14m for wolves
             AnimalSpecies::CableViper => 300.0 + (rng.gen::<f32>() * 200.0), // 6-10m for vipers
             AnimalSpecies::ArcticWalrus => 100.0, // Walruses barely flee (defensive positioning only)
+            AnimalSpecies::BeachCrab => 200.0 + (rng.gen::<f32>() * 100.0), // 4-6m for crabs - short scuttle
         };
         
         animal.investigation_x = Some(animal.pos_x + flee_distance * flee_angle.cos());
@@ -2449,6 +2474,7 @@ pub fn execute_standard_flee(
             AnimalSpecies::TundraWolf => 4_000_000, // 4 seconds  
             AnimalSpecies::CableViper => 3_000_000, // 3 seconds
             AnimalSpecies::ArcticWalrus => 1_000_000, // 1 second (walruses don't really flee)
+            AnimalSpecies::BeachCrab => 2_000_000,  // 2 seconds - quick scuttle escape
         };
         
         if distance_to_target <= 50.0 || time_fleeing > max_flee_time {
@@ -2562,6 +2588,11 @@ pub fn handle_attack_aftermath(
             // Walruses are relentless once engaged - no special behavior, just keep attacking
             log::info!("Arctic Walrus {} delivered crushing blow - remaining aggressive", animal.id);
         },
+        
+        AnimalSpecies::BeachCrab => {
+            // Crabs are simple - they pinch and continue attacking
+            log::info!("Beach Crab {} delivered pinch attack - continuing defense", animal.id);
+        },
     }
 }
 
@@ -2638,6 +2669,12 @@ pub fn handle_standard_damage_response(
             AnimalSpecies::ArcticWalrus => {
                 // Walruses are relentless once engaged - no special behavior, just keep attacking
                 log::info!("Arctic Walrus {} delivered crushing blow - remaining aggressive", animal.id);
+            },
+            
+            AnimalSpecies::BeachCrab => {
+                // Crabs retaliate when attacked - simple defensive behavior
+                transition_to_state(animal, AnimalState::Chasing, current_time, Some(attacker.identity), "crab retaliation");
+                log::info!("Beach Crab {} retaliating against attacker", animal.id);
             },
         }
     }
@@ -3262,6 +3299,7 @@ pub fn handle_fire_trap_escape(
                 AnimalSpecies::CinderFox => 640.0,     // Proportional to chase range
                 AnimalSpecies::CableViper => 500.0,    // Moderate distance
                 AnimalSpecies::ArcticWalrus => 200.0,  // Walruses barely flee
+                AnimalSpecies::BeachCrab => 250.0,    // Crabs scuttle away quickly
             };
             
             animal.investigation_x = Some(animal.pos_x + flee_distance * flee_angle.cos());

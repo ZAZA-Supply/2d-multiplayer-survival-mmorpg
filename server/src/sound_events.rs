@@ -45,6 +45,7 @@ pub enum SoundType {
     GrowlFox,       // growl_fox.mp3 (1 variation - when foxes start attacking)
     GrowlSnake,     // growl_snake.mp3 (1 variation - when vipers start approaching)
     GrowlWalrus,    // growl_walrus.mp3 (3 variations - when walruses are disturbed)
+    GrowlCrab,      // growl_crab.mp3 (1 variation - when crabs detect and attack)
     Walking,        // walking.mp3 (4 variations - footstep sounds when player moves)
     Swimming,       // swimming.mp3 (4 variations - swimming sounds when player moves in water)
     FoundationWoodConstructed, // foundation_wood_constructed.mp3 (1 variation - when foundation is placed)
@@ -105,6 +106,7 @@ impl SoundType {
             SoundType::GrowlFox => "growl_fox",
             SoundType::GrowlSnake => "growl_snake",
             SoundType::GrowlWalrus => "growl_walrus",
+            SoundType::GrowlCrab => "growl_crab",
             SoundType::Walking => "walking",
             SoundType::Swimming => "swimming",
             SoundType::FoundationWoodConstructed => "foundation_wood_constructed",
@@ -163,6 +165,7 @@ impl SoundType {
             SoundType::GrowlFox => 1,
             SoundType::GrowlSnake => 1,
             SoundType::GrowlWalrus => 3,
+            SoundType::GrowlCrab => 1, // growl_crab.mp3 (single variation)
             SoundType::Walking => 4,
             SoundType::Swimming => 4,
             SoundType::FoundationWoodConstructed => 1,
@@ -592,6 +595,11 @@ pub fn emit_walrus_growl_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, pla
     let _ = emit_sound_at_position_with_distance(ctx, SoundType::GrowlWalrus, pos_x, pos_y, 1.3, 1000.0, player_id);
 }
 
+/// Emit a crab growl sound (when crabs detect and attack players)
+pub fn emit_crab_growl_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, player_id: Identity) {
+    let _ = emit_sound_at_position_with_distance(ctx, SoundType::GrowlCrab, pos_x, pos_y, 1.0, 400.0, player_id);
+}
+
 /// Emit walking/footstep sound (when player moves)
 pub fn emit_walking_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, player_id: Identity) {
     let _ = emit_sound_at_position_with_distance(ctx, SoundType::Walking, pos_x, pos_y, 0.7, 400.0, player_id);
@@ -612,6 +620,7 @@ pub fn emit_animal_walking_sound(
         AnimalSpecies::TundraWolf => 0.9,    // Slightly lower than normal
         AnimalSpecies::CinderFox => 1.1,     // Slightly higher, lighter footsteps
         AnimalSpecies::CableViper => 1.0,    // Normal pitch
+        AnimalSpecies::BeachCrab => 1.2,     // Higher pitch - small, scuttling footsteps
     };
     
     let mut rng = ctx.rng();

@@ -154,9 +154,10 @@ const CAMPFIRE_DAMAGE_RADIUS_SQUARED: f32 = 2500.0; // 50.0 * 50.0
 pub fn move_item_to_campfire(ctx: &ReducerContext, campfire_id: u32, target_slot_index: u8, item_instance_id: u64) -> Result<(), String> {
     let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
     
-    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
-    if campfire.attached_broth_pot_id.is_some() {
-        return Err("Cannot add fuel to campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    // --- SECURITY: Prevent interaction with campfire fuel slots 1-4 when broth pot is attached ---
+    // Slot 0 remains accessible for fuel management even when broth pot is attached
+    if campfire.attached_broth_pot_id.is_some() && target_slot_index != 0 {
+        return Err("Cannot add fuel to campfire slots 1-4 while broth pot is attached. Use slot 0 for fuel management.".to_string());
     }
     
     // --- Validate item type - prevent water bottles and cauldrons ---
@@ -186,9 +187,10 @@ pub fn move_item_to_campfire(ctx: &ReducerContext, campfire_id: u32, target_slot
 pub fn quick_move_from_campfire(ctx: &ReducerContext, campfire_id: u32, source_slot_index: u8) -> Result<(), String> {
     let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
     
-    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
-    if campfire.attached_broth_pot_id.is_some() {
-        return Err("Cannot remove fuel from campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    // --- SECURITY: Prevent interaction with campfire fuel slots 1-4 when broth pot is attached ---
+    // Slot 0 remains accessible for fuel management even when broth pot is attached
+    if campfire.attached_broth_pot_id.is_some() && source_slot_index != 0 {
+        return Err("Cannot remove fuel from campfire slots 1-4 while broth pot is attached. Use slot 0 for fuel management.".to_string());
     }
     
     inventory_management::handle_quick_move_from_container(ctx, &mut campfire, source_slot_index)?;
@@ -217,9 +219,10 @@ pub fn split_stack_into_campfire(
 ) -> Result<(), String> {
     let (_player, mut campfire) = validate_campfire_interaction(ctx, target_campfire_id)?;
     
-    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
-    if campfire.attached_broth_pot_id.is_some() {
-        return Err("Cannot add fuel to campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    // --- SECURITY: Prevent interaction with campfire fuel slots 1-4 when broth pot is attached ---
+    // Slot 0 remains accessible for fuel management even when broth pot is attached
+    if campfire.attached_broth_pot_id.is_some() && target_slot_index != 0 {
+        return Err("Cannot add fuel to campfire slots 1-4 while broth pot is attached. Use slot 0 for fuel management.".to_string());
     }
     
     // --- Validate item type - prevent water bottles and cauldrons ---
@@ -270,9 +273,10 @@ pub fn move_item_within_campfire(
 ) -> Result<(), String> {
     let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
     
-    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
-    if campfire.attached_broth_pot_id.is_some() {
-        return Err("Cannot move fuel in campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    // --- SECURITY: Prevent interaction with campfire fuel slots 1-4 when broth pot is attached ---
+    // Slot 0 remains accessible for fuel management even when broth pot is attached
+    if campfire.attached_broth_pot_id.is_some() && source_slot_index != 0 && target_slot_index != 0 {
+        return Err("Cannot move fuel between slots 1-4 while broth pot is attached. Use slot 0 for fuel management.".to_string());
     }
     
     inventory_management::handle_move_within_container(ctx, &mut campfire, source_slot_index, target_slot_index)?;
@@ -293,9 +297,10 @@ pub fn split_stack_within_campfire(
 ) -> Result<(), String> {
     let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
     
-    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
-    if campfire.attached_broth_pot_id.is_some() {
-        return Err("Cannot split fuel in campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    // --- SECURITY: Prevent interaction with campfire fuel slots 1-4 when broth pot is attached ---
+    // Slot 0 remains accessible for fuel management even when broth pot is attached
+    if campfire.attached_broth_pot_id.is_some() && source_slot_index != 0 && target_slot_index != 0 {
+        return Err("Cannot split fuel between slots 1-4 while broth pot is attached. Use slot 0 for fuel management.".to_string());
     }
     
     inventory_management::handle_split_within_container(ctx, &mut campfire, source_slot_index, target_slot_index, quantity_to_split)?;
@@ -314,9 +319,11 @@ pub fn quick_move_to_campfire(
 ) -> Result<(), String> {
     let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
     
-    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
+    // --- SECURITY: Prevent quick move when broth pot is attached ---
+    // Quick move might try to use slots 1-4 which are blocked when broth pot is attached
+    // Use move_item_to_campfire with explicit slot 0 instead
     if campfire.attached_broth_pot_id.is_some() {
-        return Err("Cannot add fuel to campfire while broth pot is attached. Remove the broth pot first.".to_string());
+        return Err("Cannot use quick move while broth pot is attached. Use move_item_to_campfire with slot 0 for fuel management.".to_string());
     }
     
     // --- Validate item type - prevent water bottles and cauldrons ---
@@ -351,9 +358,10 @@ pub fn move_item_from_campfire_to_player_slot(
 ) -> Result<(), String> {
     let (_player, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
     
-    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
-    if campfire.attached_broth_pot_id.is_some() {
-        return Err("Cannot remove fuel from campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    // --- SECURITY: Prevent interaction with campfire fuel slots 1-4 when broth pot is attached ---
+    // Slot 0 remains accessible for fuel management even when broth pot is attached
+    if campfire.attached_broth_pot_id.is_some() && source_slot_index != 0 {
+        return Err("Cannot remove fuel from campfire slots 1-4 while broth pot is attached. Use slot 0 for fuel management.".to_string());
     }
     
     inventory_management::handle_move_from_container_slot(ctx, &mut campfire, source_slot_index, target_slot_type, target_slot_index)?;
@@ -1357,9 +1365,10 @@ pub fn drop_item_from_campfire_slot_to_world(
     // 1. Validate interaction and get campfire
     let (_player_for_validation, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
     
-    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
-    if campfire.attached_broth_pot_id.is_some() {
-        return Err("Cannot drop fuel from campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    // --- SECURITY: Prevent interaction with campfire fuel slots 1-4 when broth pot is attached ---
+    // Slot 0 remains accessible for fuel management even when broth pot is attached
+    if campfire.attached_broth_pot_id.is_some() && slot_index != 0 {
+        return Err("Cannot drop fuel from campfire slots 1-4 while broth pot is attached. Use slot 0 for fuel management.".to_string());
     }
  
      // 2. Get Player for drop location
@@ -1395,9 +1404,10 @@ pub fn split_and_drop_item_from_campfire_slot_to_world(
     // 1. Validate interaction and get campfire
     let (_player_for_validation, mut campfire) = validate_campfire_interaction(ctx, campfire_id)?;
     
-    // --- SECURITY: Prevent interaction with campfire fuel slots when broth pot is attached ---
-    if campfire.attached_broth_pot_id.is_some() {
-        return Err("Cannot drop fuel from campfire while broth pot is attached. Remove the broth pot first.".to_string());
+    // --- SECURITY: Prevent interaction with campfire fuel slots 1-4 when broth pot is attached ---
+    // Slot 0 remains accessible for fuel management even when broth pot is attached
+    if campfire.attached_broth_pot_id.is_some() && slot_index != 0 {
+        return Err("Cannot drop fuel from campfire slots 1-4 while broth pot is attached. Use slot 0 for fuel management.".to_string());
     }
  
      // 2. Get Player for drop location

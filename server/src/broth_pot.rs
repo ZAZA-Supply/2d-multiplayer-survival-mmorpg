@@ -593,6 +593,14 @@ pub fn place_broth_pot_on_fumarole(
         .map_err(|e| format!("Failed to insert broth pot entity: {}", e))?;
     let new_pot_id = inserted_pot.id;
 
+    // --- 6. Link Fumarole to Broth Pot ---
+    // CRITICAL: Update fumarole's attached_broth_pot_id so it knows a pot is on it
+    // This prevents accidental incineration of items when players right-click deposit
+    let mut fumarole_to_update = fumaroles.id().find(fumarole_id)
+        .ok_or_else(|| format!("Fumarole {} not found for linking", fumarole_id))?;
+    fumarole_to_update.attached_broth_pot_id = Some(new_pot_id);
+    fumaroles.id().update(fumarole_to_update);
+
     log::info!(
         "Player {} placed broth pot {} on fumarole {} at ({:.1}, {:.1}) [ALWAYS-ON HEAT]",
         player.username, new_pot_id, fumarole_id, pot_pos_x, pot_pos_y
@@ -767,6 +775,14 @@ pub fn pickup_broth_pot(ctx: &ReducerContext, broth_pot_id: u32) -> Result<(), S
         if let Some(mut campfire) = ctx.db.campfire().id().find(campfire_id) {
             campfire.attached_broth_pot_id = None;
             ctx.db.campfire().id().update(campfire);
+        }
+    }
+    
+    // Clear fumarole's broth pot reference
+    if let Some(fumarole_id) = broth_pot.attached_to_fumarole_id {
+        if let Some(mut fumarole) = ctx.db.fumarole().id().find(fumarole_id) {
+            fumarole.attached_broth_pot_id = None;
+            ctx.db.fumarole().id().update(fumarole);
         }
     }
     

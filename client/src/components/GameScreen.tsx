@@ -965,6 +965,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 draggedItemInfo={draggedItemInfo}
                 interactingWith={interactingWith}
                 campfires={campfires}
+                fumaroles={props.fumaroles}
                 stashes={stashes}
                 brothPots={brothPots}
                 startPlacement={startPlacement}

@@ -11,6 +11,7 @@ import cinderFoxImg from '../../assets/cinder_fox2.png';
 import tundraWolfImg from '../../assets/tundra_wolf.png';
 import cableViperImg from '../../assets/cable_viper.png';
 import walrusImg from '../../assets/walrus.png';
+import crabImg from '../../assets/crab.png';
 
 // --- Constants for damage visual effects ---
 const ANIMAL_SHAKE_DURATION_MS = 200; // How long the shake lasts
@@ -72,6 +73,8 @@ function getAnimalImageSrc(species: AnimalSpecies, animalId?: bigint): string {
             return cableViperImg;
         case 'ArcticWalrus':
             return walrusImg;
+        case 'BeachCrab':
+            return crabImg;
         default:
             return cinderFoxImg;
     }
@@ -225,6 +228,8 @@ export function renderWildAnimal({
             case 'CinderFox': return '#FF6B35'; // Orange
             case 'TundraWolf': return '#4A90E2'; // Blue  
             case 'CableViper': return '#7ED321'; // Green
+            case 'ArcticWalrus': return '#8B6914'; // Brown
+            case 'BeachCrab': return '#E85D04'; // Orange-red
             default: return '#9013FE'; // Purple
         }
     };
@@ -355,7 +360,8 @@ export function preloadWildAnimalImages(): void {
         cinderFoxImg,
         tundraWolfImg,
         cableViperImg,
-        walrusImg
+        walrusImg,
+        crabImg
     ];
     
     imagesToLoad.forEach(imageSrc => {

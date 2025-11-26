@@ -1486,7 +1486,21 @@ fn determine_realistic_tile_type(
     }
     
     // Beach areas around water - CHECK AFTER rivers/lakes/hot springs
-    if shore_distance < 10.0 || is_near_water(features, x, y) {
+    // EXPANDED: South side of main island gets 2-3x larger beach zones
+    let center_y = features.height as i32 / 2;
+    let is_south_side = world_y > center_y;
+    
+    // Base beach threshold
+    let mut beach_threshold = 10.0;
+    
+    // Expand beach on south side of main island (not separate islands)
+    if is_south_side && shore_distance > 0.0 && shore_distance < 50.0 {
+        // Gradual expansion: max at the southern edge, tapering toward center
+        let south_progress = (world_y - center_y) as f64 / (features.height as i32 - center_y) as f64;
+        beach_threshold = 10.0 + (20.0 * south_progress); // Ranges from 10 to 30 tiles
+    }
+    
+    if shore_distance < beach_threshold || is_near_water(features, x, y) {
         return TileType::Beach;
     }
     

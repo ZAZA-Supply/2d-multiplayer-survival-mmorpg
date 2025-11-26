@@ -149,6 +149,16 @@ pub fn get_material_definitions() -> Vec<ItemDefinition> {
             .icon("animal_leather.png")
             .build(),
 
+        // Crab Carapace - Armor component from crabs
+        basic_material("Crab Carapace", "A hard, protective shell from a beach crab. Lightweight yet sturdy, useful for crafting protective gear.", 10)
+            .icon("crab_carapace.png")
+            .build(),
+
+        // Crab Claw - Weapon/tool component from crabs
+        basic_material("Crab Claw", "A sharp pincer claw from a beach crab. Can be fashioned into improvised weapons or tools.", 20)
+            .icon("crab_claw.png")
+            .build(),
+
         // NOTE: Animal skulls (Fox, Wolf, Viper) moved to weapons.rs as they are weapons like Human Skull
 
     ]

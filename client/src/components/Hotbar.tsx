@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ItemDefinition, InventoryItem, DbConnection, Campfire as SpacetimeDBCampfire, HotbarLocationData, EquipmentSlotType, Stash, Player, ActiveConsumableEffect, ActiveEquipment, RangedWeaponStats, BrothPot as SpacetimeDBBrothPot } from '../generated';
+import { ItemDefinition, InventoryItem, DbConnection, Campfire as SpacetimeDBCampfire, Fumarole as SpacetimeDBFumarole, HotbarLocationData, EquipmentSlotType, Stash, Player, ActiveConsumableEffect, ActiveEquipment, RangedWeaponStats, BrothPot as SpacetimeDBBrothPot } from '../generated';
 import { Identity, Timestamp } from 'spacetimedb';
 import { isWaterContainer, hasWaterContent, getWaterLevelPercentage, isSaltWater, getWaterCapacity } from '../utils/waterContainerHelpers';
 import { isPlantableSeed } from '../utils/plantsUtils';
@@ -50,6 +50,7 @@ interface HotbarProps {
   draggedItemInfo: DraggedItemInfo | null;
   interactingWith: { type: string; id: number | bigint } | null;
   campfires: Map<string, SpacetimeDBCampfire>;
+  fumaroles: Map<string, SpacetimeDBFumarole>;
   stashes: Map<string, Stash>;
   brothPots: Map<string, SpacetimeDBBrothPot>;
   startPlacement: (itemInfo: PlacementItemInfo) => void;
@@ -115,6 +116,7 @@ const Hotbar: React.FC<HotbarProps> = ({
     onItemDrop,
     interactingWith,
     campfires,
+    fumaroles,
     stashes,
     brothPots,
     startPlacement,
@@ -900,27 +902,41 @@ const Hotbar: React.FC<HotbarProps> = ({
                       }
                       break;
                   case 'campfire':
-                      // Special handling: If water container and campfire has attached broth pot with empty water slot, use water container slot
+                      // CRITICAL: When broth pot is attached, redirect items to broth pot (not campfire fuel slots)
+                      // This prevents accidentally adding ingredients/water containers as fuel
                       const campfireEntity = campfires.get(containerId.toString());
-                      if (campfireEntity?.attachedBrothPotId && isWaterContainer(itemInfo.definition.name)) {
+                      if (campfireEntity?.attachedBrothPotId) {
                           const attachedBrothPot = brothPots.get(campfireEntity.attachedBrothPotId.toString());
                           // Type assertion until bindings regenerated
                           const pot = attachedBrothPot as any;
-                          if (attachedBrothPot && !pot?.waterContainerInstanceId) {
-                              // Water container slot is empty, use it
+                          if (attachedBrothPot) {
+                              // If item is a water container AND water container slot is empty, use water slot
+                              if (isWaterContainer(itemInfo.definition.name) && !pot?.waterContainerInstanceId) {
+                                  try {
+                                      (connection.reducers as any).quickMoveToBrothPotWaterContainer(
+                                          campfireEntity.attachedBrothPotId,
+                                          itemInstanceId
+                                      );
+                                      return; // Successfully handled
+                                  } catch (e: any) {
+                                      console.error(`[Hotbar CtxMenu] Error moving to water container slot:`, e);
+                                      return;
+                                  }
+                              }
+                              // Otherwise, send to broth pot ingredient slots (NOT campfire fuel!)
                               try {
-                                  (connection.reducers as any).quickMoveToBrothPotWaterContainer(
+                                  connection.reducers.quickMoveToBrothPot(
                                       campfireEntity.attachedBrothPotId,
                                       itemInstanceId
                                   );
                                   return; // Successfully handled
                               } catch (e: any) {
-                                  console.error(`[Hotbar CtxMenu] Error moving to water container slot:`, e);
+                                  console.error(`[Hotbar CtxMenu] Error moving to broth pot:`, e);
                                   return;
                               }
                           }
                       }
-                      // Default: move to campfire fuel slots
+                      // Only send to campfire fuel slots if NO broth pot is attached
                       connection.reducers.quickMoveToCampfire(containerId, itemInstanceId);
                       break;
                   case 'furnace':
@@ -940,6 +956,49 @@ const Hotbar: React.FC<HotbarProps> = ({
                      connection.reducers.quickMoveToBrothPot(containerId, itemInstanceId);
                      break;
                  case 'fumarole':
+                     // CRITICAL: When broth pot is attached, NEVER send items to fumarole incineration slots
+                     // This prevents accidental item destruction when players want to cook
+                     const fumaroleEntity = fumaroles.get(containerId.toString());
+                     console.log('[Hotbar CtxMenu] Fumarole quick deposit:', {
+                         containerId,
+                         fumaroleEntity: fumaroleEntity ? {
+                             id: fumaroleEntity.id,
+                             attachedBrothPotId: fumaroleEntity.attachedBrothPotId
+                         } : null,
+                         itemName: itemInfo.definition.name
+                     });
+                     if (fumaroleEntity?.attachedBrothPotId) {
+                         const attachedPot = brothPots.get(fumaroleEntity.attachedBrothPotId.toString());
+                         // Type assertion until bindings regenerated
+                         const pot = attachedPot as any;
+                         if (attachedPot) {
+                             // If item is a water container AND water container slot is empty, use water slot
+                             if (isWaterContainer(itemInfo.definition.name) && !pot?.waterContainerInstanceId) {
+                                 try {
+                                     (connection.reducers as any).quickMoveToBrothPotWaterContainer(
+                                         fumaroleEntity.attachedBrothPotId,
+                                         itemInstanceId
+                                     );
+                                     return; // Successfully handled
+                                 } catch (e: any) {
+                                     console.error(`[Hotbar CtxMenu] Error moving to water container slot:`, e);
+                                     return;
+                                 }
+                             }
+                             // Otherwise, send to broth pot ingredient slots (NOT fumarole incineration!)
+                             try {
+                                 connection.reducers.quickMoveToBrothPot(
+                                     fumaroleEntity.attachedBrothPotId,
+                                     itemInstanceId
+                                 );
+                                 return; // Successfully handled
+                             } catch (e: any) {
+                                 console.error(`[Hotbar CtxMenu] Error moving to broth pot:`, e);
+                                 return;
+                             }
+                         }
+                     }
+                     // Only send to fumarole incineration slots if NO broth pot is attached
                      connection.reducers.quickMoveToFumarole(containerId, itemInstanceId);
                      break;
                  default:

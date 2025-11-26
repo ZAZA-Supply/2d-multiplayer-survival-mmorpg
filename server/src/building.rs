@@ -1861,10 +1861,10 @@ pub fn check_projectile_wall_collision(
     let min_y = start_y.min(end_y);
     let max_y = start_y.max(end_y);
     
-    let start_tile_x = ((min_x - 96.0) / TILE_SIZE_PX as f32).floor() as i32;
-    let end_tile_x = ((max_x + 96.0) / TILE_SIZE_PX as f32).ceil() as i32;
-    let start_tile_y = ((min_y - 96.0) / TILE_SIZE_PX as f32).floor() as i32;
-    let end_tile_y = ((max_y + 96.0) / TILE_SIZE_PX as f32).ceil() as i32;
+    let start_tile_x = ((min_x - 96.0) / FOUNDATION_TILE_SIZE_PX as f32).floor() as i32;
+    let end_tile_x = ((max_x + 96.0) / FOUNDATION_TILE_SIZE_PX as f32).ceil() as i32;
+    let start_tile_y = ((min_y - 96.0) / FOUNDATION_TILE_SIZE_PX as f32).floor() as i32;
+    let end_tile_y = ((max_y + 96.0) / FOUNDATION_TILE_SIZE_PX as f32).ceil() as i32;
     
     for tile_x in start_tile_x..=end_tile_x {
         for tile_y in start_tile_y..=end_tile_y {
@@ -1874,11 +1874,11 @@ pub fn check_projectile_wall_collision(
                     continue;
                 }
                 
-                // Calculate wall edge collision bounds
-                let tile_left = tile_x as f32 * TILE_SIZE_PX as f32;
-                let tile_top = tile_y as f32 * TILE_SIZE_PX as f32;
-                let tile_right = tile_left + TILE_SIZE_PX as f32;
-                let tile_bottom = tile_top + TILE_SIZE_PX as f32;
+                // Calculate wall edge collision bounds (walls are on foundation grid - 96px)
+                let tile_left = tile_x as f32 * FOUNDATION_TILE_SIZE_PX as f32;
+                let tile_top = tile_y as f32 * FOUNDATION_TILE_SIZE_PX as f32;
+                let tile_right = tile_left + FOUNDATION_TILE_SIZE_PX as f32;
+                let tile_bottom = tile_top + FOUNDATION_TILE_SIZE_PX as f32;
                 
                 // Determine wall edge bounds based on edge direction
                 // Edge 0 = North (top), 1 = East (right), 2 = South (bottom), 3 = West (left)

@@ -636,6 +636,41 @@ pub fn is_wild_animal_location_suitable(ctx: &ReducerContext, pos_x: f32, pos_y:
             
             false // Not on beach or coastal area
         }
+        
+        AnimalSpecies::BeachCrab => {
+            // 🦀 CRAB BEACH REQUIREMENT: Must spawn on beach tiles only (stricter than walrus)
+            if matches!(tile_type, TileType::Beach) {
+                return true; // Perfect beach habitat for crabs
+            }
+            
+            // Also allow sand tiles adjacent to beach or water
+            if matches!(tile_type, TileType::Sand) {
+                // Check if adjacent to water or beach (within 1 tile)
+                for dy in -1..=1 {
+                    for dx in -1..=1 {
+                        if dx == 0 && dy == 0 { continue; }
+                        
+                        let check_x = tile_x + dx;
+                        let check_y = tile_y + dy;
+                        
+                        // Check bounds
+                        if check_x < 0 || check_y < 0 || 
+                           check_x >= WORLD_WIDTH_TILES as i32 || check_y >= WORLD_HEIGHT_TILES as i32 {
+                            continue;
+                        }
+                        
+                        // Check if adjacent tile is water or beach
+                        for adjacent_tile in world_tiles.idx_world_position().filter((check_x, check_y)) {
+                            if matches!(adjacent_tile.tile_type, TileType::Sea | TileType::Beach) {
+                                return true; // Coastal area suitable for crab
+                            }
+                        }
+                    }
+                }
+            }
+            
+            false // Not on beach or sandy coastal area
+        }
     }
 }
 
@@ -1478,13 +1513,13 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
 
     // Define species distribution (weighted probabilities)
     let species_weights = [
-        (AnimalSpecies::CinderFox, 45),      // 45% - Most common
-        (AnimalSpecies::ArcticWalrus, 25),   // 25% - More common (beaches only)
+        (AnimalSpecies::CinderFox, 40),      // 40% - Most common
+        (AnimalSpecies::ArcticWalrus, 20),   // 20% - Common (beaches only)
+        (AnimalSpecies::BeachCrab, 30),      // 30% - Common beach creature
         // TundraWolf removed - no wolves spawning
         // (AnimalSpecies::TundraWolf, 30),     // 30% - Moderately common
         // CableViper removed - no snakes spawning
         // (AnimalSpecies::CableViper, 20),     // 20% - Uncommon
-
     ];
     let total_weight: u32 = species_weights.iter().map(|(_, weight)| weight).sum();
     

@@ -3080,6 +3080,7 @@ pub fn damage_animal_corpse(
             crate::wild_animal_npc::AnimalSpecies::TundraWolf => Some("Wolf Fur"),
             crate::wild_animal_npc::AnimalSpecies::CableViper => Some("Viper Scale"),
             crate::wild_animal_npc::AnimalSpecies::ArcticWalrus => None, // Walrus doesn't drop cloth-type resources
+            crate::wild_animal_npc::AnimalSpecies::BeachCrab => None, // Crabs don't drop fur/cloth - they have shells
         };
         
         if let Some(cloth_name) = cloth_type {
@@ -3113,6 +3114,7 @@ pub fn damage_animal_corpse(
             crate::wild_animal_npc::AnimalSpecies::TundraWolf => "Raw Wolf Meat",
             crate::wild_animal_npc::AnimalSpecies::CableViper => "Raw Viper Meat",
             crate::wild_animal_npc::AnimalSpecies::ArcticWalrus => "Raw Walrus Meat",
+            crate::wild_animal_npc::AnimalSpecies::BeachCrab => "Raw Crab Meat",
         };
         match grant_resource(ctx, attacker_id, meat_type, quantity_per_hit) {
             Ok(_) => resources_granted.push((meat_type.to_string(), quantity_per_hit)),
@@ -3130,6 +3132,7 @@ pub fn damage_animal_corpse(
             crate::wild_animal_npc::AnimalSpecies::TundraWolf => "Wolf Skull",
             crate::wild_animal_npc::AnimalSpecies::CableViper => "Viper Skull",
             crate::wild_animal_npc::AnimalSpecies::ArcticWalrus => "Walrus Skull", // Large, imposing skull with tusks
+            crate::wild_animal_npc::AnimalSpecies::BeachCrab => "Crab Skull", // Small crab skull
         };
         
         match grant_resource(ctx, attacker_id, skull_type, 1) {

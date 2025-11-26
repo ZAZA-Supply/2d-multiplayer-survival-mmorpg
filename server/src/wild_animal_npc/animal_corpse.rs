@@ -129,6 +129,7 @@ pub fn get_animal_loot_chances(animal_species: AnimalSpecies) -> (f64, f64, f64,
         AnimalSpecies::TundraWolf => (0.70, 0.50, 0.60, 0.80), // Good fat and bone, decent cloth (pelt), good meat
         AnimalSpecies::CableViper => (0.30, 0.20, 0.90, 0.40), // Low fat/cloth, very high bone (scales), some meat
         AnimalSpecies::ArcticWalrus => (0.85, 0.95, 0.65, 0.75), // Very high fat (blubber), excellent hide, good bone, good meat
+        AnimalSpecies::BeachCrab => (0.0, 0.0, 0.0, 0.85), // No fat/cloth/bone - just meat (high chance)
     }
 }
 
@@ -139,6 +140,7 @@ fn get_meat_type(animal_species: AnimalSpecies) -> &'static str {
         AnimalSpecies::TundraWolf => "Raw Wolf Meat",
         AnimalSpecies::CableViper => "Raw Viper Meat",
         AnimalSpecies::ArcticWalrus => "Raw Walrus Meat", // Rich, fatty meat
+        AnimalSpecies::BeachCrab => "Raw Crab Meat", // Sweet, delicate meat
     }
 }
 
@@ -241,6 +243,7 @@ pub fn get_harvest_loot(
             AnimalSpecies::TundraWolf => Some("Wolf Fur"),
             AnimalSpecies::CableViper => Some("Viper Scale"), // Viper has scales (treated as cloth)
             AnimalSpecies::ArcticWalrus => None, // Walrus doesn't drop cloth-type resources
+            AnimalSpecies::BeachCrab => None, // Crabs don't drop fur/cloth - they have shells
         };
         
         if let Some(cloth_name) = cloth_type {
@@ -248,11 +251,13 @@ pub fn get_harvest_loot(
         }
     }
     
-    // NEW: Universal Animal Leather drop for ALL animals (like Animal Fat/Bone)
-    // This gives all animals a chance to drop the universal leather resource
-    let animal_leather_chance = (0.40 * effectiveness_multiplier).clamp(0.0, 0.40); // 40% base chance
-    if rng.gen_bool(animal_leather_chance) {
-        loot.push(("Animal Leather".to_string(), base_quantity));
+    // NEW: Universal Animal Leather drop for most animals (like Animal Fat/Bone)
+    // This gives animals a chance to drop the universal leather resource (except crabs)
+    if animal_species != AnimalSpecies::BeachCrab {
+        let animal_leather_chance = (0.40 * effectiveness_multiplier).clamp(0.0, 0.40); // 40% base chance
+        if rng.gen_bool(animal_leather_chance) {
+            loot.push(("Animal Leather".to_string(), base_quantity));
+        }
     }
     
     // Rare trophy drops - only with good tools and low chance
@@ -262,6 +267,7 @@ pub fn get_harvest_loot(
             AnimalSpecies::TundraWolf => if tool_name == "AK74 Bayonet" { 0.045 } else { 0.03 }, // 4.5%/3% chance for wolf pelt
             AnimalSpecies::CableViper => 0.0,  // No rare trophy for viper
             AnimalSpecies::ArcticWalrus => if tool_name == "AK74 Bayonet" { 0.015 } else { 0.01 }, // 1.5%/1% chance for walrus pelt (ultra rare)
+            AnimalSpecies::BeachCrab => if tool_name == "AK74 Bayonet" { 0.08 } else { 0.05 }, // 8%/5% chance for crab drops (more common)
         };
         
         if rare_trophy_chance > 0.0 && rng.gen_bool(rare_trophy_chance) {
@@ -270,6 +276,7 @@ pub fn get_harvest_loot(
                 AnimalSpecies::TundraWolf => "Wolf Pelt", // Rare placeable trophy
                 AnimalSpecies::CableViper => unreachable!(), // Already checked above
                 AnimalSpecies::ArcticWalrus => "Walrus Pelt", // Rare placeable trophy
+                AnimalSpecies::BeachCrab => if rng.gen_bool(0.5) { "Crab Carapace" } else { "Crab Claw" }, // 50/50 between carapace and claw
             };
             loot.push((rare_trophy.to_string(), 1)); // Rare trophies always drop just 1
         }

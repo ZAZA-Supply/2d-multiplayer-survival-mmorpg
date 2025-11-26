@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, RefObject } from 'react';
+import { useLatest } from './useLatest';
 import * as SpacetimeDB from '../generated';
 import { DbConnection, Player, ItemDefinition, ActiveEquipment, WoodenStorageBox, Stash } from '../generated';
 import { Identity } from 'spacetimedb';
@@ -175,7 +176,7 @@ export const useInputHandler = ({
     const [isAutoAttacking, setIsAutoAttacking] = useState(false);
     const [isCrouching, setIsCrouching] = useState(false);
     const pendingCrouchToggleRef = useRef<boolean>(false); // Track pending crouch requests
-    const isAutoWalkingRef = useRef<boolean>(isAutoWalking); // Track auto-walk state for event handlers
+    const isAutoWalkingRef = useLatest(isAutoWalking); // Track auto-walk state for event handlers
 
     const keysPressed = useRef<Set<string>>(new Set());
     const isEHeldDownRef = useRef<boolean>(false);
@@ -191,24 +192,23 @@ export const useInputHandler = ({
     const currentJumpOffsetYRef = useRef<number>(0);
 
     const lastMovementDirectionRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 1 });
-    const movementDirectionRef = useRef(movementDirection);
+    const movementDirectionRef = useLatest(movementDirection);
 
-    // Refs for dependencies to avoid re-running effect too often
-    const placementActionsRef = useRef(placementActions);
-    const connectionRef = useRef(connection);
-    const localPlayerRef = useRef(localPlayer);
-    const activeEquipmentsRef = useRef(activeEquipments);
+    // Refs for dependencies - using useLatest to avoid stale closures without useEffect overhead
+    const placementActionsRef = useLatest(placementActions);
+    const connectionRef = useLatest(connection);
+    const localPlayerRef = useLatest(localPlayer);
+    const activeEquipmentsRef = useLatest(activeEquipments);
     // UNIFIED TARGET REF - single source of truth for current interaction target
-    // NOTE: This will be null until parent components are updated to pass closestInteractableTarget prop
-    const closestTargetRef = useRef<InteractableTarget | null>(null);
-    const onSetInteractingWithRef = useRef(onSetInteractingWith);
-    const worldMousePosRefInternal = useRef(worldMousePos); // Shadow prop name
-    const woodenStorageBoxesRef = useRef(woodenStorageBoxes); // <<< ADDED Ref
-    const stashesRef = useRef(stashes); // Added stashesRef
-    const playersRef = useRef(players); // Added playersRef for knocked out revive
-    const targetedFoundationRef = useRef(targetedFoundation); // ADDED: Targeted foundation ref
-    const targetedWallRef = useRef(targetedWall); // ADDED: Targeted wall ref
-    const itemDefinitionsRef = useRef(itemDefinitions); // <<< ADDED Ref
+    const closestTargetRef = useLatest(closestInteractableTarget);
+    const onSetInteractingWithRef = useLatest(onSetInteractingWith);
+    const worldMousePosRefInternal = useLatest(worldMousePos); // Shadow prop name
+    const woodenStorageBoxesRef = useLatest(woodenStorageBoxes);
+    const stashesRef = useLatest(stashes);
+    const playersRef = useLatest(players);
+    const targetedFoundationRef = useLatest(targetedFoundation);
+    const targetedWallRef = useLatest(targetedWall);
+    const itemDefinitionsRef = useLatest(itemDefinitions)
 
     // Add after existing refs in the hook
     const isRightMouseDownRef = useRef<boolean>(false);
@@ -247,17 +247,9 @@ export const useInputHandler = ({
         // Auto-walk removed - movement handled by usePredictedMovement
     }, [localPlayer?.isDead]); // Depend on death state and the reducer callback
 
-    // Update refs when props change
-    useEffect(() => { placementActionsRef.current = placementActions; }, [placementActions]);
-    const buildingActionsRef = useRef(buildingActions);
-    useEffect(() => { buildingActionsRef.current = buildingActions; }, [buildingActions]);
-    const buildingStateRef = useRef(buildingState);
-    useEffect(() => { buildingStateRef.current = buildingState; }, [buildingState]);
-    useEffect(() => { connectionRef.current = connection; }, [connection]);
-    useEffect(() => { localPlayerRef.current = localPlayer; }, [localPlayer]);
-    useEffect(() => { activeEquipmentsRef.current = activeEquipments; }, [activeEquipments]);
-    useEffect(() => { targetedFoundationRef.current = targetedFoundation; }, [targetedFoundation]);
-    useEffect(() => { targetedWallRef.current = targetedWall; }, [targetedWall]);
+    // Building refs - using useLatest to avoid stale closures
+    const buildingActionsRef = useLatest(buildingActions);
+    const buildingStateRef = useLatest(buildingState);
 
     // ADDED: Reset upgrade menu refs when menu closes
     useEffect(() => {
@@ -299,9 +291,7 @@ export const useInputHandler = ({
             }
         }
     }, [buildingState?.isBuilding]);
-    useEffect(() => { movementDirectionRef.current = movementDirection; }, [movementDirection]);
-    useEffect(() => { isAutoWalkingRef.current = isAutoWalking; }, [isAutoWalking]);
-    
+
     // Synchronize local crouch state with server state to prevent desync
     // Don't override optimistic state while pending requests are in flight
     useEffect(() => {
@@ -309,16 +299,6 @@ export const useInputHandler = ({
             setIsCrouching(localPlayer.isCrouching);
         }
     }, [localPlayer?.isCrouching]);
-    // Update closest target ref when target changes
-    useEffect(() => {
-        closestTargetRef.current = closestInteractableTarget;
-    }, [closestInteractableTarget]);
-    useEffect(() => { onSetInteractingWithRef.current = onSetInteractingWith; }, [onSetInteractingWith]);
-    useEffect(() => { worldMousePosRefInternal.current = worldMousePos; }, [worldMousePos]);
-    useEffect(() => { woodenStorageBoxesRef.current = woodenStorageBoxes; }, [woodenStorageBoxes]); // <<< ADDED Effect
-    useEffect(() => { stashesRef.current = stashes; }, [stashes]); // Added stashesRef effect
-    useEffect(() => { playersRef.current = players; }, [players]); // Added playersRef effect
-    useEffect(() => { itemDefinitionsRef.current = itemDefinitions; }, [itemDefinitions]); // <<< ADDED Effect
 
     // Jump offset calculation is now handled directly in processInputsAndActions
     // to avoid React re-renders every frame

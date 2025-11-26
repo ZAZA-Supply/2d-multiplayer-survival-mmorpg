@@ -82,6 +82,14 @@ pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
             .damage_type(DamageType::Pierce) // Pierce weapon (tusks)
             .build(),
 
+        // Crab Skull - Small but sharp weapon
+        ItemBuilder::new("Crab Skull", "A small crab skull. A modest trophy from a beach scavenger. Lightweight and quick, but lacks the impact of larger skulls.", ItemCategory::Weapon)
+            .icon("crab_skull.png")
+            .stackable(10)
+            .weapon(18, 18, 1.5) // Low damage but very fast
+            .damage_type(DamageType::Pierce) // Pierce weapon (sharp edges)
+            .build(),
+
         // === CRAFTABLE SPEARS ===
         // Ranged melee weapons with reach advantage
 

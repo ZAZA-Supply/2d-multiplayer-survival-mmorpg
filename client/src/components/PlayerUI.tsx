@@ -1054,6 +1054,7 @@ const PlayerUI: React.FC<PlayerUIProps> = ({
                 interactingWith={interactingWith}
                 brothPots={brothPots}
                 campfires={campfires}
+                fumaroles={fumaroles}
                 stashes={stashes}
                 startPlacement={startPlacement}
                 cancelPlacement={cancelPlacement}

@@ -6,6 +6,7 @@ pub mod fox;
 pub mod wolf;
 pub mod viper;
 pub mod walrus;
+pub mod crab;
 pub mod respawn;
 pub mod animal_corpse;
 

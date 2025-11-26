@@ -654,6 +654,29 @@ pub fn get_consumable_definitions() -> Vec<ItemDefinition> {
             .cookable(30.0, "Charcoal")
             .build(),
 
+        // === CRAB MEAT ===
+        ItemBuilder::new("Raw Crab Meat", "Fresh, sweet meat from a beach crab. Best enjoyed cooked but edible raw in a pinch.", ItemCategory::Consumable)
+            .icon("crab_meat.png")
+            .stackable(20)
+            .consumable(5.0, 10.0, -4.0)
+            .cookable(30.0, "Cooked Crab Meat")
+            .build(),
+
+        ItemBuilder::new("Cooked Crab Meat", "Tender, flaky crab meat with a delicate sweet flavor. A coastal delicacy that provides excellent nutrition.", ItemCategory::Consumable)
+            .icon("cooked_crab_meat.png")
+            .stackable(20)
+            .consumable(25.0, 35.0, 15.0)
+            .cookable(25.0, "Burnt Crab Meat")
+            .build(),
+
+        ItemBuilder::new("Burnt Crab Meat", "Overcooked crab meat. Rubbery and unappetizing, but can be processed into charcoal.", ItemCategory::Consumable)
+            .icon("burnt_crab_meat.png")
+            .stackable(20)
+            .consumable(-3.0, 8.0, -8.0)
+            .crafting_output(8, 0)
+            .cookable(30.0, "Charcoal")
+            .build(),
+
         // === SPECIALTY FOODS & MISC ===
         ItemBuilder::new("Tallow", "Rendered animal fat. High in calories and can be used as a slow-burning fuel source for lanterns. Can be eaten in a pinch to stave off hunger, but it's not very appetizing and will make you thirsty.", ItemCategory::Consumable)
             .icon("tallow.png")

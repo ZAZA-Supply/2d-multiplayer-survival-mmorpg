@@ -33,7 +33,8 @@ import * as AnimalSpeciesVariants from './animal_species_variants'
 export type AnimalSpecies = AnimalSpeciesVariants.CinderFox |
   AnimalSpeciesVariants.TundraWolf |
   AnimalSpeciesVariants.CableViper |
-  AnimalSpeciesVariants.ArcticWalrus;
+  AnimalSpeciesVariants.ArcticWalrus |
+  AnimalSpeciesVariants.BeachCrab;
 
 let _cached_AnimalSpecies_type_value: __AlgebraicTypeType | null = null;
 
@@ -49,6 +50,7 @@ export const AnimalSpecies = {
   TundraWolf: { tag: "TundraWolf" } as const,
   CableViper: { tag: "CableViper" } as const,
   ArcticWalrus: { tag: "ArcticWalrus" } as const,
+  BeachCrab: { tag: "BeachCrab" } as const,
 
   getTypeScriptAlgebraicType(): __AlgebraicTypeType {
     if (_cached_AnimalSpecies_type_value) return _cached_AnimalSpecies_type_value;
@@ -58,6 +60,7 @@ export const AnimalSpecies = {
       { name: "TundraWolf", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "CableViper", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "ArcticWalrus", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "BeachCrab", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
     );
     return _cached_AnimalSpecies_type_value;
   },
