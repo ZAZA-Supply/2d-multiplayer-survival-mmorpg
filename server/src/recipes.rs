@@ -39,45 +39,15 @@ pub struct RecipeMatch {
     pub matched_ingredient_count: u32,
 }
 
-/// Recipe registry - returns all available recipes (hardcoded + AI)
+/// Recipe registry - returns all available recipes
+/// NOTE: Hardcoded recipes have been removed in favor of AI-generated recipes.
+/// This function now returns an empty list - recipes are generated via the
+/// AI brewing system and cached in brew_recipe_cache table.
 pub fn get_all_recipes() -> Vec<Recipe> {
-    let mut recipes = Vec::new();
-    
-    // Add hardcoded recipes
-    recipes.push(get_stone_soup_recipe());
-    
-    // TODO: Add AI-generated recipes from cache here
-    // let ai_recipes = get_ai_recipes_from_cache();
-    // recipes.extend(ai_recipes);
-    
-    recipes
-}
-
-/// Get the Stone Soup recipe definition
-fn get_stone_soup_recipe() -> Recipe {
-    Recipe {
-        name: "Stone Soup".to_string(),
-        primary_ingredient: "Stone".to_string(),
-        required_ingredients: vec!["Stone".to_string()],
-        tiers: vec![
-            RecipeTier {
-                min_ingredient_count: 1,
-                output_name: "Stone Soup".to_string(),
-                cooking_time_secs: 45.0, // Reduced from 60s - faster early game option
-            },
-            RecipeTier {
-                min_ingredient_count: 2,
-                output_name: "Hearty Stone Soup".to_string(),
-                cooking_time_secs: 75.0, // Reduced from 90s - more efficient
-            },
-            RecipeTier {
-                min_ingredient_count: 3,
-                output_name: "Gourmet Stone Soup".to_string(),
-                cooking_time_secs: 100.0, // Reduced from 120s - still significant investment
-            },
-        ],
-        is_ai_generated: false,
-    }
+    // AI-generated recipes are stored in brew_recipe_cache table
+    // and matched directly via ai_brewing::get_cached_recipe()
+    // Hardcoded recipes removed to enable fully generative brewing
+    Vec::new()
 }
 
 /// Collect ingredient names from a broth pot

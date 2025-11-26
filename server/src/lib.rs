@@ -136,6 +136,7 @@ mod rune_stone; // <<< ADDED: Rune stone system
 mod broth_pot; // <<< ADDED: Broth pot cooking system
 mod recipes; // <<< ADDED: Recipe system for broth pot cooking
 mod fire_patch; // <<< ADDED: Fire patch system for fire arrows
+mod ai_brewing; // <<< ADDED: AI-generated brew recipes system
 
 // ADD: Re-export respawn reducer
 pub use respawn::respawn_randomly;
@@ -306,7 +307,10 @@ pub use broth_pot::{
     move_item_from_broth_pot_output, quick_move_from_broth_pot_output,
     transfer_water_from_container_to_pot,
     schedule_next_broth_pot_processing, process_broth_pot_logic_scheduled
-};  
+};
+
+// Re-export AI brewing reducers for client bindings
+pub use ai_brewing::{check_brew_cache, create_generated_brew};  
 
 // Re-export knocked out functions and types for other modules
 pub use knocked_out::{schedule_knocked_out_recovery, KnockedOutRecoverySchedule, KnockedOutStatus};

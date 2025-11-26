@@ -31,6 +31,7 @@ use crate::sound_events;
 use crate::active_equipment;
 use crate::active_equipment::active_equipment as ActiveEquipmentTableTrait;
 use crate::recipes;
+use crate::ai_brewing;
 
 // --- Constants ---
 pub const NUM_INGREDIENT_SLOTS: usize = 3;
@@ -58,6 +59,9 @@ pub const HEAVY_STORM_COLLECTION_RATE_ML_PER_SEC: f32 = 6.0;    // 6ml/sec = 360
 // Desalination constants
 pub const DESALINATION_RATE_ML_PER_SEC: f32 = 25.0; // 25ml/sec = 1500ml/min = 90L/hour
 // At this rate, a full 5L pot takes ~3.3 minutes to desalinate completely
+
+// Brewing water requirement - each brew uses 250mL of water (produces one jar/vial of brew)
+pub const BREWING_WATER_REQUIREMENT_ML: u32 = 250;
 
 /// --- Broth Pot Data Structure ---
 /// Represents a broth pot placed on a campfire for cooking broth, desalinating water, etc.
@@ -1849,7 +1853,7 @@ pub fn process_broth_pot_logic_scheduled(
         };
         
         // CRITICAL: Stop brewing immediately if heat stops or water runs out
-        if !has_heat || broth_pot.water_level_ml < 1000 {
+        if !has_heat || broth_pot.water_level_ml < BREWING_WATER_REQUIREMENT_ML {
             broth_pot.is_cooking = false;
             broth_pot.cooking_progress_secs = 0.0;
             broth_pot.required_cooking_time_secs = 0.0;
@@ -1860,33 +1864,45 @@ pub fn process_broth_pot_logic_scheduled(
             
             log::info!("[BrothPot] Stopped brewing in pot {} (campfire stopped or water insufficient)", broth_pot_id);
         } else {
-            // Campfire is burning and water is sufficient - check if recipe changed
-            if let Some(new_recipe_match) = recipes::match_recipe(ctx, &broth_pot) {
-                // Check if recipe changed (different name or tier)
+            // Campfire is burning and water is sufficient - check if AI recipe changed
+            // NOTE: AI brewing requires client to first generate and cache the recipe via create_generated_brew()
+            if let Some(ai_match) = ai_brewing::match_ai_recipe_from_broth_pot(
+                ctx,
+                broth_pot.ingredient_def_id_0,
+                broth_pot.ingredient_def_id_1,
+                broth_pot.ingredient_def_id_2,
+            ) {
+                // Check if recipe changed (different name)
                 let recipe_changed = broth_pot.current_recipe_name.as_ref()
-                    .map_or(true, |current_name| current_name != &new_recipe_match.tier.output_name);
+                    .map_or(true, |current_name| current_name != &ai_match.output_name);
                 
                 if recipe_changed {
                     // Recipe changed - restart brewing
-                    log::info!("[BrothPot] Recipe changed in pot {}: {} -> {}. Restarting brewing.",
+                    log::info!("[BrothPot] AI recipe changed in pot {}: {} -> {}. Restarting brewing.",
                               broth_pot_id,
                               broth_pot.current_recipe_name.as_ref().unwrap_or(&"Unknown".to_string()),
-                              new_recipe_match.tier.output_name);
+                              ai_match.output_name);
                     
                     // Stop current cooking sound
                     sound_events::stop_soup_boiling_sound(ctx, broth_pot_id);
                     
-                    // Start new recipe
-                    recipes::start_brewing_recipe(ctx, &mut broth_pot, &new_recipe_match, broth_pot_id)?;
+                    // Start brewing with the AI-cached recipe
+                    broth_pot.is_cooking = true;
+                    broth_pot.current_recipe_name = Some(ai_match.output_name.clone());
+                    broth_pot.required_cooking_time_secs = ai_match.brew_time_secs as f32;
+                    broth_pot.cooking_progress_secs = 0.0;
+                    sound_events::start_soup_boiling_sound(ctx, broth_pot_id, broth_pot.pos_x, broth_pot.pos_y);
                 }
             } else {
-                // No recipe matches anymore - stop cooking
-                log::info!("[BrothPot] No recipe matches ingredients in pot {}. Stopping cooking.", broth_pot_id);
-                broth_pot.is_cooking = false;
-                broth_pot.current_recipe_name = None;
-                broth_pot.cooking_progress_secs = 0.0;
-                broth_pot.required_cooking_time_secs = 0.0;
-                sound_events::stop_soup_boiling_sound(ctx, broth_pot_id);
+                // No AI-cached recipe matches - stop cooking (client needs to generate recipe first)
+                if broth_pot.is_cooking {
+                    log::info!("[BrothPot] No AI-cached recipe for ingredients in pot {}. Stopping cooking.", broth_pot_id);
+                    broth_pot.is_cooking = false;
+                    broth_pot.current_recipe_name = None;
+                    broth_pot.cooking_progress_secs = 0.0;
+                    broth_pot.required_cooking_time_secs = 0.0;
+                    sound_events::stop_soup_boiling_sound(ctx, broth_pot_id);
+                }
             }
         }
     }
@@ -1910,18 +1926,21 @@ pub fn process_broth_pot_logic_scheduled(
                           broth_pot.attached_to_fumarole_id.unwrap_or(0), cooking_speed_multiplier);
             }
             
-            // Complete brewing - use recipe system to determine output
+            // Complete brewing - use AI recipe cache to determine output
             let items = ctx.db.inventory_item();
             let item_defs = ctx.db.item_definition();
             
-            // Match recipe to get output information
-            let recipe_match = recipes::match_recipe(ctx, &broth_pot)
-                .ok_or_else(|| "Recipe no longer matches ingredients".to_string())?;
+            // Match AI recipe to get output information
+            let ai_match = ai_brewing::match_ai_recipe_from_broth_pot(
+                ctx,
+                broth_pot.ingredient_def_id_0,
+                broth_pot.ingredient_def_id_1,
+                broth_pot.ingredient_def_id_2,
+            ).ok_or_else(|| "AI recipe no longer cached for ingredients".to_string())?;
             
-            // Find output item definition
-            let output_item_def = item_defs.iter()
-                .find(|def| def.name == recipe_match.tier.output_name)
-                .ok_or_else(|| format!("Output item '{}' not found", recipe_match.tier.output_name))?;
+            // Find output item definition by ID (from cache)
+            let output_item_def = item_defs.id().find(ai_match.output_def_id)
+                .ok_or_else(|| format!("Output item def {} not found", ai_match.output_def_id))?;
             
             // Create output item in output slot (slot index 3)
             let new_output_item = InventoryItem {
@@ -1940,9 +1959,8 @@ pub fn process_broth_pot_logic_scheduled(
             broth_pot.output_item_instance_id = Some(inserted_output.instance_id);
             broth_pot.output_item_def_id = Some(output_item_def.id);
             
-            // Consume ingredients based on recipe tier
-            // Consume the minimum ingredient count for the tier (e.g., tier 2 = consume 2 stones)
-            let mut ingredients_to_consume = recipe_match.tier.min_ingredient_count;
+            // AI recipes always consume all 3 ingredients (no tiers)
+            let mut ingredients_to_consume: u32 = 3;
             let slots_to_process = [
                 (broth_pot.ingredient_instance_id_0, broth_pot.ingredient_def_id_0, 0),
                 (broth_pot.ingredient_instance_id_1, broth_pot.ingredient_def_id_1, 1),
@@ -1957,47 +1975,43 @@ pub fn process_broth_pot_logic_scheduled(
                 }
                 
                 if let (Some(instance_id), Some(def_id)) = (instance_id_opt, def_id_opt) {
-                    if let Some(item_def) = item_defs.id().find(def_id) {
-                        // Check if this ingredient matches the recipe's primary ingredient
-                        if item_def.name == recipe_match.recipe.primary_ingredient {
-                            if let Some(mut ingredient_item) = items.instance_id().find(instance_id) {
-                                let consume_from_this = ingredients_to_consume.min(ingredient_item.quantity);
-                                
-                                if ingredient_item.quantity > consume_from_this {
-                                    // Reduce quantity
-                                    ingredient_item.quantity -= consume_from_this;
-                                    items.instance_id().update(ingredient_item);
-                                    ingredients_to_consume -= consume_from_this;
-                                } else {
-                                    // Remove item completely
-                                    items.instance_id().delete(*instance_id);
-                                    ingredients_to_consume -= ingredient_item.quantity;
-                                    
-                                    // Clear the slot based on index
-                                    match slot_index {
-                                        0 => {
-                                            broth_pot.ingredient_instance_id_0 = None;
-                                            broth_pot.ingredient_def_id_0 = None;
-                                        },
-                                        1 => {
-                                            broth_pot.ingredient_instance_id_1 = None;
-                                            broth_pot.ingredient_def_id_1 = None;
-                                        },
-                                        2 => {
-                                            broth_pot.ingredient_instance_id_2 = None;
-                                            broth_pot.ingredient_def_id_2 = None;
-                                        },
-                                        _ => {},
-                                    }
-                                }
+                    // AI recipes always consume all ingredients (no primary ingredient check needed)
+                    if let Some(mut ingredient_item) = items.instance_id().find(instance_id) {
+                        let consume_from_this = ingredients_to_consume.min(ingredient_item.quantity);
+                        
+                        if ingredient_item.quantity > consume_from_this {
+                            // Reduce quantity
+                            ingredient_item.quantity -= consume_from_this;
+                            items.instance_id().update(ingredient_item);
+                            ingredients_to_consume -= consume_from_this;
+                        } else {
+                            // Remove item completely
+                            items.instance_id().delete(*instance_id);
+                            ingredients_to_consume -= ingredient_item.quantity;
+                            
+                            // Clear the slot based on index
+                            match slot_index {
+                                0 => {
+                                    broth_pot.ingredient_instance_id_0 = None;
+                                    broth_pot.ingredient_def_id_0 = None;
+                                },
+                                1 => {
+                                    broth_pot.ingredient_instance_id_1 = None;
+                                    broth_pot.ingredient_def_id_1 = None;
+                                },
+                                2 => {
+                                    broth_pot.ingredient_instance_id_2 = None;
+                                    broth_pot.ingredient_def_id_2 = None;
+                                },
+                                _ => {},
                             }
                         }
                     }
                 }
             }
             
-            // Consume 1000mL (1L) of water
-            broth_pot.water_level_ml = broth_pot.water_level_ml.saturating_sub(1000);
+            // Consume 250mL of water per brew (each brew produces one jar/vial)
+            broth_pot.water_level_ml = broth_pot.water_level_ml.saturating_sub(BREWING_WATER_REQUIREMENT_ML);
             
             // Reset seawater status if pot is now empty (prevents pot from being stuck as "seawater")
             if broth_pot.water_level_ml <= 0 {
@@ -2005,7 +2019,7 @@ pub fn process_broth_pot_logic_scheduled(
             }
             
             // Capture output name for logging
-            let output_name = recipe_match.tier.output_name.clone();
+            let output_name = ai_match.output_name.clone();
             
             // Reset cooking state
             broth_pot.is_cooking = false;
@@ -2016,8 +2030,8 @@ pub fn process_broth_pot_logic_scheduled(
             // Stop boiling sound
             sound_events::stop_soup_boiling_sound(ctx, broth_pot_id);
             
-            log::info!("[BrothPot] Completed brewing {} in pot {} (consumed 1000mL water)", 
-                      output_name, broth_pot_id);
+            log::info!("[BrothPot] Completed brewing {} in pot {} (consumed {}mL water)", 
+                      output_name, broth_pot_id, BREWING_WATER_REQUIREMENT_ML);
         }
     }
     
@@ -2026,11 +2040,11 @@ pub fn process_broth_pot_logic_scheduled(
     // CRITICAL: Only brew with fresh water (not seawater)
     if !broth_pot.is_cooking && 
        broth_pot.output_item_instance_id.is_none() && 
-       broth_pot.water_level_ml >= 1000 &&
+       broth_pot.water_level_ml >= BREWING_WATER_REQUIREMENT_ML &&
        !broth_pot.is_seawater {  // Can't brew with salt water!
         
-        log::debug!("[BrothPot] Pot {} checking if can start brewing (water: {}ml, seawater: {})", 
-                   broth_pot_id, broth_pot.water_level_ml, broth_pot.is_seawater);
+        log::debug!("[BrothPot] Pot {} checking if can start brewing (water: {}ml, seawater: {}, required: {}ml)", 
+                   broth_pot_id, broth_pot.water_level_ml, broth_pot.is_seawater, BREWING_WATER_REQUIREMENT_ML);
         
         // Check if heat source is available (campfire burning OR fumarole present)
         let has_heat = if let Some(campfire_id) = broth_pot.attached_to_campfire_id {
@@ -2047,9 +2061,25 @@ pub fn process_broth_pot_logic_scheduled(
         log::debug!("[BrothPot] Pot {} has heat: {}", broth_pot_id, has_heat);
         
         if has_heat {
-            // Try to match a recipe
-            if let Some(recipe_match) = recipes::match_recipe(ctx, &broth_pot) {
-                recipes::start_brewing_recipe(ctx, &mut broth_pot, &recipe_match, broth_pot_id)?;
+            // Try to match AI-cached recipe
+            // NOTE: Requires client to have generated and cached recipe via create_generated_brew()
+            if let Some(ai_match) = ai_brewing::match_ai_recipe_from_broth_pot(
+                ctx,
+                broth_pot.ingredient_def_id_0,
+                broth_pot.ingredient_def_id_1,
+                broth_pot.ingredient_def_id_2,
+            ) {
+                broth_pot.is_cooking = true;
+                broth_pot.current_recipe_name = Some(ai_match.output_name.clone());
+                broth_pot.required_cooking_time_secs = ai_match.brew_time_secs as f32;
+                broth_pot.cooking_progress_secs = 0.0;
+                sound_events::start_soup_boiling_sound(ctx, broth_pot_id, broth_pot.pos_x, broth_pot.pos_y);
+                
+                log::info!("[BrothPot] Started AI brewing '{}' in pot {} (brew_time={}s)",
+                          ai_match.output_name, broth_pot_id, ai_match.brew_time_secs);
+            } else {
+                // No cached recipe - client needs to generate one via Gemini API
+                log::debug!("[BrothPot] No AI-cached recipe for pot {} ingredients - waiting for client to generate", broth_pot_id);
             }
         }
     }

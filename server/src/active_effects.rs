@@ -62,6 +62,16 @@ pub enum EffectType {
     MemoryRune, // Near a blue memory rune stone (spawns memory shards at night)
     HotSpring, // Healing effect from standing in a hot spring
     Fumarole, // Warmth protection from standing near a fumarole (nullifies warmth decay)
+    
+    // === BREWING SYSTEM EFFECTS (stub implementations - logic to be added later) ===
+    Intoxicated,       // Drunk effect from alcoholic brews - blurred vision, movement wobble
+    Poisoned,          // Poison DOT from brews/coated weapons (distinct from Venom which is animal-based)
+    SpeedBoost,        // Movement speed increase from performance enhancer brews
+    StaminaBoost,      // Reduced hunger/thirst drain from performance enhancer brews
+    NightVision,       // Enhanced vision at night from psychoactive brews
+    WarmthBoost,       // Warmth protection bonus from warming broths
+    ColdResistance,    // Reduced cold damage from specialty brews
+    PoisonResistance,  // Reduced poison/venom damage from antidote brews
 }
 
 // Table defining food poisoning risks for different food items
@@ -165,7 +175,7 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
                         effect.target_player_id
                     },
                     // Other effect types shouldn't reach this code path, but we need to handle them
-                    EffectType::HealthRegen | EffectType::Burn | EffectType::Bleed | EffectType::Venom | EffectType::SeawaterPoisoning | EffectType::FoodPoisoning | EffectType::Cozy | EffectType::Wet | EffectType::TreeCover | EffectType::WaterDrinking | EffectType::Exhausted | EffectType::BuildingPrivilege | EffectType::ProductionRune | EffectType::AgrarianRune | EffectType::MemoryRune | EffectType::HotSpring | EffectType::Fumarole => {
+                    EffectType::HealthRegen | EffectType::Burn | EffectType::Bleed | EffectType::Venom | EffectType::SeawaterPoisoning | EffectType::FoodPoisoning | EffectType::Cozy | EffectType::Wet | EffectType::TreeCover | EffectType::WaterDrinking | EffectType::Exhausted | EffectType::BuildingPrivilege | EffectType::ProductionRune | EffectType::AgrarianRune | EffectType::MemoryRune | EffectType::HotSpring | EffectType::Fumarole | EffectType::Intoxicated | EffectType::Poisoned | EffectType::SpeedBoost | EffectType::StaminaBoost | EffectType::NightVision | EffectType::WarmthBoost | EffectType::ColdResistance | EffectType::PoisonResistance => {
                         log::warn!("[EffectTick] Unexpected effect type {:?} in bandage processing", effect.effect_type);
                         Some(effect.player_id)
                     }
@@ -384,6 +394,56 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
                             // No healing per tick for BandageBurst/RemoteBandageBurst, healing is applied only when the effect ends.
                             // This arm handles the per-tick calculation, so it should be 0 here.
                             amount_this_tick = 0.0; 
+                        }
+                        // === NEW BREWING SYSTEM EFFECTS (stub implementations - logic to be added later) ===
+                        EffectType::Intoxicated => {
+                            // TODO: Implement drunk effect - blurred vision, movement wobble, etc.
+                            // For now, just log that the effect is active
+                            log::debug!("[EffectTick] Intoxicated effect active for player {:?} (stub - no effect yet)", effect.player_id);
+                            amount_this_tick = 0.0; // No effect yet
+                        }
+                        EffectType::Poisoned => {
+                            // TODO: Implement poison DOT from brews/coated weapons
+                            // Similar to Venom but from brew-based poison
+                            // For now, treat like Venom (damage over time)
+                            if player_to_update.is_knocked_out {
+                                amount_this_tick = 0.0;
+                                log::info!("[EffectTick] Knocked out player {:?} is immune to Poisoned damage.", effect.player_id);
+                            } else {
+                                // Stub: Apply poison damage (same as Venom for now)
+                                amount_this_tick = 1.0; // Fixed 1 damage per tick (stub)
+                                player_to_update.health = (player_to_update.health - amount_this_tick).clamp(MIN_STAT_VALUE, MAX_HEALTH_VALUE);
+                            }
+                        }
+                        EffectType::SpeedBoost => {
+                            // TODO: Implement movement speed increase
+                            // This will be handled by movement system, not effect tick
+                            amount_this_tick = 0.0; // No per-tick stat change
+                        }
+                        EffectType::StaminaBoost => {
+                            // TODO: Implement reduced hunger/thirst drain
+                            // This will be handled by stat decay system, not effect tick
+                            amount_this_tick = 0.0; // No per-tick stat change
+                        }
+                        EffectType::NightVision => {
+                            // TODO: Implement enhanced vision at night
+                            // This will be handled by rendering system, not effect tick
+                            amount_this_tick = 0.0; // No per-tick stat change
+                        }
+                        EffectType::WarmthBoost => {
+                            // TODO: Implement warmth protection bonus
+                            // This will be handled by warmth decay system, not effect tick
+                            amount_this_tick = 0.0; // No per-tick stat change
+                        }
+                        EffectType::ColdResistance => {
+                            // TODO: Implement reduced cold damage
+                            // This will be handled by cold damage system, not effect tick
+                            amount_this_tick = 0.0; // No per-tick stat change
+                        }
+                        EffectType::PoisonResistance => {
+                            // TODO: Implement reduced poison/venom damage
+                            // This will be handled by damage calculation system, not effect tick
+                            amount_this_tick = 0.0; // No per-tick stat change
                         }
                         EffectType::WaterDrinking => {
                             // WaterDrinking is purely a visual effect, no per-tick processing needed

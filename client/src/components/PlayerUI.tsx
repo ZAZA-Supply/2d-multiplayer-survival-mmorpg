@@ -894,6 +894,95 @@ const PlayerUI: React.FC<PlayerUIProps> = ({
                             };
                         }
                         break;
+                    // === NEW BREWING SYSTEM EFFECTS (stub UI - logic to be implemented) ===
+                    case 'Intoxicated':
+                        effectApplies = true;
+                        effectData = {
+                            id: 'intoxicated',
+                            name: 'Intoxicated',
+                            emoji: '🍺',
+                            type: 'negative' as const,
+                            description: 'Vision blurred, movement impaired from alcohol.',
+                            duration: bufferedRemainingTime
+                        };
+                        break;
+                    case 'Poisoned':
+                        effectApplies = true;
+                        effectData = {
+                            id: 'poisoned',
+                            name: 'Poisoned',
+                            emoji: '☠️',
+                            type: 'negative' as const,
+                            description: 'Taking poison damage over time.',
+                            duration: bufferedRemainingTime
+                        };
+                        break;
+                    case 'SpeedBoost':
+                        effectApplies = true;
+                        effectData = {
+                            id: 'speed_boost',
+                            name: 'Speed Boost',
+                            emoji: '⚡',
+                            type: 'positive' as const,
+                            description: 'Movement speed increased.',
+                            duration: bufferedRemainingTime
+                        };
+                        break;
+                    case 'StaminaBoost':
+                        effectApplies = true;
+                        effectData = {
+                            id: 'stamina_boost',
+                            name: 'Stamina Boost',
+                            emoji: '💪',
+                            type: 'positive' as const,
+                            description: 'Hunger and thirst drain reduced.',
+                            duration: bufferedRemainingTime
+                        };
+                        break;
+                    case 'NightVision':
+                        effectApplies = true;
+                        effectData = {
+                            id: 'night_vision',
+                            name: 'Night Vision',
+                            emoji: '👁️',
+                            type: 'positive' as const,
+                            description: 'Enhanced vision in darkness.',
+                            duration: bufferedRemainingTime
+                        };
+                        break;
+                    case 'WarmthBoost':
+                        effectApplies = true;
+                        effectData = {
+                            id: 'warmth_boost',
+                            name: 'Warmth Boost',
+                            emoji: '🔥',
+                            type: 'positive' as const,
+                            description: 'Warmth protection increased.',
+                            duration: bufferedRemainingTime
+                        };
+                        break;
+                    case 'ColdResistance':
+                        effectApplies = true;
+                        effectData = {
+                            id: 'cold_resistance',
+                            name: 'Cold Resistance',
+                            emoji: '🧊',
+                            type: 'positive' as const,
+                            description: 'Reduced cold damage.',
+                            duration: bufferedRemainingTime
+                        };
+                        break;
+                    case 'PoisonResistance':
+                        effectApplies = true;
+                        effectData = {
+                            id: 'poison_resistance',
+                            name: 'Poison Resistance',
+                            emoji: '🛡️',
+                            type: 'positive' as const,
+                            description: 'Reduced poison and venom damage.',
+                            duration: bufferedRemainingTime
+                        };
+                        break;
                 }
             } else if (effectTargetPlayerIdHex === localPlayerIdHex && effectTypeTag === 'RemoteBandageBurst') {
                 // Check if remote bandage healer is in range

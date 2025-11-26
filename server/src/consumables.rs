@@ -14,6 +14,9 @@ use crate::models::ItemLocation; // Added import
 // Import active effects related items
 use crate::active_effects::{ActiveConsumableEffect, EffectType, active_consumable_effect as ActiveConsumableEffectTableTrait, cancel_bleed_effects, cancel_health_regen_effects, player_has_cozy_effect, COZY_FOOD_HEALING_MULTIPLIER};
 
+// Import AI brewing cache for poison brew detection
+use crate::ai_brewing::brew_recipe_cache as BrewRecipeCacheTableTrait;
+
 // Import sound system for eating food sound and drinking water sound
 use crate::sound_events::{emit_eating_food_sound, emit_drinking_water_sound, emit_throwing_up_sound};
 
@@ -81,6 +84,18 @@ pub fn consume_item(ctx: &ReducerContext, item_instance_id: u64) -> Result<(), S
     
     if item_def.category != ItemCategory::Consumable && !has_consumable_stats {
         return Err(format!("Item '{}' cannot be consumed.", item_def.name));
+    }
+
+    // POISON BREW BLOCK: Check if this is a poison category brew (weapon coating only)
+    // Check the BrewRecipeCache to see if this item was created by the AI brewing system
+    for cached_recipe in ctx.db.brew_recipe_cache().iter() {
+        if cached_recipe.output_item_def_id == item_def.id {
+            // This is an AI-generated brew - check if it's poison category
+            if cached_recipe.category == "poison" {
+                return Err("This vial is for coating weapons, not drinking! Use it on a weapon to apply poison.".to_string());
+            }
+            break; // Found the recipe, no need to continue searching
+        }
     }
 
     // Call the centralized helper function

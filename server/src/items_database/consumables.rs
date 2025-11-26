@@ -1043,27 +1043,8 @@ pub fn get_consumable_definitions() -> Vec<ItemDefinition> {
             .respawn_time(105)
             .build(),
 
-        // === STONE SOUP VARIANTS (Brewing System Test) ===
-        ItemBuilder::new("Stone Soup", "A basic broth made by boiling stones in water. A classic survival recipe that extracts minerals from the stones.", ItemCategory::Consumable)
-            .icon("soup_stone_soup.png")
-            .stackable(5)
-            .consumable(25.0, 55.0, 15.0) // Increased hunger (20→25) and thirst (40→55) - better early game option
-            .respawn_time(0) // Not a respawnable item - created by brewing
-            .build(),
-
-        ItemBuilder::new("Hearty Stone Soup", "A richer broth made with multiple stones. More nutritious than basic stone soup.", ItemCategory::Consumable)
-            .icon("soup_stone_soup.png")
-            .stackable(5)
-            .consumable(40.0, 80.0, 20.0) // Increased hunger (35→40) and thirst (65→80) - solid mid-tier option
-            .respawn_time(0) // Not a respawnable item - created by brewing
-            .build(),
-
-        ItemBuilder::new("Gourmet Stone Soup", "A perfectly balanced broth made with three carefully selected stones. The ultimate stone soup experience.", ItemCategory::Consumable)
-            .icon("soup_stone_soup.png")
-            .stackable(5)
-            .consumable(55.0, 100.0, 25.0) // Increased hunger (50→55) and thirst (90→100) - premium hydration option
-            .respawn_time(0) // Not a respawnable item - created by brewing
-            .build(),
+        // NOTE: Stone Soup variants removed - brewing system now uses AI-generated recipes
+        // AI-generated brew recipes create ItemDefinitions dynamically via ai_brewing.rs
 
     ]
 }

@@ -47,4 +47,12 @@ export type AgrarianRune = { tag: "AgrarianRune" };
 export type MemoryRune = { tag: "MemoryRune" };
 export type HotSpring = { tag: "HotSpring" };
 export type Fumarole = { tag: "Fumarole" };
+export type Intoxicated = { tag: "Intoxicated" };
+export type Poisoned = { tag: "Poisoned" };
+export type SpeedBoost = { tag: "SpeedBoost" };
+export type StaminaBoost = { tag: "StaminaBoost" };
+export type NightVision = { tag: "NightVision" };
+export type WarmthBoost = { tag: "WarmthBoost" };
+export type ColdResistance = { tag: "ColdResistance" };
+export type PoisonResistance = { tag: "PoisonResistance" };
 

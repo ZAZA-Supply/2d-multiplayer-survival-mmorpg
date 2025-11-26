@@ -39,6 +39,8 @@ import { CancelFishing } from "./cancel_fishing_reducer.ts";
 export { CancelFishing };
 import { CastFishingLine } from "./cast_fishing_line_reducer.ts";
 export { CastFishingLine };
+import { CheckBrewCache } from "./check_brew_cache_reducer.ts";
+export { CheckBrewCache };
 import { CheckBuildingPrivilegeDistance } from "./check_building_privilege_distance_reducer.ts";
 export { CheckBuildingPrivilegeDistance };
 import { CheckFinishedCrafting } from "./check_finished_crafting_reducer.ts";
@@ -65,6 +67,8 @@ import { ConsumeFilledWaterContainer } from "./consume_filled_water_container_re
 export { ConsumeFilledWaterContainer };
 import { ConsumeItem } from "./consume_item_reducer.ts";
 export { ConsumeItem };
+import { CreateGeneratedBrew } from "./create_generated_brew_reducer.ts";
+export { CreateGeneratedBrew };
 import { CrushBoneItem } from "./crush_bone_item_reducer.ts";
 export { CrushBoneItem };
 import { DamageWildAnimal } from "./damage_wild_animal_reducer.ts";
@@ -563,6 +567,8 @@ import { BarrelRespawnScheduleTableHandle } from "./barrel_respawn_schedule_tabl
 export { BarrelRespawnScheduleTableHandle };
 import { BasaltColumnTableHandle } from "./basalt_column_table.ts";
 export { BasaltColumnTableHandle };
+import { BrewRecipeCacheTableHandle } from "./brew_recipe_cache_table.ts";
+export { BrewRecipeCacheTableHandle };
 import { BrothPotTableHandle } from "./broth_pot_table.ts";
 export { BrothPotTableHandle };
 import { BrothPotProcessingScheduleTableHandle } from "./broth_pot_processing_schedule_table.ts";
@@ -781,6 +787,8 @@ import { BasaltColumn } from "./basalt_column_type.ts";
 export { BasaltColumn };
 import { BasaltColumnType } from "./basalt_column_type_type.ts";
 export { BasaltColumnType };
+import { BrewRecipeCache } from "./brew_recipe_cache_type.ts";
+export { BrewRecipeCache };
 import { BrothPot } from "./broth_pot_type.ts";
 export { BrothPot };
 import { BrothPotProcessingSchedule } from "./broth_pot_processing_schedule_type.ts";
@@ -1108,6 +1116,15 @@ const REMOTE_MODULE = {
       primaryKeyInfo: {
         colName: "id",
         colType: (BasaltColumn.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
+      },
+    },
+    brew_recipe_cache: {
+      tableName: "brew_recipe_cache" as const,
+      rowType: BrewRecipeCache.getTypeScriptAlgebraicType(),
+      primaryKey: "recipeHash",
+      primaryKeyInfo: {
+        colName: "recipeHash",
+        colType: (BrewRecipeCache.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
       },
     },
     broth_pot: {
@@ -1983,6 +2000,10 @@ const REMOTE_MODULE = {
       reducerName: "cast_fishing_line",
       argsType: CastFishingLine.getTypeScriptAlgebraicType(),
     },
+    check_brew_cache: {
+      reducerName: "check_brew_cache",
+      argsType: CheckBrewCache.getTypeScriptAlgebraicType(),
+    },
     check_building_privilege_distance: {
       reducerName: "check_building_privilege_distance",
       argsType: CheckBuildingPrivilegeDistance.getTypeScriptAlgebraicType(),
@@ -2034,6 +2055,10 @@ const REMOTE_MODULE = {
     consume_item: {
       reducerName: "consume_item",
       argsType: ConsumeItem.getTypeScriptAlgebraicType(),
+    },
+    create_generated_brew: {
+      reducerName: "create_generated_brew",
+      argsType: CreateGeneratedBrew.getTypeScriptAlgebraicType(),
     },
     crush_bone_item: {
       reducerName: "crush_bone_item",
@@ -3029,6 +3054,7 @@ export type Reducer = never
 | { name: "CancelCraftingItem", args: CancelCraftingItem }
 | { name: "CancelFishing", args: CancelFishing }
 | { name: "CastFishingLine", args: CastFishingLine }
+| { name: "CheckBrewCache", args: CheckBrewCache }
 | { name: "CheckBuildingPrivilegeDistance", args: CheckBuildingPrivilegeDistance }
 | { name: "CheckFinishedCrafting", args: CheckFinishedCrafting }
 | { name: "CheckPlantGrowth", args: CheckPlantGrowth }
@@ -3042,6 +3068,7 @@ export type Reducer = never
 | { name: "ClearActiveItemReducer", args: ClearActiveItemReducer }
 | { name: "ConsumeFilledWaterContainer", args: ConsumeFilledWaterContainer }
 | { name: "ConsumeItem", args: ConsumeItem }
+| { name: "CreateGeneratedBrew", args: CreateGeneratedBrew }
 | { name: "CrushBoneItem", args: CrushBoneItem }
 | { name: "DamageWildAnimal", args: DamageWildAnimal }
 | { name: "DebugSetTime", args: DebugSetTime }
@@ -3343,6 +3370,22 @@ export class RemoteReducers {
     this.connection.offReducer("cast_fishing_line", callback);
   }
 
+  checkBrewCache(recipeHash: bigint) {
+    const __args = { recipeHash };
+    let __writer = new __BinaryWriter(1024);
+    CheckBrewCache.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("check_brew_cache", __argsBuffer, this.setCallReducerFlags.checkBrewCacheFlags);
+  }
+
+  onCheckBrewCache(callback: (ctx: ReducerEventContext, recipeHash: bigint) => void) {
+    this.connection.onReducer("check_brew_cache", callback);
+  }
+
+  removeOnCheckBrewCache(callback: (ctx: ReducerEventContext, recipeHash: bigint) => void) {
+    this.connection.offReducer("check_brew_cache", callback);
+  }
+
   checkBuildingPrivilegeDistance(schedule: BuildingPrivilegeCheckSchedule) {
     const __args = { schedule };
     let __writer = new __BinaryWriter(1024);
@@ -3541,6 +3584,22 @@ export class RemoteReducers {
 
   removeOnConsumeItem(callback: (ctx: ReducerEventContext, itemInstanceId: bigint) => void) {
     this.connection.offReducer("consume_item", callback);
+  }
+
+  createGeneratedBrew(recipeJson: string, iconBase64: string | undefined) {
+    const __args = { recipeJson, iconBase64 };
+    let __writer = new __BinaryWriter(1024);
+    CreateGeneratedBrew.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("create_generated_brew", __argsBuffer, this.setCallReducerFlags.createGeneratedBrewFlags);
+  }
+
+  onCreateGeneratedBrew(callback: (ctx: ReducerEventContext, recipeJson: string, iconBase64: string | undefined) => void) {
+    this.connection.onReducer("create_generated_brew", callback);
+  }
+
+  removeOnCreateGeneratedBrew(callback: (ctx: ReducerEventContext, recipeJson: string, iconBase64: string | undefined) => void) {
+    this.connection.offReducer("create_generated_brew", callback);
   }
 
   crushBoneItem(itemInstanceId: bigint) {
@@ -7290,6 +7349,11 @@ export class SetReducerFlags {
     this.castFishingLineFlags = flags;
   }
 
+  checkBrewCacheFlags: __CallReducerFlags = 'FullUpdate';
+  checkBrewCache(flags: __CallReducerFlags) {
+    this.checkBrewCacheFlags = flags;
+  }
+
   checkBuildingPrivilegeDistanceFlags: __CallReducerFlags = 'FullUpdate';
   checkBuildingPrivilegeDistance(flags: __CallReducerFlags) {
     this.checkBuildingPrivilegeDistanceFlags = flags;
@@ -7353,6 +7417,11 @@ export class SetReducerFlags {
   consumeItemFlags: __CallReducerFlags = 'FullUpdate';
   consumeItem(flags: __CallReducerFlags) {
     this.consumeItemFlags = flags;
+  }
+
+  createGeneratedBrewFlags: __CallReducerFlags = 'FullUpdate';
+  createGeneratedBrew(flags: __CallReducerFlags) {
+    this.createGeneratedBrewFlags = flags;
   }
 
   crushBoneItemFlags: __CallReducerFlags = 'FullUpdate';
@@ -8588,6 +8657,11 @@ export class RemoteTables {
   get basaltColumn(): BasaltColumnTableHandle<'basalt_column'> {
     // clientCache is a private property
     return new BasaltColumnTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<BasaltColumn>(REMOTE_MODULE.tables.basalt_column));
+  }
+
+  get brewRecipeCache(): BrewRecipeCacheTableHandle<'brew_recipe_cache'> {
+    // clientCache is a private property
+    return new BrewRecipeCacheTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<BrewRecipeCache>(REMOTE_MODULE.tables.brew_recipe_cache));
   }
 
   get brothPot(): BrothPotTableHandle<'broth_pot'> {

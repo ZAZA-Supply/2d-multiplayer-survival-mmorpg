@@ -152,7 +152,7 @@ export function useContainer(props: UseContainerProps): UseContainerResult {
             brothPots
         });
         
-        console.log('[useContainer] containerType:', containerType, 'containerId:', containerId, 'entity:', entity);
+        // console.log('[useContainer] containerType:', containerType, 'containerId:', containerId, 'entity:', entity);
         
         return entity;
     }, [containerType, containerId, campfires, furnaces, fumaroles, lanterns, woodenStorageBoxes, playerCorpses, stashes, rainCollectors, homesteadHearths, brothPots, currentStorageBox]);

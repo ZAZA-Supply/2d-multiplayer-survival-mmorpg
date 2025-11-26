@@ -43,6 +43,14 @@ import { PopulatedItem } from './InventoryUI';
 import { isWaterContainer, getWaterContent, formatWaterContent, getWaterLevelPercentage, isSaltWater } from '../utils/waterContainerHelpers';
 import { playImmediateSound } from '../hooks/useSoundSystem';
 
+// Import AI Brewing Service
+import { 
+    generateFullBrewRecipe, 
+    recipeToServerJson, 
+    getIngredientRarities,
+    computeRecipeHash 
+} from '../services/brewingAIService';
+
 // Import new utilities
 import { useContainer } from '../hooks/useContainer';
 import { ContainerType, isFuelContainer, getContainerConfig, extractContainerItems, createContainerCallbacks } from '../utils/containerUtils';
@@ -888,6 +896,166 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
         );
     }, [attachedBrothPot, connection, lastDragCompleteTime]);
 
+    // ============================================================================
+    // AI BREWING - Automatic Recipe Generation
+    // ============================================================================
+    // Track whether we're currently generating a recipe to prevent duplicate calls
+    // Using ref for immediate synchronous check (state is async and causes race conditions)
+    const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
+    const [lastGeneratedRecipeName, setLastGeneratedRecipeName] = useState<string | null>(null);
+    const isGeneratingRef = useRef(false);
+    const lastGeneratedHashRef = useRef<string | null>(null);
+
+    // Automatic AI recipe generation when broth pot has 3 ingredients
+    useEffect(() => {
+        // Skip if:
+        // - No broth pot attached
+        // - No connection
+        // - Already generating a recipe (check ref for immediate sync check)
+        // - Broth pot conditions not met for brewing
+        if (!attachedBrothPot || !connection?.reducers || isGeneratingRef.current) {
+            return;
+        }
+
+        // Check brewing conditions:
+        // - Has 3 ingredients (all slots filled)
+        // - Has sufficient water (>=250ml for brewing)
+        // - Not seawater
+        // - Not already cooking
+        // - No output item (brewing not complete)
+        const pot = attachedBrothPot as any;
+        const hasThreeIngredients = 
+            pot.ingredientDefId0 !== null && pot.ingredientDefId0 !== undefined &&
+            pot.ingredientDefId1 !== null && pot.ingredientDefId1 !== undefined &&
+            pot.ingredientDefId2 !== null && pot.ingredientDefId2 !== undefined;
+
+        const canBrew = 
+            hasThreeIngredients &&
+            pot.waterLevelMl >= 250 &&
+            !pot.isSeawater &&
+            !pot.isCooking &&
+            (pot.outputItemInstanceId === null || pot.outputItemInstanceId === undefined);
+
+        if (!canBrew) {
+            return;
+        }
+
+        // Get ingredient names from definitions
+        const ingredientDefIds = [pot.ingredientDefId0, pot.ingredientDefId1, pot.ingredientDefId2];
+        const ingredientNames: string[] = [];
+
+        for (const defId of ingredientDefIds) {
+            if (defId === null || defId === undefined) continue;
+            const def = itemDefinitions.get(defId.toString());
+            if (def) {
+                ingredientNames.push(def.name);
+            }
+        }
+
+        if (ingredientNames.length !== 3) {
+            console.warn('[AI Brewing] Could not get all 3 ingredient names');
+            return;
+        }
+
+        // Compute recipe hash to avoid regenerating the same recipe
+        const recipeHash = computeRecipeHash(ingredientNames);
+        const recipeHashStr = recipeHash.toString();
+
+        // Skip if we already generated this exact recipe combination
+        if (lastGeneratedHashRef.current === recipeHashStr) {
+            return;
+        }
+
+        // IMMEDIATELY mark as generating to prevent race conditions
+        isGeneratingRef.current = true;
+        setIsGeneratingRecipe(true);
+        
+        // Start generating recipe
+        console.log('[AI Brewing] Detected 3 ingredients, starting recipe generation:', ingredientNames);
+
+        // Async function to generate and cache the recipe
+        const generateAndCacheRecipe = async () => {
+            try {
+                // Generate recipe via Gemini API
+                const result = await generateFullBrewRecipe(
+                    ingredientNames,
+                    getIngredientRarities(ingredientNames),
+                    false // Skip icon generation for now (faster)
+                );
+
+                console.log('[AI Brewing] Recipe generated:', result.recipe.name);
+
+                // Convert recipe to JSON for server
+                const recipeJson = recipeToServerJson(result.recipe, ingredientNames);
+
+                // Cache the recipe on the server via reducer
+                console.log('[AI Brewing] Caching recipe on server...');
+                connection.reducers.createGeneratedBrew(recipeJson, result.icon_base64 ?? undefined);
+
+                // Remember this hash and recipe name so we don't regenerate
+                lastGeneratedHashRef.current = recipeHashStr;
+                setLastGeneratedRecipeName(result.recipe.name);
+                console.log('[AI Brewing] Recipe cached successfully! Server will start brewing shortly.');
+
+            } catch (error) {
+                console.error('[AI Brewing] Failed to generate recipe:', error);
+                // Don't set lastGeneratedHashRef so we can retry on next render
+            } finally {
+                isGeneratingRef.current = false;
+                setIsGeneratingRecipe(false);
+            }
+        };
+
+        generateAndCacheRecipe();
+
+    }, [attachedBrothPot, connection, itemDefinitions]);
+
+    // Check if we have a cached recipe ready for the current ingredients
+    const recipeReadyState = useMemo(() => {
+        if (!attachedBrothPot || !itemDefinitions) return null;
+        
+        const pot = attachedBrothPot as any;
+        const hasThreeIngredients = 
+            pot.ingredientDefId0 !== null && pot.ingredientDefId0 !== undefined &&
+            pot.ingredientDefId1 !== null && pot.ingredientDefId1 !== undefined &&
+            pot.ingredientDefId2 !== null && pot.ingredientDefId2 !== undefined;
+        
+        if (!hasThreeIngredients) return null;
+        
+        // Get current ingredient names
+        const ingredientDefIds = [pot.ingredientDefId0, pot.ingredientDefId1, pot.ingredientDefId2];
+        const ingredientNames: string[] = [];
+        for (const defId of ingredientDefIds) {
+            if (defId === null || defId === undefined) continue;
+            const def = itemDefinitions.get(defId.toString());
+            if (def) ingredientNames.push(def.name);
+        }
+        if (ingredientNames.length !== 3) return null;
+        
+        // Check if this matches our last generated recipe
+        const currentHash = computeRecipeHash(ingredientNames).toString();
+        if (lastGeneratedHashRef.current === currentHash && lastGeneratedRecipeName) {
+            return {
+                recipeName: lastGeneratedRecipeName,
+                isReady: true
+            };
+        }
+        
+        return null;
+    }, [attachedBrothPot, itemDefinitions, lastGeneratedRecipeName]);
+
+    // Check if campfire has heat (for showing "light the fire" message)
+    const hasHeatSource = useMemo(() => {
+        if (container.containerType === 'campfire') {
+            const campfire = container.containerEntity as SpacetimeDBCampfire;
+            return campfire.isBurning && !campfire.isDestroyed;
+        } else if (container.containerType === 'fumarole') {
+            // Fumaroles always have heat
+            return true;
+        }
+        return false;
+    }, [container.containerType, container.containerEntity]);
+
     // Create special context menu handler for water container slot
     const waterContainerContextMenuHandler = useCallback((event: React.MouseEvent, itemInfo: PopulatedItem, slotIndex: number) => {
         event.preventDefault();
@@ -1294,6 +1462,97 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
                                 </div>
                         </div>
 
+                        {/* AI Brewing Status Indicator - shown when 3 ingredients ready */}
+                        {!attachedBrothPot.isCooking && 
+                         !attachedBrothPot.isSeawater &&
+                         attachedBrothPot.waterLevelMl >= 250 &&
+                         attachedBrothPot.outputItemInstanceId === null &&
+                         brothPotItems.filter(item => item !== null).length === 3 && (
+                            <div style={{
+                                marginTop: '8px',
+                                marginBottom: '12px',
+                                padding: '8px 12px',
+                                backgroundColor: isGeneratingRecipe 
+                                    ? 'rgba(255, 200, 100, 0.15)' 
+                                    : recipeReadyState?.isReady 
+                                        ? (hasHeatSource ? 'rgba(100, 255, 100, 0.15)' : 'rgba(255, 150, 50, 0.15)')
+                                        : 'rgba(100, 150, 255, 0.15)',
+                                border: isGeneratingRecipe 
+                                    ? '1px solid rgba(255, 200, 100, 0.5)' 
+                                    : recipeReadyState?.isReady 
+                                        ? (hasHeatSource ? '1px solid rgba(100, 255, 100, 0.5)' : '1px solid rgba(255, 150, 50, 0.5)')
+                                        : '1px solid rgba(100, 150, 255, 0.5)',
+                                borderRadius: '4px',
+                                textAlign: 'center',
+                                animation: 'analyzePulse 1.5s ease-in-out infinite',
+                                boxShadow: isGeneratingRecipe 
+                                    ? '0 0 12px rgba(255, 200, 100, 0.4)' 
+                                    : recipeReadyState?.isReady 
+                                        ? (hasHeatSource ? '0 0 12px rgba(100, 255, 100, 0.4)' : '0 0 12px rgba(255, 150, 50, 0.4)')
+                                        : '0 0 12px rgba(100, 150, 255, 0.4)',
+                            }}>
+                                <style>{`
+                                    @keyframes analyzePulse {
+                                        0%, 100% {
+                                            opacity: 1;
+                                            box-shadow: 0 0 12px rgba(100, 150, 255, 0.4);
+                                        }
+                                        50% {
+                                            opacity: 0.7;
+                                            box-shadow: 0 0 20px rgba(100, 150, 255, 0.7);
+                                        }
+                                    }
+                                `}</style>
+                                <div style={{
+                                    fontSize: '13px',
+                                    color: isGeneratingRecipe 
+                                        ? '#ffcc66' 
+                                        : recipeReadyState?.isReady 
+                                            ? (hasHeatSource ? '#88ff88' : '#ffaa44')
+                                            : '#87CEEB',
+                                    fontWeight: 'bold',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                }}>
+                                    <span style={{ fontSize: '16px' }}>
+                                        {isGeneratingRecipe ? '⚗️' : recipeReadyState?.isReady ? (hasHeatSource ? '✨' : '🔥') : '🔮'}
+                                    </span>
+                                    <span>
+                                        {isGeneratingRecipe 
+                                            ? 'Generating Recipe...' 
+                                            : recipeReadyState?.isReady 
+                                                ? (hasHeatSource 
+                                                    ? `Ready: ${recipeReadyState.recipeName}` 
+                                                    : `Recipe: ${recipeReadyState.recipeName}`)
+                                                : 'Analyzing Ingredients...'}
+                                    </span>
+                                    <span style={{ fontSize: '16px' }}>
+                                        {isGeneratingRecipe ? '⚗️' : recipeReadyState?.isReady ? (hasHeatSource ? '✨' : '🔥') : '🔮'}
+                                    </span>
+                                </div>
+                                <div style={{
+                                    marginTop: '6px',
+                                    fontSize: '11px',
+                                    color: isGeneratingRecipe 
+                                        ? '#cc9944' 
+                                        : recipeReadyState?.isReady 
+                                            ? (hasHeatSource ? '#66cc66' : '#cc8833')
+                                            : '#6699cc',
+                                    fontStyle: 'italic',
+                                }}>
+                                    {isGeneratingRecipe 
+                                        ? 'Consulting the ancient brew masters...' 
+                                        : recipeReadyState?.isReady 
+                                            ? (hasHeatSource 
+                                                ? 'Waiting for server to start brewing...' 
+                                                : 'Light the campfire to start brewing!')
+                                            : 'Discovering what these ingredients create...'}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Currently Brewing Indicator - pulsing animation */}
                         {attachedBrothPot.isCooking && (
                             <div style={{
@@ -1329,16 +1588,55 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
                                     gap: '6px',
                                 }}>
                                     <span style={{ fontSize: '16px' }}>🍲</span>
-                                    <span>Currently Brewing {attachedBrothPot.currentRecipeName || 'Soup'}</span>
+                                    <span>Currently Brewing {attachedBrothPot.currentRecipeName || 'Unknown Brew'}</span>
                                     <span style={{ fontSize: '16px' }}>🍲</span>
                                 </div>
+                                {/* Brewing Time Remaining */}
+                                {attachedBrothPot.requiredCookingTimeSecs > 0 && (
+                                    <div style={{
+                                        marginTop: '8px',
+                                        fontSize: '12px',
+                                        color: '#87CEEB',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px',
+                                    }}>
+                                        <span>⏱️ Time Remaining:</span>
+                                        <span style={{ fontWeight: 'bold', color: '#ffcc44' }}>
+                                            {(() => {
+                                                const remaining = Math.max(0, attachedBrothPot.requiredCookingTimeSecs - attachedBrothPot.cookingProgressSecs);
+                                                const minutes = Math.floor(remaining / 60);
+                                                const seconds = Math.floor(remaining % 60);
+                                                return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                                            })()}
+                                        </span>
+                                        {/* Progress bar */}
+                                        <div style={{
+                                            width: '60px',
+                                            height: '6px',
+                                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                                            borderRadius: '3px',
+                                            overflow: 'hidden',
+                                            border: '1px solid rgba(255, 200, 0, 0.3)',
+                                        }}>
+                                            <div style={{
+                                                width: `${Math.min(100, (attachedBrothPot.cookingProgressSecs / attachedBrothPot.requiredCookingTimeSecs) * 100)}%`,
+                                                height: '100%',
+                                                background: 'linear-gradient(90deg, #ffcc44 0%, #ff8800 100%)',
+                                                transition: 'width 0.5s ease',
+                                                boxShadow: '0 0 4px rgba(255, 200, 0, 0.6)',
+                                            }} />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         {/* Seawater Warning - shown when pot has seawater and ingredients */}
                         {!attachedBrothPot.isCooking && 
                          attachedBrothPot.isSeawater && 
-                         attachedBrothPot.waterLevelMl >= 1000 &&
+                         attachedBrothPot.waterLevelMl >= 250 &&
                          (brothPotItems.some(item => item !== null)) && (
                             <div style={{
                                 marginTop: '8px',

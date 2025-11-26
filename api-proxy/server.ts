@@ -1,6 +1,6 @@
 /**
  * Secure API Proxy Server
- * Routes OpenAI API calls through backend to keep API keys secure
+ * Routes OpenAI and Gemini API calls through backend to keep API keys secure
  * Note: Kokoro TTS runs locally and doesn't need this proxy
  */
 
@@ -12,6 +12,7 @@ import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 
 // Get the directory of the current module
 const __filename = fileURLToPath(import.meta.url);
@@ -82,6 +83,7 @@ app.use(express.raw({ type: 'audio/*', limit: '50mb' }));
 
 // Environment variables
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 if (!OPENAI_API_KEY) {
   console.error('❌ OpenAI API key not found in environment variables');
@@ -90,15 +92,23 @@ if (!OPENAI_API_KEY) {
   process.exit(1);
 }
 
+// Initialize Gemini client if API key is available
+let genAI: GoogleGenerativeAI | null = null;
+if (GEMINI_API_KEY) {
+  genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+}
+
 console.log('✅ API Proxy Server starting...');
 console.log(`   OpenAI API: ${OPENAI_API_KEY ? 'Ready' : 'Not configured'}`);
+console.log(`   Gemini API: ${GEMINI_API_KEY ? 'Ready' : 'Not configured'}`);
 console.log(`   Note: Kokoro TTS runs locally (no proxy needed)`);
 
 // Health check
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
-    openaiConfigured: !!OPENAI_API_KEY
+    openaiConfigured: !!OPENAI_API_KEY,
+    geminiConfigured: !!GEMINI_API_KEY
   });
 });
 
@@ -217,11 +227,280 @@ app.post('/api/openai/chat', async (req, res) => {
   }
 });
 
+// ============================================================================
+// GEMINI API ENDPOINTS - AI Brewing System
+// ============================================================================
+
+// Brew categories for AI guidance (from brew_categories_design.md)
+const BREW_CATEGORIES = [
+  'healing_broth',      // Health restoration, hunger satisfaction
+  'medicinal_tea',      // Stat buffs, healing over time, status removal
+  'alcoholic',          // Buffs/debuffs, cold resistance, trade value
+  'poison',             // Offensive combat, weapon coating
+  'performance_enhancer', // Temporary stat boosts, combat advantages
+  'utility_brew',       // Non-consumable uses, crafting materials
+  'psychoactive',       // Special effects, vision quests, high-risk
+  'nutritional_drink',  // Hunger/thirst satisfaction
+  'maritime_specialty', // Coastal/island specific
+  'cooking_base',       // Used in other recipes
+  'technological',      // Sci-fi/crashed ship themed
+];
+
+// Effect types that map to server-side EffectType enum
+const VALID_EFFECT_TYPES = [
+  'HealthRegen',      // For medicinal teas
+  'FoodPoisoning',    // For poisons
+  'Intoxicated',      // For alcoholic (new effect)
+  'StaminaBoost',     // For performance enhancers
+  'SpeedBoost',       // For performance enhancers
+  'ColdResistance',   // For warming brews
+  'NightVision',      // For special brews
+  null,               // No special effect (stats only)
+];
+
+// System prompt for recipe generation
+const BREW_SYSTEM_PROMPT = `You are an AI recipe generator for a survival game called "Broth & Bullets". 
+Players combine 3 ingredients in a broth pot to create unique brews.
+
+Your task is to generate a balanced, thematically appropriate recipe based on the ingredients provided.
+
+CATEGORIES (choose one):
+- healing_broth: Health restoration, hunger satisfaction (health: 30-80, hunger: 40-100)
+- medicinal_tea: Stat buffs, healing over time (health: 20-50, hunger: 5-20, thirst: 30-60)
+- alcoholic: Buffs/debuffs, cold resistance (health: -5 to 10, hunger: 10-30, thirst: -10 to 0)
+- poison: Offensive combat, dangerous (health: -50 to -200, hunger: -20 to -50)
+- performance_enhancer: Temporary buffs (health: 10-30, hunger: 20-40, thirst: 10-30)
+- utility_brew: Crafting materials, non-consumable (minimal stats)
+- psychoactive: Special effects, risky (variable stats)
+- nutritional_drink: Hunger/thirst satisfaction (health: 10-30, hunger: 50-90, thirst: 40-80)
+- maritime_specialty: Coastal themed (variable stats)
+- cooking_base: Intermediate ingredient (minimal stats)
+- technological: Sci-fi themed (unique effects)
+
+EFFECT TYPES (optional, use only when appropriate):
+- HealthRegen: For medicinal teas, healing over time
+- FoodPoisoning: For poisons, damage over time
+- Intoxicated: For alcoholic drinks, buffs + debuffs
+- StaminaBoost: For performance enhancers
+- SpeedBoost: For performance enhancers
+- ColdResistance: For warming brews
+- NightVision: For special brews
+- null: No special effect (most common, stats only)
+
+NAMING CONVENTIONS:
+- Prefix: "Glass Jar of", "Vial of", "Flask of", "Bottle of", "Draught of", "Elixir of", "Tonic of", "Brew of", "Potion of", "Extract of"
+- Suffix: "Soup/Stew/Broth" (food), "Tea/Infusion" (herbs), "Wine/Spirit/Ale" (alcohol), "Poison/Toxin/Venom" (deadly)
+
+DESCRIPTION TONE:
+- Survival-themed, practical, grounded
+- 1-2 sentences max
+- Hint at effects without being mechanical
+- Example: "A hearty stew made from foraged roots and wild herbs. Warms the body and fills the belly."
+
+RARITY TIERS affect stats:
+- Common (0.0-0.3): Basic stats, 60-120 sec brew time
+- Uncommon (0.3-0.6): Good stats, 120-180 sec brew time
+- Rare (0.6-0.8): Strong stats, 180-240 sec brew time
+- Very Rare (0.8-1.0): Extreme stats, 240-300 sec brew time
+
+IMPORTANT: Return ONLY valid JSON, no markdown formatting or code blocks.`;
+
+// Gemini Brew Recipe Generation
+app.post('/api/gemini/brew', async (req, res) => {
+  try {
+    if (!genAI || !GEMINI_API_KEY) {
+      return res.status(500).json({ error: 'Gemini API key not configured' });
+    }
+
+    const { ingredients, ingredient_rarities } = req.body;
+
+    if (!ingredients || !Array.isArray(ingredients) || ingredients.length !== 3) {
+      return res.status(400).json({ error: 'Exactly 3 ingredients required' });
+    }
+
+    console.log(`[Proxy] Gemini brew request: ${ingredients.join(', ')}`);
+
+    // Calculate average rarity for tier determination
+    const avgRarity = ingredient_rarities && ingredient_rarities.length > 0
+      ? ingredient_rarities.reduce((sum: number, r: number) => sum + r, 0) / ingredient_rarities.length
+      : 0.3;
+
+    const rarityTier = avgRarity < 0.3 ? 'Common' : avgRarity < 0.6 ? 'Uncommon' : avgRarity < 0.8 ? 'Rare' : 'Very Rare';
+
+    const userPrompt = `Generate a brew recipe for these 3 ingredients:
+${ingredients.map((ing: string, i: number) => `- ${ing} (rarity: ${ingredient_rarities?.[i]?.toFixed(2) || '0.30'})`).join('\n')}
+
+Average rarity tier: ${rarityTier} (${avgRarity.toFixed(2)})
+
+Return a JSON object with these exact fields:
+{
+  "name": "string - creative name following naming conventions",
+  "description": "string - 1-2 sentence atmospheric description",
+  "health": number - health restoration/damage (negative for poisons),
+  "hunger": number - hunger satisfaction,
+  "thirst": number - thirst satisfaction,
+  "brew_time_secs": number - brewing time in seconds (60-300 based on rarity),
+  "category": "string - one of the valid categories",
+  "effect_type": "string or null - one of the valid effect types, or null for stats-only",
+  "icon_subject": "string - short description of the brew's appearance for icon generation (e.g., 'steaming bowl of mushroom soup', 'glowing green poison vial')"
+}`;
+
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-2.0-flash',
+      generationConfig: {
+        temperature: 0.7,
+        topP: 0.9,
+        maxOutputTokens: 1024,
+      },
+      safetySettings: [
+        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+      ],
+    });
+
+    const result = await model.generateContent([
+      { text: BREW_SYSTEM_PROMPT },
+      { text: userPrompt }
+    ]);
+
+    const responseText = result.response.text();
+    console.log(`[Proxy] Gemini raw response: ${responseText.substring(0, 200)}...`);
+
+    // Parse JSON from response (handle potential markdown code blocks)
+    let recipeJson;
+    try {
+      // Try to extract JSON from markdown code blocks if present
+      const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const jsonStr = jsonMatch ? jsonMatch[1].trim() : responseText.trim();
+      recipeJson = JSON.parse(jsonStr);
+    } catch (parseError) {
+      console.error('[Proxy] Failed to parse Gemini response as JSON:', parseError);
+      return res.status(500).json({ 
+        error: 'Failed to parse recipe response',
+        raw: responseText 
+      });
+    }
+
+    // Validate required fields
+    const requiredFields = ['name', 'description', 'health', 'hunger', 'thirst', 'brew_time_secs', 'category', 'icon_subject'];
+    for (const field of requiredFields) {
+      if (recipeJson[field] === undefined) {
+        console.error(`[Proxy] Missing required field: ${field}`);
+        return res.status(500).json({ error: `Missing required field: ${field}` });
+      }
+    }
+
+    // Validate category
+    if (!BREW_CATEGORIES.includes(recipeJson.category)) {
+      console.warn(`[Proxy] Invalid category '${recipeJson.category}', defaulting to healing_broth`);
+      recipeJson.category = 'healing_broth';
+    }
+
+    // Validate effect_type
+    if (recipeJson.effect_type && !VALID_EFFECT_TYPES.includes(recipeJson.effect_type)) {
+      console.warn(`[Proxy] Invalid effect_type '${recipeJson.effect_type}', setting to null`);
+      recipeJson.effect_type = null;
+    }
+
+    console.log(`[Proxy] Generated recipe: ${recipeJson.name} (${recipeJson.category})`);
+    res.json(recipeJson);
+
+  } catch (error: any) {
+    console.error('[Proxy] Gemini brew error:', error);
+    res.status(500).json({ error: error.message || 'Recipe generation failed' });
+  }
+});
+
+// Gemini Icon Generation (using Imagen via Gemini)
+app.post('/api/gemini/icon', async (req, res) => {
+  try {
+    if (!genAI || !GEMINI_API_KEY) {
+      return res.status(500).json({ error: 'Gemini API key not configured' });
+    }
+
+    const { subject } = req.body;
+
+    if (!subject || typeof subject !== 'string') {
+      return res.status(400).json({ error: 'Subject string required' });
+    }
+
+    console.log(`[Proxy] Gemini icon request: ${subject}`);
+
+    // Pixel art prompt template
+    const iconPrompt = `A pixel art style ${subject} with consistent pixel width and clean black outlines, designed as a game item icon. Rendered with a transparent background, PNG format. The object should have a clear silhouette, sharp pixel-level detail, and fit naturally in a top-down RPG game like Secret of Mana. No background, no shadows outside the object. Stylized with a warm palette and light dithering where appropriate. 64x64 pixels.`;
+
+    // Use Gemini's imagen model for image generation
+    // Note: As of the SDK version, we use gemini-2.0-flash-exp for image generation
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-2.0-flash-exp',
+      generationConfig: {
+        temperature: 0.4,
+      },
+    });
+
+    // Try to generate image using Gemini's multimodal capabilities
+    // If image generation isn't available, fall back to a description
+    try {
+      const result = await model.generateContent({
+        contents: [{
+          role: 'user',
+          parts: [{ text: `Generate a pixel art game icon: ${iconPrompt}` }]
+        }],
+        generationConfig: {
+          responseModalities: ['image', 'text'],
+          responseMimeType: 'text/plain',
+        } as any,
+      });
+
+      const response = result.response;
+      
+      // Check if we got an image in the response
+      const parts = response.candidates?.[0]?.content?.parts || [];
+      for (const part of parts) {
+        if ((part as any).inlineData?.mimeType?.startsWith('image/')) {
+          const imageData = (part as any).inlineData;
+          console.log(`[Proxy] Generated icon successfully`);
+          return res.json({
+            icon_base64: imageData.data,
+            mime_type: imageData.mimeType,
+          });
+        }
+      }
+
+      // If no image was generated, return a placeholder indicator
+      console.log(`[Proxy] No image in response, returning placeholder indicator`);
+      return res.json({
+        icon_base64: null,
+        placeholder: true,
+        description: subject,
+      });
+
+    } catch (imageError: any) {
+      // Image generation may not be available - return placeholder
+      console.log(`[Proxy] Image generation not available: ${imageError.message}`);
+      return res.json({
+        icon_base64: null,
+        placeholder: true,
+        description: subject,
+        error: 'Image generation not available, use placeholder'
+      });
+    }
+
+  } catch (error: any) {
+    console.error('[Proxy] Gemini icon error:', error);
+    res.status(500).json({ error: error.message || 'Icon generation failed' });
+  }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Secure API Proxy Server running on port ${PORT}`);
   console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`   OpenAI Whisper: POST /api/whisper/transcribe`);
   console.log(`   OpenAI Chat: POST /api/openai/chat`);
+  console.log(`   Gemini Brew: POST /api/gemini/brew`);
+  console.log(`   Gemini Icon: POST /api/gemini/icon`);
   console.log(`   Health Check: GET /health`);
 });
 

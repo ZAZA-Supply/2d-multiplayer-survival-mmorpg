@@ -48,7 +48,15 @@ export type EffectType = EffectTypeVariants.HealthRegen |
   EffectTypeVariants.AgrarianRune |
   EffectTypeVariants.MemoryRune |
   EffectTypeVariants.HotSpring |
-  EffectTypeVariants.Fumarole;
+  EffectTypeVariants.Fumarole |
+  EffectTypeVariants.Intoxicated |
+  EffectTypeVariants.Poisoned |
+  EffectTypeVariants.SpeedBoost |
+  EffectTypeVariants.StaminaBoost |
+  EffectTypeVariants.NightVision |
+  EffectTypeVariants.WarmthBoost |
+  EffectTypeVariants.ColdResistance |
+  EffectTypeVariants.PoisonResistance;
 
 let _cached_EffectType_type_value: __AlgebraicTypeType | null = null;
 
@@ -79,6 +87,14 @@ export const EffectType = {
   MemoryRune: { tag: "MemoryRune" } as const,
   HotSpring: { tag: "HotSpring" } as const,
   Fumarole: { tag: "Fumarole" } as const,
+  Intoxicated: { tag: "Intoxicated" } as const,
+  Poisoned: { tag: "Poisoned" } as const,
+  SpeedBoost: { tag: "SpeedBoost" } as const,
+  StaminaBoost: { tag: "StaminaBoost" } as const,
+  NightVision: { tag: "NightVision" } as const,
+  WarmthBoost: { tag: "WarmthBoost" } as const,
+  ColdResistance: { tag: "ColdResistance" } as const,
+  PoisonResistance: { tag: "PoisonResistance" } as const,
 
   getTypeScriptAlgebraicType(): __AlgebraicTypeType {
     if (_cached_EffectType_type_value) return _cached_EffectType_type_value;
@@ -103,6 +119,14 @@ export const EffectType = {
       { name: "MemoryRune", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "HotSpring", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "Fumarole", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "Intoxicated", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "Poisoned", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "SpeedBoost", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "StaminaBoost", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "NightVision", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "WarmthBoost", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "ColdResistance", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "PoisonResistance", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
     );
     return _cached_EffectType_type_value;
   },

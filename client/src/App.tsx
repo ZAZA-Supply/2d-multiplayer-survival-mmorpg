@@ -647,10 +647,10 @@ function AppContent() {
                 const dy = currentPlayer.positionY - entityPosition.y;
                 const currentDistSq = dx * dx + dy * dy;
 
-                console.log(`[App] Distance check for ${interactingWith.type} (ID: ${interactingWith.id}): distance=${Math.sqrt(currentDistSq).toFixed(1)}, threshold=${Math.sqrt(interactionDistanceSquared).toFixed(1)}`);
+                // console.log(`[App] Distance check for ${interactingWith.type} (ID: ${interactingWith.id}): distance=${Math.sqrt(currentDistSq).toFixed(1)}, threshold=${Math.sqrt(interactionDistanceSquared).toFixed(1)}`);
 
                 if (currentDistSq > interactionDistanceSquared) {
-                    console.log(`[App] Player moved too far from ${interactingWith.type} (ID: ${interactingWith.id}). Clearing interaction.`);
+                    // console.log(`[App] Player moved too far from ${interactingWith.type} (ID: ${interactingWith.id}). Clearing interaction.`);
                     handleSetInteractingWith(null);
                 }
             }
