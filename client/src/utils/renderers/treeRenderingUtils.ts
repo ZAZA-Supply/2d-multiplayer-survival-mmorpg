@@ -1,10 +1,10 @@
 import { Tree } from '../../generated'; // Import generated types
-import aleppoPineImage from '../../assets/doodads/siberian_birch_c.png';
-import mannaAshImage from '../../assets/doodads/mountain_hemlock_c.png';
-import mannaAshImage2 from '../../assets/doodads/mountain_hemlock_d.png';
-import downyOakImage from '../../assets/doodads/sitka_spruce_c.png';
-import stonePineImage from '../../assets/doodads/sitka_alder_c.png';
-import stonePineImage2 from '../../assets/doodads/sitka_alder_d.png';
+import birchImage from '../../assets/doodads/siberian_birch_c.png';
+import mountainHemlockImage from '../../assets/doodads/mountain_hemlock_c.png';
+import mountainHemlockImage2 from '../../assets/doodads/mountain_hemlock_d.png';
+import sitkaSpruceImage from '../../assets/doodads/sitka_spruce_c.png';
+import beachBirchImage from '../../assets/doodads/sitka_alder_c.png';
+import beachBirchImage2 from '../../assets/doodads/sitka_alder_d.png';
 import { drawDynamicGroundShadow, calculateShakeOffsets } from './shadowUtils'; // Import shadow utils
 import { applyStandardDropShadow } from './shadowUtils'; // Import new shadow util
 import { GroundEntityConfig, renderConfiguredGroundEntity } from './genericGroundRenderer'; // Import generic renderer
@@ -38,15 +38,15 @@ function getCachedTreeTypeInfo(entity: Tree): { imageSource: string; targetWidth
         
         switch (treeTypeKey) {
             case 'AleppoPine':
-                imageSource = aleppoPineImage;
+                imageSource = birchImage;
                 targetWidth = 320; // 33% shorter than Sitka Spruce
                 break;
             case 'MannaAsh':
-                imageSource = mannaAshImage;
+                imageSource = mountainHemlockImage;
                 targetWidth = 400; // 17% shorter than Sitka Spruce
                 break;
             case 'MannaAsh2':
-                imageSource = mannaAshImage2;
+                imageSource = mountainHemlockImage2;
                 targetWidth = 400; // Same size as MannaAsh variant A
                 break;
             case 'DownyOak':
@@ -250,9 +250,9 @@ const treeConfig: GroundEntityConfig<Tree> = {
 };
 
 // Preload using the imported URL
-imageManager.preloadImage(aleppoPineImage);
-imageManager.preloadImage(mannaAshImage);
-imageManager.preloadImage(mannaAshImage2);
+imageManager.preloadImage(birchImage);
+imageManager.preloadImage(mountainHemlockImage);
+imageManager.preloadImage(mountainHemlockImage2);
 imageManager.preloadImage(downyOakImage);
 imageManager.preloadImage(stonePineImage);
 imageManager.preloadImage(stonePineImage2);

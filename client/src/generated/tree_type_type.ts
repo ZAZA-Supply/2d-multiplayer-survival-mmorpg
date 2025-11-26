@@ -32,6 +32,7 @@ import * as TreeTypeVariants from './tree_type_variants'
 // The tagged union or sum type for the algebraic type `TreeType`.
 export type TreeType = TreeTypeVariants.AleppoPine |
   TreeTypeVariants.MannaAsh |
+  TreeTypeVariants.MannaAsh2 |
   TreeTypeVariants.DownyOak |
   TreeTypeVariants.StonePine |
   TreeTypeVariants.StonePine2;
@@ -48,6 +49,7 @@ export const TreeType = {
   // ```
   AleppoPine: { tag: "AleppoPine" } as const,
   MannaAsh: { tag: "MannaAsh" } as const,
+  MannaAsh2: { tag: "MannaAsh2" } as const,
   DownyOak: { tag: "DownyOak" } as const,
   StonePine: { tag: "StonePine" } as const,
   StonePine2: { tag: "StonePine2" } as const,
@@ -58,6 +60,7 @@ export const TreeType = {
     _cached_TreeType_type_value.value.variants.push(
       { name: "AleppoPine", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "MannaAsh", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "MannaAsh2", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "DownyOak", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "StonePine", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "StonePine2", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },

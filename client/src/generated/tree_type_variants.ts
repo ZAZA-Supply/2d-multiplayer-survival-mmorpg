@@ -30,6 +30,7 @@ import {
 
 export type AleppoPine = { tag: "AleppoPine" };
 export type MannaAsh = { tag: "MannaAsh" };
+export type MannaAsh2 = { tag: "MannaAsh2" };
 export type DownyOak = { tag: "DownyOak" };
 export type StonePine = { tag: "StonePine" };
 export type StonePine2 = { tag: "StonePine2" };
