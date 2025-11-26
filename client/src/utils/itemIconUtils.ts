@@ -249,6 +249,11 @@ import burntFoxMeatIcon from '../assets/items/burnt_fox_meat.png';
 import rawViperMeatlIcon from '../assets/items/viper_meat.png';
 import cookedViperMeatIcon from '../assets/items/cooked_viper_meat.png';
 import burntViperMeatIcon from '../assets/items/burnt_viper_meat.png';
+import rawCrabMeatIcon from '../assets/items/crab_meat.png';
+import cookedCrabMeatIcon from '../assets/items/cooked_crab_meat.png';
+import burntCrabMeatIcon from '../assets/items/burnt_crab_meat.png';
+import crabCarapaceIcon from '../assets/items/crab_carapace.png';
+import crabClawIcon from '../assets/items/crab_claw.png';
 import bearMeatIcon from '../assets/items/bear_meat.png';
 import boarMeatIcon from '../assets/items/boar_meat.png';
 import chickenMeatIcon from '../assets/items/chicken_meat.png';
@@ -580,6 +585,11 @@ const iconMap: { [key: string]: string | undefined } = {
   'viper_meat.png': rawViperMeatlIcon,
   'cooked_viper_meat.png': cookedViperMeatIcon,
   'burnt_viper_meat.png': burntViperMeatIcon,
+  'crab_meat.png': rawCrabMeatIcon,
+  'cooked_crab_meat.png': cookedCrabMeatIcon,
+  'burnt_crab_meat.png': burntCrabMeatIcon,
+  'crab_carapace.png': crabCarapaceIcon,
+  'crab_claw.png': crabClawIcon,
   'bear_meat.png': bearMeatIcon,
   'boar_meat.png': boarMeatIcon,
   'chicken_meat.png': chickenMeatIcon,

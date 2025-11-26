@@ -3126,27 +3126,30 @@ pub fn damage_animal_corpse(
         log::info!("[DamageAnimalCorpse:{}] Animal corpse depleted by Player {:?} using item {} (category {:?}, multiplier {:.1})", 
                  animal_corpse_id, attacker_id, item_def.name, item_def.category, effectiveness_multiplier);
         
-        // Always grant 1 skull when corpse is depleted, regardless of tool used (like player corpses)
-        let skull_type = match animal_corpse.animal_species {
-            crate::wild_animal_npc::AnimalSpecies::CinderFox => "Fox Skull",
-            crate::wild_animal_npc::AnimalSpecies::TundraWolf => "Wolf Skull",
-            crate::wild_animal_npc::AnimalSpecies::CableViper => "Viper Skull",
-            crate::wild_animal_npc::AnimalSpecies::ArcticWalrus => "Walrus Skull", // Large, imposing skull with tusks
-            crate::wild_animal_npc::AnimalSpecies::BeachCrab => "Crab Skull", // Small crab skull
+        // Grant 1 skull when corpse is depleted, regardless of tool used (like player corpses)
+        // Note: Crabs don't have skulls - they have exoskeletons
+        let skull_type: Option<&str> = match animal_corpse.animal_species {
+            crate::wild_animal_npc::AnimalSpecies::CinderFox => Some("Fox Skull"),
+            crate::wild_animal_npc::AnimalSpecies::TundraWolf => Some("Wolf Skull"),
+            crate::wild_animal_npc::AnimalSpecies::CableViper => Some("Viper Skull"),
+            crate::wild_animal_npc::AnimalSpecies::ArcticWalrus => Some("Walrus Skull"), // Large, imposing skull with tusks
+            crate::wild_animal_npc::AnimalSpecies::BeachCrab => None, // Crabs don't have skulls - they have exoskeletons
         };
         
-        match grant_resource(ctx, attacker_id, skull_type, 1) {
-            Ok(_) => {
-                resources_granted.push((skull_type.to_string(), 1));
-                log::info!(
-                    "[DamageAnimalCorpse:{}] Granted 1 {} to Player {:?} (corpse depleted).",
-                    animal_corpse_id, skull_type, attacker_id
-                );
+        if let Some(skull_name) = skull_type {
+            match grant_resource(ctx, attacker_id, skull_name, 1) {
+                Ok(_) => {
+                    resources_granted.push((skull_name.to_string(), 1));
+                    log::info!(
+                        "[DamageAnimalCorpse:{}] Granted 1 {} to Player {:?} (corpse depleted).",
+                        animal_corpse_id, skull_name, attacker_id
+                    );
+                }
+                Err(e) => log::error!(
+                    "[DamageAnimalCorpse:{}] Failed to grant {} to Player {:?}: {}",
+                    animal_corpse_id, skull_name, attacker_id, e
+                ),
             }
-            Err(e) => log::error!(
-                "[DamageAnimalCorpse:{}] Failed to grant {} to Player {:?}: {}",
-                animal_corpse_id, skull_type, attacker_id, e
-            ),
         }
         
         // GUARANTEED: Cable Viper Gland drop for Cable Vipers (100% chance when corpse depleted)
