@@ -131,25 +131,22 @@ impl AnimalBehavior for TundraWolfBehavior {
                     
                     // 🐺 PACK COMBAT: Wolves maintain aggressive behavior regardless of pack status
                     // Pack behavior does NOT interfere with hunting - all wolves chase independently
+                    // Wolves are AGGRESSIVE BY DEFAULT - immediately chase any detected player
                     if self.should_chase_player(ctx, animal, stats, player) {
-                        transition_to_state(animal, AnimalState::Chasing, current_time, Some(player.identity), "player in range");
+                        transition_to_state(animal, AnimalState::Chasing, current_time, Some(player.identity), "aggressive predator - immediate chase");
                         
                         // 🔊 WOLF GROWL: Emit intimidating growl when starting to chase
                         emit_species_sound(ctx, animal, player.identity, "chase_start");
                         
                         // 🐺 PACK ALERT: If this wolf is in a pack, notify pack members about the threat
                         if let Some(pack_id) = animal.pack_id {
-                            log::debug!("🐺 Pack wolf {} (pack {}) chasing player {} - pack hunt initiated!", 
+                            log::debug!("🐺 Pack wolf {} (pack {}) aggressively chasing player {} - pack hunt initiated!", 
                                       animal.id, pack_id, player.identity);
                         } else {
-                            log::debug!("Solo Tundra Wolf {} immediately chasing player {}", animal.id, player.identity);
+                            log::debug!("Solo Tundra Wolf {} immediately and aggressively chasing player {}", animal.id, player.identity);
                         }
-                    } else {
-                        // If not chasing, briefly investigate
-                        transition_to_state(animal, AnimalState::Alert, current_time, None, "investigating player");
-                        animal.investigation_x = Some(player.position_x);
-                        animal.investigation_y = Some(player.position_y);
                     }
+                    // Removed Alert state - wolves are too aggressive to investigate, they just chase
                 }
             },
             
@@ -341,18 +338,9 @@ impl AnimalBehavior for TundraWolfBehavior {
         if !is_water_tile(ctx, target_x, target_y) && 
            !super::core::is_position_in_shelter(ctx, target_x, target_y) {
             
-            let mut final_x = target_x;
-            let mut final_y = target_y;
-            
-            // Check for collisions before moving
-            if let Some((pushback_x, pushback_y)) = check_animal_collision(ctx, animal.id, target_x, target_y) {
-                final_x = animal.pos_x + pushback_x;
-                final_y = animal.pos_y + pushback_y;
-                log::debug!("Wandering wolf {} pushed back by other animal: ({:.1}, {:.1})", animal.id, pushback_x, pushback_y);
-            }
-            
-            // Use centralized position update function
-            update_animal_position(animal, final_x, final_y);
+            // Use move_towards_target to update position AND facing direction
+            // This ensures the wolf faces the direction it's actually moving
+            move_towards_target(ctx, animal, target_x, target_y, stats.movement_speed, dt);
             
             // Check if stuck - use centralized handler
             detect_and_handle_stuck_movement(animal, prev_x, prev_y, 5.0, rng, "patrol");

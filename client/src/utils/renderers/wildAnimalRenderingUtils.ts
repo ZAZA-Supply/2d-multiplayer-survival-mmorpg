@@ -146,12 +146,14 @@ function getSpeciesRenderingProps(species: AnimalSpecies) {
             // Walruses are large, hefty animals
             return { width: 128, height: 128, shadowRadius: 40 };
         case 'TundraWolf':
-            return { width: 96, height: 96, shadowRadius: 32 };
+            // Wolves are larger predators
+            return { width: 128, height: 128, shadowRadius: 40 };
         case 'CinderFox':
             // Foxes are larger
-            return { width: 112, height: 112, shadowRadius: 32 };
+            return { width: 128, height: 128, shadowRadius: 36 };
         case 'CableViper':
-            return { width: 72, height: 72, shadowRadius: 24 };
+            // Vipers are larger snakes
+            return { width: 96, height: 96, shadowRadius: 28 };
         case 'BeachCrab':
             return { width: 64, height: 64, shadowRadius: 20 };
         default:

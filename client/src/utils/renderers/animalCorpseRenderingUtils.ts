@@ -13,7 +13,7 @@ const SPRITE_SHEET_CONFIG = {
     sheetWidth: 320,
     sheetHeight: 320,
     sheetCols: 3,
-    sheetRows: 3,
+    sheetRows: 3, 
 };
 
 const FRAME_WIDTH = Math.floor(SPRITE_SHEET_CONFIG.sheetWidth / SPRITE_SHEET_CONFIG.sheetCols);
@@ -42,11 +42,11 @@ function getCorpseRenderSize(species: any): { width: number; height: number } {
         case 'ArcticWalrus':
             return { width: 128, height: 128 };
         case 'TundraWolf':
-            return { width: 96, height: 96 };
+            return { width: 128, height: 128 };
         case 'CinderFox':
-            return { width: 112, height: 112 };
+            return { width: 128, height: 128 };
         case 'CableViper':
-            return { width: 72, height: 72 };
+            return { width: 96, height: 96 };
         case 'BeachCrab':
             return { width: 64, height: 64 };
         default:
