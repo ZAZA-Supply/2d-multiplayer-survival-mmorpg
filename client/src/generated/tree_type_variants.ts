@@ -32,4 +32,5 @@ export type AleppoPine = { tag: "AleppoPine" };
 export type MannaAsh = { tag: "MannaAsh" };
 export type DownyOak = { tag: "DownyOak" };
 export type StonePine = { tag: "StonePine" };
+export type StonePine2 = { tag: "StonePine2" };
 

@@ -976,11 +976,11 @@ const ExternalContainerUI: React.FC<ExternalContainerUIProps> = ({
         // Async function to generate and cache the recipe
         const generateAndCacheRecipe = async () => {
             try {
-                // Generate recipe via Gemini API
+                // Generate recipe via Gemini API (with icon generation enabled)
                 const result = await generateFullBrewRecipe(
                     ingredientNames,
                     getIngredientRarities(ingredientNames),
-                    false // Skip icon generation for now (faster)
+                    true // Enable icon generation via Gemini
                 );
 
                 console.log('[AI Brewing] Recipe generated:', result.recipe.name);

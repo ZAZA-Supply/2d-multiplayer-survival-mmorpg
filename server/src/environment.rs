@@ -1074,16 +1074,22 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
                 
                 // Check if position is on a beach tile first
                 let tree_type = if is_position_on_beach_tile(ctx, pos_x, pos_y) {
-                    // If on beach tile, use StonePine
-                    crate::tree::TreeType::StonePine
+                    // If on beach tile, randomly choose between StonePine variants
+                    if tree_type_roll < 0.5 {
+                        crate::tree::TreeType::StonePine
+                    } else {
+                        crate::tree::TreeType::StonePine2
+                    }
                 } else {
                     // Otherwise, determine tree type with weighted probability using the passed-in roll
                     if tree_type_roll < 0.6 { // 60% chance for DownyOak
                         crate::tree::TreeType::DownyOak
                     } else if tree_type_roll < 0.8 { // 20% chance for AleppoPine
                         crate::tree::TreeType::AleppoPine
-                    } else { // 20% chance for MannaAsh
+                    } else if tree_type_roll < 0.86 { // 6% chance for MannaAsh (variant c - less common)
                         crate::tree::TreeType::MannaAsh
+                    } else { // 14% chance for MannaAsh2 (variant d - more common)
+                        crate::tree::TreeType::MannaAsh2
                     }
                 };
                 

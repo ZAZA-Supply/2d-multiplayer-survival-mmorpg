@@ -257,23 +257,19 @@ pub fn create_generated_brew(
         existing.id
     } else {
         // Create new ItemDefinition for the brew output
-        // Use generated icon or fallback to generic brew icon based on category
-        let icon_asset = match recipe_data.category.as_str() {
-            "healing_broth" => "generic_soup_icon.png",
-            "medicinal_tea" => "generic_tea_icon.png",
-            "alcoholic" => "generic_wine_icon.png",
-            "poison" => "generic_poison_icon.png",
-            "performance_enhancer" => "generic_potion_icon.png",
-            "nutritional_drink" => "generic_juice_icon.png",
-            _ => "generic_brew_icon.png",
-        };
+        // Use AI-generated base64 icon if available, otherwise empty string (client shows ? icon)
+        let icon_asset = icon_base64
+            .as_ref()
+            .filter(|s| !s.is_empty())
+            .cloned()
+            .unwrap_or_default();
         
         let new_item_def = ItemDefinition {
             id: 0, // Auto-inc
             name: recipe_data.name.clone(),
             description: recipe_data.description.clone(),
             category: ItemCategory::Consumable,
-            icon_asset_name: icon_asset.to_string(),
+            icon_asset_name: icon_asset,
             is_stackable: true,
             stack_size: 10,
             is_equippable: false,

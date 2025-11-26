@@ -1,10 +1,10 @@
 import { Tree } from '../../generated'; // Import generated types
-import aleppoPineImage from '../../assets/doodads/siberian_birch_b.png';
-import mannaAshImage from '../../assets/doodads/mountain_hemlock_b.png';
-import downyOakImage from '../../assets/doodads/sitka_spruce_b.png';
-import stonePineImage from '../../assets/doodads/sitka_alder_b.png'; // New import for stone pine
-// import treeOakImage from '../assets/doodads/tree.png'; // REMOVED
-// import treeStumpImage from '../assets/doodads/tree_stump.png'; // REMOVED
+import aleppoPineImage from '../../assets/doodads/siberian_birch_c.png';
+import mannaAshImage from '../../assets/doodads/mountain_hemlock_c.png';
+import mannaAshImage2 from '../../assets/doodads/mountain_hemlock_d.png';
+import downyOakImage from '../../assets/doodads/sitka_spruce_c.png';
+import stonePineImage from '../../assets/doodads/sitka_alder_c.png';
+import stonePineImage2 from '../../assets/doodads/sitka_alder_d.png';
 import { drawDynamicGroundShadow, calculateShakeOffsets } from './shadowUtils'; // Import shadow utils
 import { applyStandardDropShadow } from './shadowUtils'; // Import new shadow util
 import { GroundEntityConfig, renderConfiguredGroundEntity } from './genericGroundRenderer'; // Import generic renderer
@@ -45,6 +45,10 @@ function getCachedTreeTypeInfo(entity: Tree): { imageSource: string; targetWidth
                 imageSource = mannaAshImage;
                 targetWidth = 400; // 17% shorter than Sitka Spruce
                 break;
+            case 'MannaAsh2':
+                imageSource = mannaAshImage2;
+                targetWidth = 400; // Same size as MannaAsh variant A
+                break;
             case 'DownyOak':
                 imageSource = downyOakImage;
                 targetWidth = 480; // Full size (same as old uniform height)
@@ -52,6 +56,10 @@ function getCachedTreeTypeInfo(entity: Tree): { imageSource: string; targetWidth
             case 'StonePine':
                 imageSource = stonePineImage;
                 targetWidth = 360; // 25% shorter than Sitka Spruce
+                break;
+            case 'StonePine2':
+                imageSource = stonePineImage2;
+                targetWidth = 360; // Same size as StonePine variant A
                 break;
             default:
                 imageSource = downyOakImage;
@@ -244,9 +252,10 @@ const treeConfig: GroundEntityConfig<Tree> = {
 // Preload using the imported URL
 imageManager.preloadImage(aleppoPineImage);
 imageManager.preloadImage(mannaAshImage);
+imageManager.preloadImage(mannaAshImage2);
 imageManager.preloadImage(downyOakImage);
 imageManager.preloadImage(stonePineImage);
-// TODO: Preload other variants if added
+imageManager.preloadImage(stonePineImage2);
 
 // Refactored rendering function
 export function renderTree(

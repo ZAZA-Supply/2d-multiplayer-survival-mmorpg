@@ -680,6 +680,39 @@ export function getItemIcon(assetName: string | undefined | null): string {
         return errorIcon; // Return error icon if assetName is missing
     }
     
+    // Check for AI-generated base64 data URL icons first
+    // These are stored directly as data:image/png;base64,... or just the base64 string
+    if (assetName.startsWith('data:image/')) {
+        // Already a complete data URL, return as-is
+        return assetName;
+    }
+    
+    // Check if it's a raw base64 string (AI-generated icon)
+    // Common base64 image prefixes:
+    // PNG: iVBORw0KGgo (PNG magic bytes)
+    // JPEG: /9j/ (JPEG magic bytes)
+    // GIF: R0lGOD (GIF magic bytes)
+    // WebP: UklGR (RIFF header for WebP)
+    if (assetName.startsWith('iVBORw0KGgo')) {
+        return `data:image/png;base64,${assetName}`;
+    }
+    if (assetName.startsWith('/9j/')) {
+        return `data:image/jpeg;base64,${assetName}`;
+    }
+    if (assetName.startsWith('R0lGOD')) {
+        return `data:image/gif;base64,${assetName}`;
+    }
+    if (assetName.startsWith('UklGR')) {
+        return `data:image/webp;base64,${assetName}`;
+    }
+    
+    // Generic check for very long strings that look like base64 (likely AI-generated icons)
+    // Base64 encoded images are typically 1000+ characters and contain only base64 chars
+    if (assetName.length > 500 && /^[A-Za-z0-9+/=]+$/.test(assetName)) {
+        console.log('[ItemIconUtils] Detected likely base64 image data, assuming PNG');
+        return `data:image/png;base64,${assetName}`;
+    }
+    
     const iconPath = iconMap[assetName];
     if (iconPath) {
         return iconPath; // Return exact match if found
@@ -691,7 +724,7 @@ export function getItemIcon(assetName: string | undefined | null): string {
         return mushroomSporeIcon; // All spores use the same icon
     }
     
-    // No match found
+    // No match found - use error icon
     console.log(`[ItemIconUtils] No icon found in map for '${assetName}', returning errorIcon`);
     return errorIcon;
 }

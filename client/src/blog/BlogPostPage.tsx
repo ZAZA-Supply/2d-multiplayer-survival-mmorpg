@@ -169,7 +169,7 @@ function BlogPostPage() {
       "name": "Broth & Bullets",
       "logo": {
         "@type": "ImageObject",
-        "url": "/images/blog/logo.png"
+        "url": "/images/blog/logo_new.png"
       }
     },
     "description": subtitle,

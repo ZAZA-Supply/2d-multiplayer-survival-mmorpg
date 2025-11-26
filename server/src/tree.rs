@@ -34,9 +34,11 @@ pub(crate) const MAX_TREE_RESPAWN_TIME_SECS: u64 = 1200; // 20 minutes
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, SpacetimeType)]
 pub enum TreeType {
     AleppoPine,
-    MannaAsh,
+    MannaAsh,   // Variant A (mountain_hemlock_c) - less common
+    MannaAsh2,  // Variant B (mountain_hemlock_d) - more common
     DownyOak,
-    StonePine, // New variant for trees that spawn on beach tiles
+    StonePine,  // Variant A for trees that spawn on beach tiles
+    StonePine2, // Variant B for trees that spawn on beach tiles
 }
 
 #[spacetimedb::table(name = tree, public)]

@@ -413,10 +413,10 @@ Return a JSON object with these exact fields:
   }
 });
 
-// Gemini Icon Generation (using Imagen via Gemini)
+// Gemini Icon Generation (using Imagen 3 via REST API for best results)
 app.post('/api/gemini/icon', async (req, res) => {
   try {
-    if (!genAI || !GEMINI_API_KEY) {
+    if (!GEMINI_API_KEY) {
       return res.status(500).json({ error: 'Gemini API key not configured' });
     }
 
@@ -428,20 +428,53 @@ app.post('/api/gemini/icon', async (req, res) => {
 
     console.log(`[Proxy] Gemini icon request: ${subject}`);
 
-    // Pixel art prompt template
-    const iconPrompt = `A pixel art style ${subject} with consistent pixel width and clean black outlines, designed as a game item icon. Rendered with a transparent background, PNG format. The object should have a clear silhouette, sharp pixel-level detail, and fit naturally in a top-down RPG game like Secret of Mana. No background, no shadows outside the object. Stylized with a warm palette and light dithering where appropriate. 64x64 pixels.`;
+    // Concise pixel art prompt - Imagen works better with simpler prompts
+    const iconPrompt = `Pixel art game icon of ${subject}, 64x64, transparent background, clean black outlines, top-down RPG style, warm colors`;
 
-    // Use Gemini's imagen model for image generation
-    // Note: As of the SDK version, we use gemini-2.0-flash-exp for image generation
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.0-flash-exp',
+    // Try Imagen 3 first (best for image generation)
+    try {
+      const imagenResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instances: [{ prompt: iconPrompt }],
+            parameters: {
+              sampleCount: 1,
+              aspectRatio: '1:1',
+              outputOptions: { mimeType: 'image/png' }
+            }
+          })
+        }
+      );
+
+      if (imagenResponse.ok) {
+        const imagenData = await imagenResponse.json() as { predictions?: Array<{ bytesBase64Encoded?: string }> };
+        const predictions = imagenData.predictions || [];
+        if (predictions.length > 0 && predictions[0].bytesBase64Encoded) {
+          console.log(`[Proxy] Generated icon via Imagen 3 successfully`);
+          return res.json({
+            icon_base64: predictions[0].bytesBase64Encoded,
+            mime_type: 'image/png',
+          });
+        }
+      } else {
+        const errorText = await imagenResponse.text();
+        console.log(`[Proxy] Imagen 3 not available (${imagenResponse.status}), trying Gemini fallback: ${errorText.substring(0, 100)}`);
+      }
+    } catch (imagenError: any) {
+      console.log(`[Proxy] Imagen 3 error, trying Gemini fallback: ${imagenError.message}`);
+    }
+
+    // Fallback to Gemini 2.0 Flash with image generation
+    const model = genAI!.getGenerativeModel({ 
+      model: 'gemini-2.0-flash',
       generationConfig: {
         temperature: 0.4,
       },
     });
 
-    // Try to generate image using Gemini's multimodal capabilities
-    // If image generation isn't available, fall back to a description
     try {
       const result = await model.generateContent({
         contents: [{
