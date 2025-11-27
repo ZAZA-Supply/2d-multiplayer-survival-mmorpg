@@ -129,7 +129,7 @@ pub fn get_animal_loot_chances(animal_species: AnimalSpecies) -> (f64, f64, f64,
         AnimalSpecies::TundraWolf => (0.70, 0.50, 0.60, 0.80), // Good fat and bone, decent cloth (pelt), good meat
         AnimalSpecies::CableViper => (0.30, 0.20, 0.90, 0.40), // Low fat/cloth, very high bone (scales), some meat
         AnimalSpecies::ArcticWalrus => (0.85, 0.95, 0.65, 0.75), // Very high fat (blubber), excellent hide, good bone, good meat
-        AnimalSpecies::BeachCrab => (0.0, 0.0, 0.0, 0.85), // No fat/cloth/bone - just meat (high chance)
+        AnimalSpecies::BeachCrab => (0.0, 0.0, 0.30, 1.0), // No fat/cloth, some bone (shell fragments), guaranteed meat
         AnimalSpecies::Tern => (0.15, 0.60, 0.20, 0.50), // Low fat, good feathers, some bone, decent meat
         AnimalSpecies::Crow => (0.10, 0.50, 0.15, 0.45), // Low fat, feathers, low bone, some meat
     }
@@ -296,7 +296,13 @@ pub fn get_harvest_loot(
         loot.push(("Animal Bone".to_string(), base_quantity));
     }
     
-    if rng.gen_bool(actual_meat_chance) {
+    // Special case: Crabs are a beginner food source - guarantee at least 1 meat per harvest
+    if animal_species == AnimalSpecies::BeachCrab {
+        // Crabs always drop at least 1 meat, with chance for more based on tool
+        let meat_quantity = if rng.gen_bool(actual_meat_chance) { base_quantity.max(1) } else { 1 };
+        let meat_type = get_meat_type(animal_species);
+        loot.push((meat_type.to_string(), meat_quantity));
+    } else if rng.gen_bool(actual_meat_chance) {
         let meat_type = get_meat_type(animal_species);
         loot.push((meat_type.to_string(), base_quantity));
     }

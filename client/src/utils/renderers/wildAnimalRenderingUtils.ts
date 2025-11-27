@@ -163,11 +163,11 @@ function getSpeciesRenderingProps(species: AnimalSpecies) {
         case 'BeachCrab':
             return { width: 64, height: 64, shadowRadius: 20 };
         case 'Tern':
-            // Terns are small-medium coastal birds
-            return { width: 72, height: 72, shadowRadius: 22 };
+            // Terns are medium-sized coastal birds
+            return { width: 96, height: 96, shadowRadius: 28 };
         case 'Crow':
-            // Crows are small-medium inland birds
-            return { width: 64, height: 64, shadowRadius: 20 };
+            // Crows are medium-sized inland birds
+            return { width: 88, height: 88, shadowRadius: 26 };
         default:
             return { width: 96, height: 96, shadowRadius: 32 };
     }

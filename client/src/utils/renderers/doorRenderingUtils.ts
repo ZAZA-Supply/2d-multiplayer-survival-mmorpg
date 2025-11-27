@@ -81,7 +81,8 @@ export const renderDoor = ({
   let drawX = door.posX - drawWidth / 2;
   let drawY = door.posY - drawHeight / 2 - 44; // Offset 44px up to align with foundation
 
-  // Calculate transparency for SOUTH doors when player is behind them (similar to trees/south walls)
+  // Calculate transparency for SOUTH doors when player is behind them (similar to trees/walls)
+  // South door: player is "behind" when NORTH of the door (player.y < door.y)
   const MIN_ALPHA = 0.3;
   const MAX_ALPHA = 1.0;
   let doorAlpha = MAX_ALPHA;
@@ -105,8 +106,8 @@ export const renderDoor = ({
     const overlapsHorizontally = playerRight > doorLeft && playerLeft < doorRight;
     const overlapsVertically = playerBottom > doorTop && playerTop < doorBottom;
     
-    // South door: player is behind if player.y > door.posY (player is south of door)
-    const isPlayerBehind = localPlayerPosition.y > door.posY;
+    // South door: player is behind if player.y < door.posY (player is NORTH of door, looking south)
+    const isPlayerBehind = localPlayerPosition.y < door.posY;
     
     if (overlapsHorizontally && overlapsVertically && isPlayerBehind) {
       // Calculate depth difference for smooth fade

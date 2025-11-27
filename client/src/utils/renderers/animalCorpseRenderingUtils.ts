@@ -7,6 +7,8 @@ import foxWalkingSheet from '../../assets/fox_walking.png';
 import crabWalkingSheet from '../../assets/crab_walking.png';
 import tundraWolfWalkingSheet from '../../assets/tundra_wolf_walking.png';
 import cableViperWalkingSheet from '../../assets/cable_viper_walking.png';
+import ternWalkingSheet from '../../assets/tern_walking.png';
+import crowWalkingSheet from '../../assets/crow_walking.png';
 
 // Sprite sheet configuration (must match wildAnimalRenderingUtils)
 const SPRITE_SHEET_CONFIG = {
@@ -34,6 +36,8 @@ const speciesSpriteSheets: Record<string, string> = {
     'CableViper': cableViperWalkingSheet,
     'ArcticWalrus': walrusWalkingSheet,
     'BeachCrab': crabWalkingSheet,
+    'Tern': ternWalkingSheet,
+    'Crow': crowWalkingSheet,
 };
 
 // Get corpse render size based on species (match live animal sizes)
@@ -49,6 +53,10 @@ function getCorpseRenderSize(species: any): { width: number; height: number } {
             return { width: 96, height: 96 };
         case 'BeachCrab':
             return { width: 64, height: 64 };
+        case 'Tern':
+            return { width: 96, height: 96 }; // Medium-sized coastal bird
+        case 'Crow':
+            return { width: 88, height: 88 }; // Medium-sized inland bird
         default:
             return { width: 96, height: 96 };
     }

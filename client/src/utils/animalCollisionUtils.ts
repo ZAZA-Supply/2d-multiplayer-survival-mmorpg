@@ -14,8 +14,8 @@ export const ANIMAL_COLLISION_SIZES = {
   CableViper: { width: 80, height: 48 },
   ArcticWalrus: { width: 96, height: 96 },
   BeachCrab: { width: 64, height: 48 }, // Small crab - compact collision box
-  Tern: { width: 56, height: 40 }, // Small-medium coastal bird
-  Crow: { width: 48, height: 36 }, // Small inland bird
+  Tern: { width: 72, height: 56 }, // Medium-sized coastal bird
+  Crow: { width: 64, height: 48 }, // Medium-sized inland bird
 } as const;
 
 // Default collision size for unknown species

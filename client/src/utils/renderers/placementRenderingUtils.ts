@@ -837,32 +837,46 @@ export function renderPlacementPreview({
                 foundationTileImagesRef,
             });
         } else if (buildingState.mode === BuildingMode.Wall) {
-            const isValid = isWallPlacementValid(
-                connection,
-                cellX,
-                cellY,
-                worldMouseX,
-                worldMouseY,
-                localPlayerX,
-                localPlayerY,
-                inventoryItems,
-                itemDefinitions
-            );
+            // First check if there's a foundation at this cell - don't render wall preview without one
+            let hasFoundation = false;
+            if (connection) {
+                for (const foundation of connection.db.foundationCell.iter()) {
+                    if (foundation.cellX === cellX && foundation.cellY === cellY && !foundation.isDestroyed) {
+                        hasFoundation = true;
+                        break;
+                    }
+                }
+            }
 
-            renderWallPreview({
-                ctx,
-                cellX: cellX,
-                cellY: cellY,
-                worldMouseX,
-                worldMouseY,
-                tier: buildingState.buildingTier,
-                isValid,
-                worldScale,
-                viewOffsetX,
-                viewOffsetY,
-                foundationTileImagesRef,
-                connection, // ADDED: Pass connection to check foundation shape
-            });
+            // Only render wall preview if there's a foundation to snap to
+            if (hasFoundation) {
+                const isValid = isWallPlacementValid(
+                    connection,
+                    cellX,
+                    cellY,
+                    worldMouseX,
+                    worldMouseY,
+                    localPlayerX,
+                    localPlayerY,
+                    inventoryItems,
+                    itemDefinitions
+                );
+
+                renderWallPreview({
+                    ctx,
+                    cellX: cellX,
+                    cellY: cellY,
+                    worldMouseX,
+                    worldMouseY,
+                    tier: buildingState.buildingTier,
+                    isValid,
+                    worldScale,
+                    viewOffsetX,
+                    viewOffsetY,
+                    foundationTileImagesRef,
+                    connection, // ADDED: Pass connection to check foundation shape
+                });
+            }
         }
         return; // Building preview rendered, exit early
     }
