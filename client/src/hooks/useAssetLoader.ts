@@ -15,12 +15,6 @@ import burlapSackUrl from '../assets/items/burlap_sack.png';
 import deathMarkerUrl from '../assets/items/death_marker.png';
 import shelterSpritePath from '../assets/doodads/shelter_b.png';
 
-// Import animal images for corpse rendering
-import cinderFoxImg from '../assets/cinder_fox2.png';
-import tundraWolfImg from '../assets/tundra_wolf.png';
-import cableViperImg from '../assets/cable_viper.png';
-import walrusImg from '../assets/walrus2.png';
-
 // Import cloud image paths
 import cloud1Texture from '../assets/environment/clouds/cloud1.png';
 import cloud2Texture from '../assets/environment/clouds/cloud2.png';
@@ -62,9 +56,9 @@ export function useAssetLoader(): AssetLoaderResult {
   const cloudImagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const shelterImageRef = useRef<HTMLImageElement | null>(null);
 
-  useEffect(() => {
+    useEffect(() => {
     let loadedCount = 0;
-    const totalStaticAssets = 6 + 5 + 1 + 4 + 1 + 1 + 2; // hero images (6) + clouds (5) + shelter (1) + animal corpse images (4) + grass (1) + campfire (1) + burlap/death (2) = 20 total
+    const totalStaticAssets = 6 + 5 + 1 + 1 + 1 + 2; // hero images (6) + clouds (5) + shelter (1) + grass (1) + campfire (1) + burlap/death (2) = 16 total
     
     // Count total item icons to preload
     const itemIconEntries = Object.entries(itemIcons).filter(([key, iconPath]) => iconPath);
@@ -131,34 +125,6 @@ export function useAssetLoader(): AssetLoaderResult {
       checkLoadingComplete();
     };
     shelterImg.src = shelterSpritePath;
-
-    // Preload animal corpse images using ImageManager
-    console.log('[useAssetLoader] Preloading animal corpse images via ImageManager...');
-    const animalImages = [
-      { name: 'cinder_fox', src: cinderFoxImg },
-      { name: 'tundra_wolf', src: tundraWolfImg },
-      { name: 'cable_viper', src: cableViperImg },
-      { name: 'walrus', src: walrusImg }
-    ];
-    
-    animalImages.forEach(({ name, src }) => {
-      // Preload with ImageManager for in-game access
-      imageManager.preloadImage(src);
-      
-      // Also count towards our loading completion
-      const img = new Image();
-      img.onload = () => {
-        console.log(`[useAssetLoader] Successfully preloaded animal image: ${name}`);
-        loadedCount++;
-        checkLoadingComplete();
-      };
-      img.onerror = () => {
-        console.error(`Failed to preload animal image: ${name} -> ${src}`);
-        loadedCount++;
-        checkLoadingComplete();
-      };
-      img.src = src;
-    });
 
     // Preload ALL item icons using ImageManager - this blocks completion until done
     console.log('[useAssetLoader] Preloading item icons via ImageManager...');
