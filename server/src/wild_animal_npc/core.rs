@@ -883,7 +883,71 @@ fn execute_animal_movement(
             handle_tamed_protecting(ctx, animal, stats, current_time, dt, rng);
         },
         
-        _ => {} // Other states don't move
+        // ============================================================
+        // BIRD-SPECIFIC STATES - Handle Flying, Grounded, Scavenging, Stealing
+        // ============================================================
+        
+        AnimalState::Flying => {
+            // Flying birds - use execute_patrol_logic which handles flying internally
+            behavior.execute_patrol_logic(ctx, animal, stats, dt, rng);
+        },
+        
+        AnimalState::FlyingChase => {
+            // Flying chase toward a target
+            is_sprinting = true;
+            if let (Some(target_x), Some(target_y)) = (animal.investigation_x, animal.investigation_y) {
+                execute_flying_chase(ctx, animal, stats, target_x, target_y, dt);
+            } else if let Some(target_id) = animal.target_player_id {
+                if let Some(target_player) = ctx.db.player().identity().find(&target_id) {
+                    execute_flying_chase(ctx, animal, stats, target_player.position_x, target_player.position_y, dt);
+                }
+            }
+        },
+        
+        AnimalState::Grounded => {
+            // Grounded birds - walk around or take off
+            execute_grounded_idle(ctx, animal, stats, dt, rng);
+        },
+        
+        AnimalState::Scavenging => {
+            // Terns scavenging dropped items - fly/walk toward investigation target
+            if let (Some(target_x), Some(target_y)) = (animal.investigation_x, animal.investigation_y) {
+                let distance_sq = get_distance_squared(animal.pos_x, animal.pos_y, target_x, target_y);
+                
+                if animal.is_flying {
+                    // Fly toward item
+                    execute_flying_chase(ctx, animal, stats, target_x, target_y, dt);
+                } else if distance_sq > 100.0 * 100.0 {
+                    // Too far - take off and fly
+                    animal.is_flying = true;
+                    execute_flying_chase(ctx, animal, stats, target_x, target_y, dt);
+                } else {
+                    // Walk toward item on ground
+                    move_towards_target(ctx, animal, target_x, target_y, stats.movement_speed, dt);
+                }
+            } else {
+                // No target - return to patrol
+                behavior.execute_patrol_logic(ctx, animal, stats, dt, rng);
+            }
+        },
+        
+        AnimalState::Stealing => {
+            // Crows stealing from players - fly toward target
+            if let (Some(target_x), Some(target_y)) = (animal.investigation_x, animal.investigation_y) {
+                animal.is_flying = true;
+                execute_flying_chase(ctx, animal, stats, target_x, target_y, dt);
+            } else if let Some(target_id) = animal.target_player_id {
+                if let Some(target_player) = ctx.db.player().identity().find(&target_id) {
+                    animal.is_flying = true;
+                    execute_flying_chase(ctx, animal, stats, target_player.position_x, target_player.position_y, dt);
+                }
+            } else {
+                // No target - return to patrol
+                behavior.execute_patrol_logic(ctx, animal, stats, dt, rng);
+            }
+        },
+        
+        _ => {} // Other states (Attacking, Hiding, Burrowed) don't move continuously
     }
 
     // Keep animal within world bounds
@@ -2580,13 +2644,13 @@ pub fn execute_standard_flee(
 // ============================================================================
 
 /// Flying patrol constants
-const FLYING_PATROL_MIN_DISTANCE: f32 = 400.0;  // Minimum distance to fly when patrolling
-const FLYING_PATROL_MAX_DISTANCE: f32 = 1200.0; // Maximum distance to fly when patrolling
-const FLYING_SPEED_MULTIPLIER: f32 = 2.5;       // Birds fly much faster than they walk
+const FLYING_PATROL_MIN_DISTANCE: f32 = 200.0;  // Minimum distance to fly when patrolling (reduced for more frequent landings)
+const FLYING_PATROL_MAX_DISTANCE: f32 = 600.0;  // Maximum distance to fly when patrolling (reduced)
+const FLYING_SPEED_MULTIPLIER: f32 = 2.0;       // Birds fly faster than they walk (reduced for better visuals)
 const FLYING_HEIGHT_VISUAL: f32 = 32.0;         // Visual height offset for flying birds (not actual collision)
-const GROUNDED_CIRCLE_RADIUS: f32 = 30.0;       // Small circle radius for grounded birds
-const CHANCE_TO_LAND: f32 = 0.02;               // 2% chance per tick to land while flying
-const CHANCE_TO_TAKE_OFF: f32 = 0.05;           // 5% chance per tick to take off while grounded
+const GROUNDED_PATROL_RADIUS: f32 = 120.0;      // Walking patrol radius for grounded birds (much larger!)
+const CHANCE_TO_LAND: f32 = 0.08;               // 8% chance per tick to land while flying (up from 2%)
+const CHANCE_TO_TAKE_OFF: f32 = 0.03;           // 3% chance per tick to take off while grounded (down from 5%)
 
 /// **FLYING PATROL** - Birds fly vast distances around the island
 /// This is the primary patrol behavior for birds - they spend most of their time flying
@@ -2668,7 +2732,7 @@ pub fn execute_flying_patrol(
     }
 }
 
-/// **GROUNDED IDLE** - Birds on the ground either stay still or walk in tiny circles
+/// **GROUNDED PATROL** - Birds on the ground walk around and patrol like other animals
 pub fn execute_grounded_idle(
     ctx: &ReducerContext,
     animal: &mut WildAnimal,
@@ -2679,7 +2743,7 @@ pub fn execute_grounded_idle(
     // Ensure bird is not flying
     animal.is_flying = false;
     
-    // Random chance to take off
+    // Random chance to take off (lower chance so they spend more time walking)
     if rng.gen::<f32>() < CHANCE_TO_TAKE_OFF {
         animal.is_flying = true;
         animal.state = AnimalState::Flying;
@@ -2689,24 +2753,67 @@ pub fn execute_grounded_idle(
         return;
     }
     
-    // 70% stay still, 30% walk in tiny circle
-    if rng.gen::<f32>() < 0.30 {
-        // Walk in tiny circle around spawn/landing position
-        let circle_angle = rng.gen::<f32>() * 2.0 * PI;
-        let circle_distance = rng.gen::<f32>() * GROUNDED_CIRCLE_RADIUS;
+    // Use flying_target as walking destination while grounded
+    // This gives birds proper patrol movement like other animals
+    if animal.flying_target_x.is_none() || animal.flying_target_y.is_none() {
+        // Pick a new walking destination around current position
+        let walk_angle = rng.gen::<f32>() * 2.0 * PI;
+        let walk_distance = 30.0 + rng.gen::<f32>() * GROUNDED_PATROL_RADIUS;
         
-        let target_x = animal.spawn_x + circle_distance * circle_angle.cos();
-        let target_y = animal.spawn_y + circle_distance * circle_angle.sin();
+        let target_x = animal.pos_x + walk_distance * walk_angle.cos();
+        let target_y = animal.pos_y + walk_distance * walk_angle.sin();
         
-        // Slow walking speed on ground
-        let ground_speed = stats.movement_speed * 0.3;
+        // Clamp to world bounds and check for obstacles
+        let clamped_x = target_x.clamp(50.0, WORLD_WIDTH_PX - 50.0);
+        let clamped_y = target_y.clamp(50.0, WORLD_HEIGHT_PX - 50.0);
         
-        // Check for obstacles before moving
-        if !is_water_tile(ctx, target_x, target_y) && !is_position_in_shelter(ctx, target_x, target_y) {
-            move_towards_target(ctx, animal, target_x, target_y, ground_speed, dt);
+        // Only set target if position is valid (not water, not in shelter)
+        if !is_water_tile(ctx, clamped_x, clamped_y) && !is_position_in_shelter(ctx, clamped_x, clamped_y) {
+            animal.flying_target_x = Some(clamped_x);
+            animal.flying_target_y = Some(clamped_y);
+            log::debug!("{:?} {} set grounded patrol target to ({:.0}, {:.0})", 
+                       animal.species, animal.id, clamped_x, clamped_y);
         }
     }
-    // Otherwise stay still (do nothing)
+    
+    // Walk toward destination
+    if let (Some(target_x), Some(target_y)) = (animal.flying_target_x, animal.flying_target_y) {
+        // Ground walking speed - reasonable pace
+        let ground_speed = stats.movement_speed * 0.7;
+        
+        let distance_sq = get_distance_squared(animal.pos_x, animal.pos_y, target_x, target_y);
+        
+        if distance_sq > 20.0 * 20.0 {
+            // Check if target is still valid
+            if is_water_tile(ctx, target_x, target_y) || is_position_in_shelter(ctx, target_x, target_y) {
+                // Destination became invalid - clear it
+                animal.flying_target_x = None;
+                animal.flying_target_y = None;
+            } else {
+                // Walk toward target
+                move_towards_target(ctx, animal, target_x, target_y, ground_speed, dt);
+            }
+        } else {
+            // Reached destination - clear it and maybe take off
+            animal.flying_target_x = None;
+            animal.flying_target_y = None;
+            
+            // Small chance to take off after reaching destination
+            if rng.gen::<f32>() < 0.15 {
+                animal.is_flying = true;
+                animal.state = AnimalState::Flying;
+                log::debug!("{:?} {} took off after reaching walking destination", animal.species, animal.id);
+            }
+        }
+    } else {
+        // No destination and couldn't set one - maybe just pause briefly
+        // (10% chance to try taking off instead of being stuck)
+        if rng.gen::<f32>() < 0.10 {
+            animal.is_flying = true;
+            animal.state = AnimalState::Flying;
+            log::debug!("{:?} {} took off (couldn't find valid walking destination)", animal.species, animal.id);
+        }
+    }
 }
 
 /// **FLYING CHASE** - Birds aggressively fly-chase players for food/items

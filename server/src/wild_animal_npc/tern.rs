@@ -72,10 +72,10 @@ impl AnimalBehavior for TernBehavior {
     ) -> Result<f32, String> {
         let damage = stats.attack_damage;
         
-        // Terns peck and then fly away - they're not fighters
-        set_flee_destination_away_from_threat(animal, target_player.position_x, target_player.position_y, 300.0, rng);
-        transition_to_state(animal, AnimalState::Flying, current_time, None, "tern flee after peck");
+        // Terns peck and then flee (use Fleeing state so movement system handles it)
         animal.is_flying = true;
+        set_flee_destination_away_from_threat(animal, target_player.position_x, target_player.position_y, 300.0, rng);
+        transition_to_state(animal, AnimalState::Fleeing, current_time, None, "tern flee after peck");
         
         log::info!("Tern {} pecked player {} for {:.1} damage and flew away", 
                   animal.id, target_player.identity, damage);
@@ -94,16 +94,11 @@ impl AnimalBehavior for TernBehavior {
     ) -> Result<(), String> {
         match animal.state {
             AnimalState::Patrolling | AnimalState::Flying => {
-                // Default flying patrol for terns
-                if !animal.is_flying {
-                    // Take off if not flying
-                    animal.is_flying = true;
-                    transition_to_state(animal, AnimalState::Flying, current_time, None, "tern takeoff");
-                }
+                // Terns can be either flying or grounded - don't force takeoff
                 
                 // Check for dropped items to scavenge (only if not already carrying)
                 if animal.held_item_name.is_none() {
-                    if let Some((item_id, item_x, item_y)) = find_nearby_dropped_item(ctx, animal.pos_x, animal.pos_y) {
+                    if let Some((_item_id, item_x, item_y)) = find_nearby_dropped_item(ctx, animal.pos_x, animal.pos_y) {
                         // Found a dropped item - go scavenge it
                         animal.investigation_x = Some(item_x);
                         animal.investigation_y = Some(item_y);
@@ -114,40 +109,45 @@ impl AnimalBehavior for TernBehavior {
                 
                 // Alert other animals when detecting a player
                 if let Some(player) = detected_player {
-                    // Emit alert screech
-                    emit_species_sound(ctx, animal, player.identity, "alert");
-                    alert_nearby_animals(ctx, animal, player, current_time);
+                    let distance = get_player_distance(animal, player);
+                    
+                    // If player is close, flee
+                    if distance < 150.0 {
+                        animal.is_flying = true;
+                        set_flee_destination_away_from_threat(animal, player.position_x, player.position_y, 400.0, rng);
+                        transition_to_state(animal, AnimalState::Fleeing, current_time, None, "flee from nearby player");
+                        log::debug!("Tern {} fleeing from nearby player", animal.id);
+                    } else {
+                        // Emit alert screech to warn other animals
+                        emit_species_sound(ctx, animal, player.identity, "alert");
+                        alert_nearby_animals(ctx, animal, player, current_time);
+                    }
                 }
             },
             
             AnimalState::Grounded => {
-                // Random chance to take off
-                if rng.gen::<f32>() < 0.03 { // 3% chance per tick
-                    animal.is_flying = true;
-                    transition_to_state(animal, AnimalState::Flying, current_time, None, "tern takeoff");
-                }
-                
                 // Check for nearby dropped items while grounded
                 if animal.held_item_name.is_none() {
-                    if let Some((item_id, item_x, item_y)) = find_nearby_dropped_item(ctx, animal.pos_x, animal.pos_y) {
+                    if let Some((_item_id, item_x, item_y)) = find_nearby_dropped_item(ctx, animal.pos_x, animal.pos_y) {
                         animal.investigation_x = Some(item_x);
                         animal.investigation_y = Some(item_y);
                         transition_to_state(animal, AnimalState::Scavenging, current_time, None, "found dropped item grounded");
                     }
                 }
                 
-                // Alert if player detected
+                // Check for nearby players - flee if too close
                 if let Some(player) = detected_player {
                     let distance = get_player_distance(animal, player);
                     if distance < 150.0 {
                         // Too close! Take off and flee
                         animal.is_flying = true;
                         set_flee_destination_away_from_threat(animal, player.position_x, player.position_y, 400.0, rng);
-                        transition_to_state(animal, AnimalState::Flying, current_time, None, "flee from player");
+                        transition_to_state(animal, AnimalState::Fleeing, current_time, None, "flee from player");
                     } else {
                         alert_nearby_animals(ctx, animal, player, current_time);
                     }
                 }
+                // Normal grounded behavior handled by core movement system
             },
             
             AnimalState::Scavenging => {
@@ -163,24 +163,21 @@ impl AnimalBehavior for TernBehavior {
                             log::info!("Tern {} picked up {} x{}", animal.id, item_name, quantity);
                         }
                         
-                        // Return to flying patrol after scavenging attempt
+                        // Return to patrol after scavenging attempt
                         animal.investigation_x = None;
                         animal.investigation_y = None;
+                        transition_to_state(animal, AnimalState::Patrolling, current_time, None, "scavenge complete");
+                    } else if distance_sq > 150.0 * 150.0 {
+                        // Far from item - take off to fly there
                         animal.is_flying = true;
-                        transition_to_state(animal, AnimalState::Flying, current_time, None, "scavenge complete");
-                    } else {
-                        // Fly toward the item if far away, walk if close
-                        if distance_sq > 100.0 * 100.0 {
-                            animal.is_flying = true;
-                        }
                     }
+                    // Movement handled by core movement system
                 } else {
                     // No target - return to patrol
-                    animal.is_flying = true;
-                    transition_to_state(animal, AnimalState::Flying, current_time, None, "no scavenge target");
+                    transition_to_state(animal, AnimalState::Patrolling, current_time, None, "no scavenge target");
                 }
                 
-                // Still alert other animals if player detected
+                // Flee if player gets too close while scavenging
                 if let Some(player) = detected_player {
                     let distance = get_player_distance(animal, player);
                     if distance < 100.0 {
@@ -189,28 +186,15 @@ impl AnimalBehavior for TernBehavior {
                         animal.investigation_y = None;
                         animal.is_flying = true;
                         set_flee_destination_away_from_threat(animal, player.position_x, player.position_y, 400.0, rng);
-                        transition_to_state(animal, AnimalState::Flying, current_time, None, "abort scavenge flee");
+                        transition_to_state(animal, AnimalState::Fleeing, current_time, None, "abort scavenge flee");
                     }
                 }
             },
             
             AnimalState::Fleeing => {
-                // Terns flee by flying
-                if !animal.is_flying {
-                    animal.is_flying = true;
-                }
-                
-                // Check if fled far enough
-                if let (Some(target_x), Some(target_y)) = (animal.investigation_x, animal.investigation_y) {
-                    let distance_sq = get_distance_squared(animal.pos_x, animal.pos_y, target_x, target_y);
-                    
-                    if distance_sq < 50.0 * 50.0 {
-                        // Reached flee destination - return to flying patrol
-                        animal.investigation_x = None;
-                        animal.investigation_y = None;
-                        transition_to_state(animal, AnimalState::Flying, current_time, None, "flee complete");
-                    }
-                }
+                // Terns always flee by flying
+                animal.is_flying = true;
+                // Flee logic handled by execute_flee_logic and core movement system
             },
             
             _ => {} // Other states handled by core system
@@ -228,22 +212,30 @@ impl AnimalBehavior for TernBehavior {
         current_time: Timestamp,
         rng: &mut impl Rng,
     ) {
-        // Terns flee by flying - use flying chase mechanics toward flee destination
+        // Terns always flee by flying
         animal.is_flying = true;
         
         if let (Some(target_x), Some(target_y)) = (animal.investigation_x, animal.investigation_y) {
+            // Fly toward flee destination at high speed
             execute_flying_chase(ctx, animal, stats, target_x, target_y, dt);
             
             // Check if reached destination
             let distance_sq = get_distance_squared(animal.pos_x, animal.pos_y, target_x, target_y);
-            if distance_sq < 50.0 * 50.0 {
+            if distance_sq < 60.0 * 60.0 {
+                // Reached flee destination - return to patrol
                 animal.investigation_x = None;
                 animal.investigation_y = None;
-                transition_to_state(animal, AnimalState::Flying, current_time, None, "flee complete");
+                animal.target_player_id = None;
+                transition_to_state(animal, AnimalState::Patrolling, current_time, None, "tern flee complete");
+                log::debug!("Tern {} finished fleeing, returning to patrol", animal.id);
             }
         } else {
-            // No flee destination - just fly in random direction
-            execute_flying_patrol(ctx, animal, stats, dt, rng);
+            // No flee destination - set one in random direction and keep fleeing
+            let flee_angle = rng.gen::<f32>() * 2.0 * PI;
+            let flee_distance = 350.0 + rng.gen::<f32>() * 250.0;
+            animal.investigation_x = Some(animal.pos_x + flee_distance * flee_angle.cos());
+            animal.investigation_y = Some(animal.pos_y + flee_distance * flee_angle.sin());
+            log::debug!("Tern {} set new flee destination", animal.id);
         }
     }
 
@@ -255,8 +247,8 @@ impl AnimalBehavior for TernBehavior {
         dt: f32,
         rng: &mut impl Rng,
     ) {
-        // Terns patrol by flying
-        if animal.is_flying || animal.state == AnimalState::Flying {
+        // Terns can patrol both flying and grounded
+        if animal.is_flying {
             execute_flying_patrol(ctx, animal, stats, dt, rng);
         } else {
             execute_grounded_idle(ctx, animal, stats, dt, rng);
@@ -283,9 +275,10 @@ impl AnimalBehavior for TernBehavior {
             drop_held_item(ctx, animal, current_time);
         }
         
+        // Use Fleeing state so the core movement system handles flight
         animal.is_flying = true;
         set_flee_destination_away_from_threat(animal, attacker.position_x, attacker.position_y, 500.0, rng);
-        transition_to_state(animal, AnimalState::Flying, current_time, None, "tern flee damage");
+        transition_to_state(animal, AnimalState::Fleeing, current_time, None, "tern flee damage");
         
         log::info!("Tern {} fleeing after damage from {}", animal.id, attacker.identity);
         

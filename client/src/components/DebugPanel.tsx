@@ -6,6 +6,7 @@ import springIcon from '../assets/ui/spring.png';
 import summerIcon from '../assets/ui/summer.png';
 import autumnIcon from '../assets/ui/autumn.png';
 import winterIcon from '../assets/ui/winter.png';
+import clockIcon from '../assets/ui/clock.png';
 
 interface DebugPanelProps {
     localPlayer: any;
@@ -440,10 +441,19 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ localPlayer, worldState, connec
                                 fontFamily: 'inherit',
                                 letterSpacing: '0.5px',
                                 flex: 1,
-                                textAlign: 'center'
+                                textAlign: 'center',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px'
                             }}
                         >
-                            🕐 {worldState?.timeOfDay?.tag || 'UNKNOWN'}
+                            <img 
+                                src={clockIcon} 
+                                alt="Time"
+                                style={{ width: '14px', height: '14px', objectFit: 'contain', verticalAlign: 'middle' }}
+                            />
+                            {worldState?.timeOfDay?.tag || 'UNKNOWN'}
                         </div>
                         
                         {/* Right Arrow */}

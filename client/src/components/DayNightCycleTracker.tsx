@@ -5,6 +5,7 @@ import springIcon from '../assets/ui/spring.png';
 import summerIcon from '../assets/ui/summer.png';
 import autumnIcon from '../assets/ui/autumn.png';
 import winterIcon from '../assets/ui/winter.png';
+import clockIcon from '../assets/ui/clock.png';
 
 // Style constants
 const UI_BG_COLOR = 'linear-gradient(135deg, rgba(30, 15, 50, 0.9), rgba(20, 10, 40, 0.95))';
@@ -136,21 +137,6 @@ const DayNightCycleTracker: React.FC<DayNightCycleTrackerProps> = ({ worldState,
     }
   };
 
-  // Helper function to get emoji based on time of day
-  const getTimeOfDayEmoji = (timeOfDay: TimeOfDay, isFullMoon: boolean) => {
-    switch (timeOfDay.tag) {
-      case 'Dawn': return '🌅';
-      case 'TwilightMorning': return '🌄';
-      case 'Morning': return '☀️';
-      case 'Noon': return '☀️'; // Use same sun emoji to avoid weather confusion
-      case 'Afternoon': return '☀️'; // Use same sun emoji to avoid weather confusion
-      case 'Dusk': return '🌇';
-      case 'TwilightEvening': return '🌆';
-      case 'Night': return isFullMoon ? '🌕' : '🌙';
-      case 'Midnight': return isFullMoon ? '🌕' : '🌑';
-      default: return '🌍';
-    }
-  };
 
   // Helper function to get background gradient based on time of day
   const getBackgroundGradient = () => {
@@ -219,9 +205,11 @@ const DayNightCycleTracker: React.FC<DayNightCycleTrackerProps> = ({ worldState,
             alt={getSeasonDisplay(worldState.currentSeason)}
             style={{ width: '16px', height: '16px', objectFit: 'contain' }}
           />
-          <span style={{ fontSize: '16px' }}>
-            {getTimeOfDayEmoji(worldState.timeOfDay, worldState.isFullMoon)}
-          </span>
+          <img 
+            src={clockIcon} 
+            alt="Time"
+            style={{ width: '16px', height: '16px', objectFit: 'contain' }}
+          />
         </div>
       </div>
     );
@@ -318,15 +306,17 @@ const DayNightCycleTracker: React.FC<DayNightCycleTrackerProps> = ({ worldState,
                 </div>
               )}
             </div>
-            <span
+            <div
               onClick={toggleMinimized}
               style={{
                 cursor: 'pointer',
                 transition: 'all 0.3s ease',
                 opacity: 0.9,
-                fontSize: '16px',
                 filter: 'drop-shadow(0 0 8px rgba(0, 255, 255, 0.6))',
-                position: 'relative'
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
               onMouseEnter={(e) => { 
                 e.currentTarget.style.opacity = '1'; 
@@ -341,7 +331,11 @@ const DayNightCycleTracker: React.FC<DayNightCycleTrackerProps> = ({ worldState,
                 setHoveredElement(null);
               }}
             >
-              {getTimeOfDayEmoji(worldState.timeOfDay, worldState.isFullMoon)}
+              <img 
+                src={clockIcon} 
+                alt="Time"
+                style={{ width: '16px', height: '16px', objectFit: 'contain' }}
+              />
               {hoveredElement === 'timeOfDay' && (
                 <div style={{
                   position: 'absolute',
@@ -368,7 +362,7 @@ const DayNightCycleTracker: React.FC<DayNightCycleTrackerProps> = ({ worldState,
                   {worldState.isFullMoon && (worldState.timeOfDay.tag === 'Night' || worldState.timeOfDay.tag === 'Midnight') && ' - Full Moon'}
                 </div>
               )}
-            </span>
+            </div>
           </div>
         </div>
         

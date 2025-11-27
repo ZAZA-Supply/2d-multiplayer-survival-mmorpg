@@ -83,10 +83,10 @@ impl AnimalBehavior for CrowBehavior {
             }
         }
         
-        // Crows peck and then fly away
-        set_flee_destination_away_from_threat(animal, target_player.position_x, target_player.position_y, 250.0, rng);
-        transition_to_state(animal, AnimalState::Flying, current_time, None, "crow flee after peck");
+        // Crows peck and then flee (use Fleeing state so movement system handles it)
         animal.is_flying = true;
+        set_flee_destination_away_from_threat(animal, target_player.position_x, target_player.position_y, 250.0, rng);
+        transition_to_state(animal, AnimalState::Fleeing, current_time, None, "crow flee after peck");
         
         log::info!("Crow {} pecked player {} for {:.1} damage and flew away", 
                   animal.id, target_player.identity, damage);
@@ -105,179 +105,126 @@ impl AnimalBehavior for CrowBehavior {
     ) -> Result<(), String> {
         match animal.state {
             AnimalState::Patrolling | AnimalState::Flying => {
-                // Default flying patrol for crows
-                if !animal.is_flying {
-                    animal.is_flying = true;
-                    transition_to_state(animal, AnimalState::Flying, current_time, None, "crow takeoff");
-                }
+                // Crows can be either flying or grounded - decide based on is_flying flag
+                // Don't force takeoff - let the grounded behavior work
                 
                 // Check for players with food to follow
                 if let Some(player) = detected_player {
-                    if player_has_food(ctx, player.identity) {
-                        // Follow the player at a safe distance
-                        let distance = get_player_distance(animal, player);
-                        
-                        if distance > FOOD_FOLLOW_DISTANCE {
-                            // Fly closer to the player
+                    let distance = get_player_distance(animal, player);
+                    
+                    if player_has_food(ctx, player.identity) && distance < stats.perception_range {
+                        // Follow the player - take off if needed
+                        animal.is_flying = true;
+                        animal.investigation_x = Some(player.position_x);
+                        animal.investigation_y = Some(player.position_y);
+                        animal.target_player_id = Some(player.identity);
+                        animal.last_food_check = Some(current_time); // Reset steal cooldown
+                        transition_to_state(animal, AnimalState::Stealing, current_time, Some(player.identity), "detected food carrier");
+                        log::info!("Crow {} detected player {} with food, moving to steal", animal.id, player.identity);
+                    } else if animal.held_item_name.is_none() && distance < STEAL_DETECTION_RADIUS {
+                        // No food but close - might steal something else
+                        if should_attempt_steal(animal, current_time) && rng.gen::<f32>() < 0.3 { // 30% chance to try
+                            animal.is_flying = true;
                             animal.investigation_x = Some(player.position_x);
                             animal.investigation_y = Some(player.position_y);
                             animal.target_player_id = Some(player.identity);
-                            transition_to_state(animal, AnimalState::Following, current_time, Some(player.identity), "following food carrier");
-                            log::debug!("Crow {} following player {} with food", animal.id, player.identity);
-                        }
-                    } else if animal.held_item_name.is_none() {
-                        // Player doesn't have food but we might steal something
-                        let distance = get_player_distance(animal, player);
-                        
-                        if distance < STEAL_DETECTION_RADIUS {
-                            // Consider attempting a steal
-                            if should_attempt_steal(animal, current_time) {
-                                animal.investigation_x = Some(player.position_x);
-                                animal.investigation_y = Some(player.position_y);
-                                animal.target_player_id = Some(player.identity);
-                                transition_to_state(animal, AnimalState::Stealing, current_time, Some(player.identity), "attempting steal");
-                                log::debug!("Crow {} attempting steal from player {}", animal.id, player.identity);
-                            }
+                            animal.last_food_check = Some(current_time);
+                            transition_to_state(animal, AnimalState::Stealing, current_time, Some(player.identity), "opportunistic steal");
+                            log::debug!("Crow {} attempting opportunistic steal from player {}", animal.id, player.identity);
                         }
                     }
                 }
             },
             
             AnimalState::Grounded => {
-                // Random chance to take off
-                if rng.gen::<f32>() < 0.05 { // 5% chance per tick
-                    animal.is_flying = true;
-                    transition_to_state(animal, AnimalState::Flying, current_time, None, "crow takeoff");
-                }
-                
-                // Check for nearby players with food
+                // Check for nearby players - flee if too close
                 if let Some(player) = detected_player {
                     let distance = get_player_distance(animal, player);
-                    if distance < 100.0 {
+                    if distance < 120.0 {
                         // Too close! Take off and flee
                         animal.is_flying = true;
                         set_flee_destination_away_from_threat(animal, player.position_x, player.position_y, 300.0, rng);
-                        transition_to_state(animal, AnimalState::Flying, current_time, None, "flee from player");
-                    } else if player_has_food(ctx, player.identity) {
-                        // Take off to follow
+                        transition_to_state(animal, AnimalState::Fleeing, current_time, None, "flee from nearby player");
+                        log::debug!("Crow {} fleeing from nearby player", animal.id);
+                    } else if player_has_food(ctx, player.identity) && distance < stats.perception_range {
+                        // Take off to steal
                         animal.is_flying = true;
                         animal.target_player_id = Some(player.identity);
-                        transition_to_state(animal, AnimalState::Following, current_time, Some(player.identity), "takeoff to follow food");
+                        animal.investigation_x = Some(player.position_x);
+                        animal.investigation_y = Some(player.position_y);
+                        animal.last_food_check = Some(current_time);
+                        transition_to_state(animal, AnimalState::Stealing, current_time, Some(player.identity), "takeoff to steal food");
                     }
                 }
-            },
-            
-            AnimalState::Following => {
-                // Following a player with food
-                if let Some(target_id) = animal.target_player_id {
-                    if let Some(target_player) = ctx.db.player().identity().find(&target_id) {
-                        // Check if player still has food
-                        if !player_has_food(ctx, target_id) {
-                            // Lost interest - return to patrol
-                            animal.target_player_id = None;
-                            animal.investigation_x = None;
-                            animal.investigation_y = None;
-                            transition_to_state(animal, AnimalState::Flying, current_time, None, "food gone");
-                            log::debug!("Crow {} lost interest - player {} no longer has food", animal.id, target_id);
-                        } else {
-                            // Update follow position
-                            let distance = get_player_distance(animal, &target_player);
-                            
-                            if distance < FOOD_FOLLOW_DISTANCE * 0.5 {
-                                // Too close - back off
-                                let dx = animal.pos_x - target_player.position_x;
-                                let dy = animal.pos_y - target_player.position_y;
-                                let dist = (dx * dx + dy * dy).sqrt();
-                                if dist > 0.0 {
-                                    animal.investigation_x = Some(animal.pos_x + (dx / dist) * 50.0);
-                                    animal.investigation_y = Some(animal.pos_y + (dy / dist) * 50.0);
-                                }
-                            } else if distance > FOOD_FOLLOW_DISTANCE * 1.5 {
-                                // Too far - fly closer
-                                animal.investigation_x = Some(target_player.position_x);
-                                animal.investigation_y = Some(target_player.position_y);
-                            }
-                            
-                            // Random chance to attempt a steal while following
-                            if animal.held_item_name.is_none() && distance < STEAL_ATTEMPT_RADIUS * 2.0 {
-                                if rng.gen::<f32>() < 0.02 { // 2% chance per tick
-                                    transition_to_state(animal, AnimalState::Stealing, current_time, Some(target_id), "steal while following");
-                                }
-                            }
-                        }
-                    } else {
-                        // Target lost
-                        animal.target_player_id = None;
-                        transition_to_state(animal, AnimalState::Flying, current_time, None, "target lost");
-                    }
-                } else {
-                    // No target - return to patrol
-                    transition_to_state(animal, AnimalState::Flying, current_time, None, "no follow target");
-                }
+                // Normal grounded behavior handled by core movement system
             },
             
             AnimalState::Stealing => {
                 // Attempting to steal from a player
+                animal.is_flying = true; // Always fly while stealing
+                
                 if let Some(target_id) = animal.target_player_id {
                     if let Some(target_player) = ctx.db.player().identity().find(&target_id) {
                         let distance = get_player_distance(animal, &target_player);
                         
+                        // Update investigation position to track moving player
+                        animal.investigation_x = Some(target_player.position_x);
+                        animal.investigation_y = Some(target_player.position_y);
+                        
                         if distance <= STEAL_ATTEMPT_RADIUS {
-                            // Close enough - attempt steal
+                            // Close enough - attempt steal!
                             if animal.held_item_name.is_none() {
-                                if let Some((item_name, quantity)) = try_steal_from_player(ctx, &target_player, rng) {
-                                    animal.held_item_name = Some(item_name.clone());
-                                    animal.held_item_quantity = Some(quantity);
-                                    log::info!("Crow {} stole {} x{} from player {}!", 
-                                              animal.id, item_name, quantity, target_id);
-                                    
-                                    // Fly away with the loot!
-                                    set_flee_destination_away_from_threat(animal, target_player.position_x, target_player.position_y, 400.0, rng);
-                                    transition_to_state(animal, AnimalState::Flying, current_time, None, "stolen and fleeing");
-                                    animal.is_flying = true;
-                                } else {
-                                    // Failed to steal - back off
-                                    set_flee_destination_away_from_threat(animal, target_player.position_x, target_player.position_y, 150.0, rng);
-                                    transition_to_state(animal, AnimalState::Flying, current_time, None, "steal failed");
+                                if rng.gen::<f32>() < STEAL_CHANCE {
+                                    if let Some((item_name, quantity)) = try_steal_from_player(ctx, &target_player, rng) {
+                                        animal.held_item_name = Some(item_name.clone());
+                                        animal.held_item_quantity = Some(quantity);
+                                        log::info!("Crow {} stole {} x{} from player {}!", 
+                                                  animal.id, item_name, quantity, target_id);
+                                        
+                                        // Fly away with the loot!
+                                        set_flee_destination_away_from_threat(animal, target_player.position_x, target_player.position_y, 400.0, rng);
+                                        transition_to_state(animal, AnimalState::Fleeing, current_time, None, "stolen and fleeing");
+                                        return Ok(());
+                                    }
+                                }
+                                
+                                // Failed steal attempt - back off briefly then try again or give up
+                                animal.last_food_check = Some(current_time);
+                                
+                                // 50% chance to give up after failed attempt
+                                if rng.gen::<f32>() < 0.5 {
+                                    animal.target_player_id = None;
+                                    animal.investigation_x = None;
+                                    animal.investigation_y = None;
+                                    transition_to_state(animal, AnimalState::Flying, current_time, None, "steal failed - giving up");
+                                    log::debug!("Crow {} failed steal, giving up", animal.id);
                                 }
                             } else {
-                                // Already have an item - fly away
-                                transition_to_state(animal, AnimalState::Flying, current_time, None, "already have item");
+                                // Already have an item - flee with it
+                                set_flee_destination_away_from_threat(animal, target_player.position_x, target_player.position_y, 300.0, rng);
+                                transition_to_state(animal, AnimalState::Fleeing, current_time, None, "already have item");
                             }
-                        } else {
-                            // Fly toward player
-                            animal.investigation_x = Some(target_player.position_x);
-                            animal.investigation_y = Some(target_player.position_y);
-                            animal.is_flying = true;
                         }
+                        // Movement toward player handled by core movement system
                     } else {
-                        // Target lost
+                        // Target lost - return to patrol
                         animal.target_player_id = None;
+                        animal.investigation_x = None;
+                        animal.investigation_y = None;
                         transition_to_state(animal, AnimalState::Flying, current_time, None, "steal target lost");
                     }
                 } else {
                     // No target - return to patrol
+                    animal.investigation_x = None;
+                    animal.investigation_y = None;
                     transition_to_state(animal, AnimalState::Flying, current_time, None, "no steal target");
                 }
             },
             
             AnimalState::Fleeing => {
-                // Crows flee by flying
-                if !animal.is_flying {
-                    animal.is_flying = true;
-                }
-                
-                // Check if fled far enough
-                if let (Some(target_x), Some(target_y)) = (animal.investigation_x, animal.investigation_y) {
-                    let distance_sq = get_distance_squared(animal.pos_x, animal.pos_y, target_x, target_y);
-                    
-                    if distance_sq < 50.0 * 50.0 {
-                        // Reached flee destination - return to flying patrol
-                        animal.investigation_x = None;
-                        animal.investigation_y = None;
-                        transition_to_state(animal, AnimalState::Flying, current_time, None, "flee complete");
-                    }
-                }
+                // Crows flee by flying - ensure we're in the air
+                animal.is_flying = true;
+                // Flee logic handled by execute_flee_logic and core movement system
             },
             
             _ => {} // Other states handled by core system
@@ -295,22 +242,30 @@ impl AnimalBehavior for CrowBehavior {
         current_time: Timestamp,
         rng: &mut impl Rng,
     ) {
-        // Crows flee by flying
+        // Crows always flee by flying
         animal.is_flying = true;
         
         if let (Some(target_x), Some(target_y)) = (animal.investigation_x, animal.investigation_y) {
+            // Fly toward flee destination at high speed
             execute_flying_chase(ctx, animal, stats, target_x, target_y, dt);
             
             // Check if reached destination
             let distance_sq = get_distance_squared(animal.pos_x, animal.pos_y, target_x, target_y);
-            if distance_sq < 50.0 * 50.0 {
+            if distance_sq < 60.0 * 60.0 {
+                // Reached flee destination - return to patrol
                 animal.investigation_x = None;
                 animal.investigation_y = None;
-                transition_to_state(animal, AnimalState::Flying, current_time, None, "flee complete");
+                animal.target_player_id = None;
+                transition_to_state(animal, AnimalState::Patrolling, current_time, None, "crow flee complete");
+                log::debug!("Crow {} finished fleeing, returning to patrol", animal.id);
             }
         } else {
-            // No flee destination - just fly in random direction
-            execute_flying_patrol(ctx, animal, stats, dt, rng);
+            // No flee destination - set one in random direction and keep fleeing
+            let flee_angle = rng.gen::<f32>() * 2.0 * PI;
+            let flee_distance = 300.0 + rng.gen::<f32>() * 200.0;
+            animal.investigation_x = Some(animal.pos_x + flee_distance * flee_angle.cos());
+            animal.investigation_y = Some(animal.pos_y + flee_distance * flee_angle.sin());
+            log::debug!("Crow {} set new flee destination", animal.id);
         }
     }
 
@@ -322,24 +277,11 @@ impl AnimalBehavior for CrowBehavior {
         dt: f32,
         rng: &mut impl Rng,
     ) {
-        // Handle different states
-        match animal.state {
-            AnimalState::Following | AnimalState::Stealing => {
-                // Fly toward investigation target
-                if let (Some(target_x), Some(target_y)) = (animal.investigation_x, animal.investigation_y) {
-                    execute_flying_chase(ctx, animal, stats, target_x, target_y, dt);
-                } else {
-                    execute_flying_patrol(ctx, animal, stats, dt, rng);
-                }
-            },
-            _ => {
-                // Default flying patrol
-                if animal.is_flying || animal.state == AnimalState::Flying {
-                    execute_flying_patrol(ctx, animal, stats, dt, rng);
-                } else {
-                    execute_grounded_idle(ctx, animal, stats, dt, rng);
-                }
-            }
+        // Crows can patrol both flying and grounded
+        if animal.is_flying {
+            execute_flying_patrol(ctx, animal, stats, dt, rng);
+        } else {
+            execute_grounded_idle(ctx, animal, stats, dt, rng);
         }
     }
 
@@ -362,9 +304,10 @@ impl AnimalBehavior for CrowBehavior {
             drop_held_item(ctx, animal, current_time);
         }
         
+        // Use Fleeing state so the core movement system handles flight
         animal.is_flying = true;
         set_flee_destination_away_from_threat(animal, attacker.position_x, attacker.position_y, 400.0, rng);
-        transition_to_state(animal, AnimalState::Flying, current_time, None, "crow flee damage");
+        transition_to_state(animal, AnimalState::Fleeing, current_time, None, "crow flee damage");
         
         log::info!("Crow {} fleeing after damage from {}", animal.id, attacker.identity);
         
