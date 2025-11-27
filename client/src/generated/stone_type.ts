@@ -27,6 +27,10 @@ import {
   type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
   type TableHandle as __TableHandle,
 } from "spacetimedb";
+import { OreType } from "./ore_type_type";
+// Mark import as potentially unused
+declare type __keep_OreType = OreType;
+
 
 export type Stone = {
   id: bigint,
@@ -34,6 +38,7 @@ export type Stone = {
   posY: number,
   health: number,
   resourceRemaining: number,
+  oreType: OreType,
   chunkIndex: number,
   lastHitTime: __Timestamp | undefined,
   respawnAt: __Timestamp | undefined,
@@ -57,6 +62,7 @@ export const Stone = {
       { name: "posY", algebraicType: __AlgebraicTypeValue.F32 },
       { name: "health", algebraicType: __AlgebraicTypeValue.U32 },
       { name: "resourceRemaining", algebraicType: __AlgebraicTypeValue.U32 },
+      { name: "oreType", algebraicType: OreType.getTypeScriptAlgebraicType() },
       { name: "chunkIndex", algebraicType: __AlgebraicTypeValue.U32 },
       { name: "lastHitTime", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.createTimestampType()) },
       { name: "respawnAt", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.createTimestampType()) },

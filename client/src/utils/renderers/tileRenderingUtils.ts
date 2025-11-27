@@ -1,5 +1,5 @@
 import grassTile from '../../assets/tiles/grass_new.png';
-import dirtTile from '../../assets/tiles/dirt.png';
+import dirtTile from '../../assets/tiles/dirt_new.png';
 import dirtRoadTile from '../../assets/tiles/dirt_road.png';
 import seaTile from '../../assets/tiles/sea_new.png';
 import beachTile from '../../assets/tiles/beach_new.png';

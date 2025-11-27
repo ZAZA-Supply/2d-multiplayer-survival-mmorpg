@@ -1,7 +1,73 @@
-use spacetimedb::{Timestamp};
+use spacetimedb::{Timestamp, SpacetimeType};
+use rand::Rng;
 
 // Import necessary constants
 use crate::{PLAYER_RADIUS}; // Removed unused TILE_SIZE_PX
+
+// --- Ore Type Enum ---
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum OreType {
+    Stone,
+    Metal,
+    Sulfur,
+    Memory,
+}
+
+impl OreType {
+    /// Returns the item name string for this ore type
+    pub fn get_resource_name(&self) -> &'static str {
+        match self {
+            OreType::Stone => "Stone",
+            OreType::Metal => "Metal Ore",
+            OreType::Sulfur => "Sulfur Ore",
+            OreType::Memory => "Memory Shard",
+        }
+    }
+
+    /// Determines ore type based on location with weighted probabilities
+    pub fn random_for_location(pos_x: f32, pos_y: f32, is_in_quarry: bool, rng: &mut impl Rng) -> OreType {
+        let center_y = crate::WORLD_HEIGHT_PX / 2.0;
+        let is_north = pos_y < center_y;
+        
+        // Ultra-rare Memory ore check (1% chance everywhere)
+        let memory_roll = rng.gen::<f32>();
+        if memory_roll < 0.01 {
+            return OreType::Memory;
+        }
+        
+        if is_in_quarry {
+            // Quarries: 49.5% Metal, 29.7% Sulfur, 19.8% Stone (after Memory check)
+            let roll = rng.gen::<f32>();
+            if roll < 0.5 {
+                OreType::Metal
+            } else if roll < 0.8 {
+                OreType::Sulfur
+            } else {
+                OreType::Stone
+            }
+        } else if is_north {
+            // North terrain: 39.6% Metal, 29.7% Sulfur, 29.7% Stone (after Memory check)
+            let roll = rng.gen::<f32>();
+            if roll < 0.4 {
+                OreType::Metal
+            } else if roll < 0.7 {
+                OreType::Sulfur
+            } else {
+                OreType::Stone
+            }
+        } else {
+            // South terrain: 69.3% Stone, 19.8% Metal, 9.9% Sulfur (after Memory check)
+            let roll = rng.gen::<f32>();
+            if roll < 0.7 {
+                OreType::Stone
+            } else if roll < 0.9 {
+                OreType::Metal
+            } else {
+                OreType::Sulfur
+            }
+        }
+    }
+}
 
 // --- Stone-Specific Constants ---
 pub(crate) const STONE_RADIUS: f32 = 40.0;
@@ -33,6 +99,7 @@ pub struct Stone {
     pub pos_y: f32,
     pub health: u32, // Stones just disappear when health is 0
     pub resource_remaining: u32, // NEW: How much stone ore is left to collect
+    pub ore_type: OreType, // Type of ore this stone node contains
     #[index(btree)]
     pub chunk_index: u32, // Added for spatial filtering/queries
     pub last_hit_time: Option<Timestamp>, // Added for shake effect

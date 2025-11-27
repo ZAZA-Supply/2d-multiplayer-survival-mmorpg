@@ -1013,9 +1013,20 @@ pub fn grant_resource(
     amount: u32
 ) -> Result<(), String> {
     let item_defs = ctx.db.item_definition();
+    log::debug!("[grant_resource] Looking for item '{}' in {} total item definitions", resource_name, item_defs.count());
+    
+    // Debug: List all item names for troubleshooting
+    let all_item_names: Vec<String> = item_defs.iter().map(|def| def.name.clone()).collect();
+    log::debug!("[grant_resource] Available items: {:?}", all_item_names);
+    
     let resource_def = item_defs.iter()
         .find(|def| def.name == resource_name)
-        .ok_or_else(|| format!("{} item definition not found.", resource_name))?;
+        .ok_or_else(|| {
+            let available: Vec<String> = item_defs.iter().map(|def| def.name.clone()).collect();
+            format!("{} item definition not found. Available items: {:?}", resource_name, available)
+        })?;
+    
+    log::debug!("[grant_resource] Found item '{}' with id: {}", resource_name, resource_def.id);
         
     // Use our new system that automatically drops items if inventory is full
     match crate::dropped_item::try_give_item_to_player(ctx, player_id, resource_def.id, amount) {
@@ -1307,12 +1318,19 @@ pub fn damage_stone(
     stone_id: u64, 
     damage: f32,
     yield_amount: u32,
-    resource_name_to_grant: &str,
+    resource_name_to_grant: &str, // This parameter is now ignored - we use stone's ore_type instead
     timestamp: Timestamp,
     rng: &mut impl Rng
 ) -> Result<AttackResult, String> {
     let mut stone = ctx.db.stone().id().find(stone_id)
         .ok_or_else(|| "Target stone disappeared".to_string())?;
+    
+    // Determine resource name from stone's ore type
+    // Safety: If ore_type is somehow not set (shouldn't happen, but handle gracefully for existing stones)
+    let resource_name = stone.ore_type.get_resource_name();
+    
+    log::info!("[damage_stone] Stone {} - ore_type: {:?}, resource_name: '{}', resource_remaining: {}, yield_amount: {}, damage: {}", 
+               stone_id, stone.ore_type, resource_name, stone.resource_remaining, yield_amount, damage);
     
     let old_health = stone.health;
     stone.health = stone.health.saturating_sub(damage as u32);
@@ -1322,8 +1340,10 @@ pub fn damage_stone(
     let actual_yield = std::cmp::min(yield_amount, stone.resource_remaining);
     stone.resource_remaining = stone.resource_remaining.saturating_sub(actual_yield);
     
-    log::info!("Player {:?} hit Stone {} for {:.1} damage. Health: {} -> {}, Resources: {} remaining", 
-           attacker_id, stone_id, damage, old_health, stone.health, stone.resource_remaining);
+    log::info!("[damage_stone] After calculation - actual_yield: {}, new resource_remaining: {}", actual_yield, stone.resource_remaining);
+    
+    log::info!("Player {:?} hit Stone {} (ore_type: {:?}) for {:.1} damage. Health: {} -> {}, Resources: {} remaining", 
+           attacker_id, stone_id, stone.ore_type, damage, old_health, stone.health, stone.resource_remaining);
     
     // Stone is destroyed when either health reaches 0 OR resources are depleted
     let stone_destroyed = stone.health == 0 || stone.resource_remaining == 0;
@@ -1342,10 +1362,13 @@ pub fn damage_stone(
     
     // Only grant resources if we actually got some
     if actual_yield > 0 {
-        let resource_result = grant_resource(ctx, attacker_id, resource_name_to_grant, actual_yield);
+        log::debug!("[damage_stone] Attempting to grant {} {} to player {:?}", actual_yield, resource_name, attacker_id);
+        let resource_result = grant_resource(ctx, attacker_id, resource_name, actual_yield);
         
         if let Err(e) = resource_result {
-            log::error!("Failed to grant {} to player {:?}: {}", resource_name_to_grant, attacker_id, e);
+            log::error!("Failed to grant {} to player {:?}: {}", resource_name, attacker_id, e);
+        } else {
+            log::debug!("[damage_stone] Successfully granted {} {} to player {:?}", actual_yield, resource_name, attacker_id);
         }
     }
     
@@ -1357,13 +1380,13 @@ pub fn damage_stone(
         let final_hit_bonus = ((stone::STONE_INITIAL_HEALTH as f32) * bonus_percentage).ceil() as u32;
         
         if final_hit_bonus > 0 {
-            let bonus_result = grant_resource(ctx, attacker_id, resource_name_to_grant, final_hit_bonus);
+            let bonus_result = grant_resource(ctx, attacker_id, resource_name, final_hit_bonus);
             
             if let Err(e) = bonus_result {
-                log::error!("Failed to grant final hit bonus {} to player {:?}: {}", resource_name_to_grant, attacker_id, e);
+                log::error!("Failed to grant final hit bonus {} to player {:?}: {}", resource_name, attacker_id, e);
             } else {
                 log::info!("Player {:?} received final hit bonus: {} {} ({}% of stone health)", 
-                         attacker_id, final_hit_bonus, resource_name_to_grant, (bonus_percentage * 100.0) as u32);
+                         attacker_id, final_hit_bonus, resource_name, (bonus_percentage * 100.0) as u32);
                 // Bonus notification is now handled by the item acquisition system via grant_resource()
             }
         }
@@ -1384,7 +1407,7 @@ pub fn damage_stone(
     Ok(AttackResult {
         hit: true,
         target_type: Some(TargetType::Stone),
-        resource_granted: if actual_yield > 0 { Some((resource_name_to_grant.to_string(), actual_yield)) } else { None },
+        resource_granted: if actual_yield > 0 { Some((resource_name.to_string(), actual_yield)) } else { None },
     })
 }
 

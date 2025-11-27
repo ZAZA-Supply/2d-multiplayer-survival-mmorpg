@@ -1175,12 +1175,24 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
                 // Calculate chunk index for the stone
                 let chunk_idx = calculate_chunk_index(pos_x, pos_y);
                 
+                // Determine if this position is in a quarry
+                let is_in_quarry = is_position_on_monument(ctx, pos_x, pos_y);
+                
+                // Create a deterministic RNG seeded from position for ore type selection
+                // This ensures consistent ore type per position while appearing random
+                let position_seed: u64 = ((pos_x as u64) << 32) ^ (pos_y as u64);
+                let mut position_rng = StdRng::seed_from_u64(position_seed);
+                
+                // Determine ore type based on location
+                let ore_type = crate::stone::OreType::random_for_location(pos_x, pos_y, is_in_quarry, &mut position_rng);
+                
                 crate::stone::Stone {
                     id: 0,
                     pos_x,
                     pos_y,
                     health: crate::stone::STONE_INITIAL_HEALTH,
                     resource_remaining: resource_amount, // Use the passed-in resource amount
+                    ore_type, // Set the ore type based on location
                     chunk_index: chunk_idx, // Set the chunk index
                     last_hit_time: None,
                     respawn_at: None,
@@ -1504,12 +1516,20 @@ pub fn seed_environment(ctx: &ReducerContext) -> Result<(), String> {
             if !too_close {
                 let chunk_idx = calculate_chunk_index(world_x_px, world_y_px);
                 let stone_resource_amount = rng.gen_range(crate::stone::STONE_MIN_RESOURCES..=crate::stone::STONE_MAX_RESOURCES);
+                
+                // Quarry stones are always in quarries, so is_in_quarry = true
+                let is_in_quarry = true;
+                
+                // Determine ore type based on location (quarry = more metal/sulfur)
+                let ore_type = crate::stone::OreType::random_for_location(world_x_px, world_y_px, is_in_quarry, &mut rng);
+                
                 let stone = crate::stone::Stone {
                     id: 0,
                     pos_x: world_x_px,
                     pos_y: world_y_px,
                     health: crate::stone::STONE_INITIAL_HEALTH,
                     resource_remaining: stone_resource_amount,
+                    ore_type, // Set the ore type based on location
                     chunk_index: chunk_idx,
                     last_hit_time: None,
                     respawn_at: None,
@@ -2507,6 +2527,12 @@ pub fn check_resource_respawns(ctx: &ReducerContext) -> Result<(), String> {
             s.health = crate::stone::STONE_INITIAL_HEALTH;
             // Generate new random resource amount for respawned stone
             s.resource_remaining = ctx.rng().gen_range(crate::stone::STONE_MIN_RESOURCES..=crate::stone::STONE_MAX_RESOURCES);
+            // Preserve ore type based on position (deterministic, same as initial spawn)
+            let is_in_quarry = is_position_on_monument(ctx, s.pos_x, s.pos_y);
+            // Create deterministic RNG seeded from position to ensure consistent ore type
+            let position_seed: u64 = ((s.pos_x as u64) << 32) ^ (s.pos_y as u64);
+            let mut position_rng = StdRng::seed_from_u64(position_seed);
+            s.ore_type = crate::stone::OreType::random_for_location(s.pos_x, s.pos_y, is_in_quarry, &mut position_rng);
             s.respawn_at = None;
             s.last_hit_time = None;
         }

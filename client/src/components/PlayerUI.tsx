@@ -983,6 +983,17 @@ const PlayerUI: React.FC<PlayerUIProps> = ({
                             duration: bufferedRemainingTime
                         };
                         break;
+                    case 'FireResistance':
+                        effectApplies = true;
+                        effectData = {
+                            id: 'fire_resistance',
+                            name: 'Fire Resistance',
+                            emoji: '🔥',
+                            type: 'positive' as const,
+                            description: 'Reduced fire and burn damage.',
+                            duration: bufferedRemainingTime
+                        };
+                        break;
                 }
             } else if (effectTargetPlayerIdHex === localPlayerIdHex && effectTypeTag === 'RemoteBandageBurst') {
                 // Check if remote bandage healer is in range

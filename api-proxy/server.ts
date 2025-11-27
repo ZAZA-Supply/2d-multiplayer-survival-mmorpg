@@ -254,7 +254,11 @@ const VALID_EFFECT_TYPES = [
   'StaminaBoost',     // For performance enhancers
   'SpeedBoost',       // For performance enhancers
   'ColdResistance',   // For warming brews
+  'FireResistance',   // For fire-resistant brews
+  'PoisonResistance', // For antidote brews
   'NightVision',      // For special brews
+  'WarmthBoost',      // For warming brews
+  'Poisoned',         // For poison brews (distinct from FoodPoisoning)
   null,               // No special effect (stats only)
 ];
 
@@ -277,15 +281,28 @@ CATEGORIES (choose one):
 - cooking_base: Intermediate ingredient (minimal stats)
 - technological: Sci-fi themed (unique effects)
 
-EFFECT TYPES (optional, use only when appropriate):
+EFFECT TYPES (optional, use only when appropriate - IMPORTANT: Apply these when the brew category or ingredients suggest them):
 - HealthRegen: For medicinal teas, healing over time
 - FoodPoisoning: For poisons, damage over time
-- Intoxicated: For alcoholic drinks, buffs + debuffs
-- StaminaBoost: For performance enhancers
-- SpeedBoost: For performance enhancers
-- ColdResistance: For warming brews
-- NightVision: For special brews
+- Intoxicated: For alcoholic drinks (ales, wines, spirits), buffs + debuffs - ALWAYS apply for alcoholic category
+- StaminaBoost: For performance enhancers, reduces hunger/thirst drain
+- SpeedBoost: For performance enhancers, increases movement speed
+- ColdResistance: For warming brews, reduces cold damage
+- FireResistance: For fire-resistant brews, reduces fire/burn damage
+- PoisonResistance: For antidote brews, reduces poison/venom damage
+- NightVision: For psychoactive brews, enhanced vision at night
+- WarmthBoost: For warming broths, warmth protection bonus
+- Poisoned: For poison brews (distinct from FoodPoisoning), damage over time
 - null: No special effect (most common, stats only)
+
+CRITICAL: When generating recipes, you MUST include an appropriate effect_type when:
+- Category is "alcoholic" → MUST use "Intoxicated"
+- Category is "poison" → MUST use "Poisoned" or "FoodPoisoning"
+- Category is "performance_enhancer" → SHOULD use "SpeedBoost" or "StaminaBoost"
+- Category is "psychoactive" → SHOULD use "NightVision"
+- Ingredients suggest fire resistance (e.g., fire-related materials) → CONSIDER "FireResistance"
+- Ingredients suggest cold resistance (e.g., warming herbs) → CONSIDER "ColdResistance"
+- Ingredients suggest poison resistance (e.g., antidote herbs) → CONSIDER "PoisonResistance"
 
 NAMING CONVENTIONS:
 - Prefix: "Glass Jar of", "Vial of", "Flask of", "Bottle of", "Draught of", "Elixir of", "Tonic of", "Brew of", "Potion of", "Extract of"
@@ -429,8 +446,9 @@ app.post('/api/gemini/icon', async (req, res) => {
 
     console.log(`[Proxy] DALL-E icon request: ${subject}`);
 
-    // Optimized pixel art prompt for DALL-E 2 - emphasizes transparent PNG background
-    const iconPrompt = `A pixel art style ${subject} with consistent pixel width and clean black outlines, designed as a game item icon. Rendered with a transparent background, PNG format. The object should have a clear silhouette, sharp pixel-level detail, and fit naturally in a top-down RPG game like Secret of Mana. No background, no shadows outside the object. Stylized with a warm palette and light dithering where appropriate.`;
+    // Optimized pixel art prompt for DALL-E 2 - CRITICAL: Must have transparent background
+    // Note: DALL-E 2 generates PNGs but may include white backgrounds. The prompt emphasizes transparency.
+    const iconPrompt = `Pixel art style ${subject} as a game item icon. Pixel art with consistent pixel width, clean black outlines, sharp pixel-level detail. CRITICAL: Must have a completely transparent background - no white background, no colored background, no shadows, no background elements whatsoever. The icon should be the object only on a transparent PNG. Top-down RPG style like Secret of Mana. Warm color palette with light dithering. The entire background must be transparent alpha channel.`;
 
     const response = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',

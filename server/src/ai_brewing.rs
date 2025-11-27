@@ -95,6 +95,7 @@ pub fn parse_effect_type(effect_str: &str) -> Option<EffectType> {
         "WarmthBoost" => Some(EffectType::WarmthBoost),
         "ColdResistance" => Some(EffectType::ColdResistance),
         "PoisonResistance" => Some(EffectType::PoisonResistance),
+        "FireResistance" => Some(EffectType::FireResistance),
         _ => None,
     }
 }

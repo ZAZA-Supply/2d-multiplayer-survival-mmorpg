@@ -72,17 +72,26 @@ pub fn get_material_definitions() -> Vec<ItemDefinition> {
             .build(),
 
         // Metal Ore - Raw metal resource
-        ItemBuilder::new("Metal Ore", "Raw metallic ore extracted from the ground. Can be smelted into metal fragments.", ItemCategory::Material)
-            .icon("metal_ore.png")
-            .stackable(1000)
-            .cook_time(4.0)
-            .cooked_item("Metal Fragments")
-            .respawn_time(600)
+        basic_material("Metal Ore", "Raw metallic ore extracted from the ground. Can be smelted into metal fragments.", 1000)
+            .icon("metal.png")
+            .respawn_time(300)
             .build(),
 
         // Metal Fragments - Processed metal
         basic_material("Metal Fragments", "Processed metal fragments smelted from metal ore. Used for crafting advanced tools and equipment.", 1000)
             .icon("metal_fragments.png")
+            .respawn_time(300)
+            .build(),
+
+        // Sulfur Ore - Raw sulfur resource
+        basic_material("Sulfur Ore", "Raw sulfur ore extracted from mineral deposits. Useful for crafting explosives and advanced materials.", 1000)
+            .icon("sulfur.png")
+            .respawn_time(300)
+            .build(),
+
+        // Sulfur - Refined material
+        basic_material("Sulfur", "Refined sulfur obtained by processing sulfur ore. Essential for crafting gunpowder and explosives.", 1000)
+            .icon("sulfur.png")
             .respawn_time(300)
             .stackable(1000)
             .build(),

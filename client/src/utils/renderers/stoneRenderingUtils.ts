@@ -1,5 +1,8 @@
 import { Stone } from '../../generated'; // Import generated Stone type
-import stoneImage from '../../assets/doodads/stone_c.png'; // Direct import
+import stoneImage from '../../assets/doodads/stone_d.png'; // Direct import
+import metalImage from '../../assets/doodads/metal.png'; // Metal ore node image
+import sulfurImage from '../../assets/doodads/sulfur.png'; // Sulfur ore node image
+import memoryImage from '../../assets/doodads/memory.png'; // Memory ore node image
 import { drawDynamicGroundShadow } from './shadowUtils'; // Import shadow utils
 import { GroundEntityConfig, renderConfiguredGroundEntity } from './genericGroundRenderer';
 import { imageManager } from './imageManager';
@@ -18,7 +21,23 @@ const lastKnownServerStoneShakeTimes = new Map<string, number>(); // stoneId -> 
 const stoneConfig: GroundEntityConfig<Stone> = {
     // shouldRender: (entity) => entity.health > 0, // Removed: Filtering should happen before calling renderStone
 
-    getImageSource: (_entity) => stoneImage, // Use imported URL
+    getImageSource: (entity) => {
+        // Determine which image to use based on ore type
+        // Note: oreType field will be available after bindings are regenerated
+        const oreType = (entity as any).oreType;
+        if (oreType) {
+            // Check the ore type variant (assuming it's an enum/tagged union)
+            if (oreType.tag === 'Metal' || oreType === 'Metal') {
+                return metalImage;
+            } else if (oreType.tag === 'Sulfur' || oreType === 'Sulfur') {
+                return sulfurImage;
+            } else if (oreType.tag === 'Memory' || oreType === 'Memory') {
+                return memoryImage;
+            }
+        }
+        // Default to stone image
+        return stoneImage;
+    },
 
     getTargetDimensions: (img, _entity) => {
         // Calculate scaling factor based on target width
@@ -214,8 +233,11 @@ const stoneConfig: GroundEntityConfig<Stone> = {
     fallbackColor: 'gray', // Fallback if image fails to load
 };
 
-// Preload using imported URL
+// Preload all ore node images
 imageManager.preloadImage(stoneImage);
+imageManager.preloadImage(metalImage);
+imageManager.preloadImage(sulfurImage);
+imageManager.preloadImage(memoryImage);
 
 /**
  * Renders a single stone entity onto the canvas using the generic renderer.

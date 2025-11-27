@@ -72,6 +72,7 @@ pub enum EffectType {
     WarmthBoost,       // Warmth protection bonus from warming broths
     ColdResistance,    // Reduced cold damage from specialty brews
     PoisonResistance,  // Reduced poison/venom damage from antidote brews
+    FireResistance,    // Reduced fire/burn damage from fire-resistant brews
 }
 
 // Table defining food poisoning risks for different food items
@@ -131,10 +132,13 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
         }
 
     // Skip cozy, tree cover, exhausted, building privilege, rune stone effects, hot spring, and fumarole - they are managed by other systems, not the effect tick system
-    // Wet effects are now processed normally like other effects
+    // These effects are permanent until removed by other systems, so skip them entirely
     if effect.effect_type == EffectType::Cozy || effect.effect_type == EffectType::TreeCover || effect.effect_type == EffectType::Exhausted || effect.effect_type == EffectType::BuildingPrivilege || effect.effect_type == EffectType::ProductionRune || effect.effect_type == EffectType::AgrarianRune || effect.effect_type == EffectType::MemoryRune || effect.effect_type == EffectType::HotSpring || effect.effect_type == EffectType::Fumarole {
         continue;
     }
+    
+    // Stub brewing effects (Intoxicated, Poisoned, SpeedBoost, etc.) need to be checked for expiration
+    // but don't need per-tick processing - they'll be handled in the time-based expiration check below
 
         let mut effect_ended = false;
         let mut player_effect_applied_this_iteration = false; // Tracks if this specific effect iteration changed player health
@@ -175,7 +179,7 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
                         effect.target_player_id
                     },
                     // Other effect types shouldn't reach this code path, but we need to handle them
-                    EffectType::HealthRegen | EffectType::Burn | EffectType::Bleed | EffectType::Venom | EffectType::SeawaterPoisoning | EffectType::FoodPoisoning | EffectType::Cozy | EffectType::Wet | EffectType::TreeCover | EffectType::WaterDrinking | EffectType::Exhausted | EffectType::BuildingPrivilege | EffectType::ProductionRune | EffectType::AgrarianRune | EffectType::MemoryRune | EffectType::HotSpring | EffectType::Fumarole | EffectType::Intoxicated | EffectType::Poisoned | EffectType::SpeedBoost | EffectType::StaminaBoost | EffectType::NightVision | EffectType::WarmthBoost | EffectType::ColdResistance | EffectType::PoisonResistance => {
+                    EffectType::HealthRegen | EffectType::Burn | EffectType::Bleed | EffectType::Venom | EffectType::SeawaterPoisoning | EffectType::FoodPoisoning | EffectType::Cozy | EffectType::Wet | EffectType::TreeCover | EffectType::WaterDrinking | EffectType::Exhausted | EffectType::BuildingPrivilege | EffectType::ProductionRune | EffectType::AgrarianRune | EffectType::MemoryRune | EffectType::HotSpring | EffectType::Fumarole | EffectType::Intoxicated | EffectType::Poisoned | EffectType::SpeedBoost | EffectType::StaminaBoost | EffectType::NightVision | EffectType::WarmthBoost | EffectType::ColdResistance | EffectType::PoisonResistance | EffectType::FireResistance => {
                         log::warn!("[EffectTick] Unexpected effect type {:?} in bandage processing", effect.effect_type);
                         Some(effect.player_id)
                     }
@@ -277,10 +281,16 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
             }
         }
         // --- Handle Other Progressive Effects (HealthRegen, Bleed, item-based Damage) ---
-        // Wet and WaterDrinking effects don't have total_amount, so handle them separately
-        if effect.effect_type == EffectType::Wet || effect.effect_type == EffectType::WaterDrinking {
+        // Wet, WaterDrinking, and stub brewing effects don't need per-tick processing
+        // Stub brewing effects (Intoxicated, Poisoned, SpeedBoost, etc.) are time-based only
+        let is_stub_brewing_effect = matches!(effect.effect_type, 
+            EffectType::Intoxicated | EffectType::Poisoned | EffectType::SpeedBoost | 
+            EffectType::StaminaBoost | EffectType::NightVision | EffectType::WarmthBoost | 
+            EffectType::ColdResistance | EffectType::PoisonResistance | EffectType::FireResistance);
+        
+        if effect.effect_type == EffectType::Wet || effect.effect_type == EffectType::WaterDrinking || is_stub_brewing_effect {
             // These effects are purely time-based, no per-tick processing needed
-            // They just exist until they expire or are removed by environmental conditions
+            // They just exist until they expire or are removed
         } else if let Some(total_amount_val) = effect.total_amount {
             let total_duration_micros = effect.ends_at.to_micros_since_unix_epoch().saturating_sub(effect.started_at.to_micros_since_unix_epoch());
 
@@ -445,6 +455,11 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
                             // This will be handled by damage calculation system, not effect tick
                             amount_this_tick = 0.0; // No per-tick stat change
                         }
+                        EffectType::FireResistance => {
+                            // TODO: Implement reduced fire/burn damage
+                            // This will be handled by burn damage calculation system, not effect tick
+                            amount_this_tick = 0.0; // No per-tick stat change
+                        }
                         EffectType::WaterDrinking => {
                             // WaterDrinking is purely a visual effect, no per-tick processing needed
                             // It just exists for the duration to trigger client-side animations
@@ -536,8 +551,16 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
                 }
 
         // Check if effect should end based on amount or time
-        // For SeawaterPoisoning, Venom, Wet, and WaterDrinking effects, only end based on time, not accumulated damage
-        if effect.effect_type == EffectType::SeawaterPoisoning || effect.effect_type == EffectType::Venom || effect.effect_type == EffectType::Wet || effect.effect_type == EffectType::WaterDrinking {
+        // For SeawaterPoisoning, Venom, Wet, WaterDrinking, and stub brewing effects, only end based on time, not accumulated amount
+        // Stub brewing effects (Intoxicated, Poisoned, SpeedBoost, etc.) have total_amount = 0.0 and should only expire by time
+        let is_stub_brewing_effect = matches!(effect.effect_type, 
+            EffectType::Intoxicated | EffectType::Poisoned | EffectType::SpeedBoost | 
+            EffectType::StaminaBoost | EffectType::NightVision | EffectType::WarmthBoost | 
+            EffectType::ColdResistance | EffectType::PoisonResistance | EffectType::FireResistance);
+        
+        if effect.effect_type == EffectType::SeawaterPoisoning || effect.effect_type == EffectType::Venom || 
+           effect.effect_type == EffectType::Wet || effect.effect_type == EffectType::WaterDrinking ||
+           is_stub_brewing_effect {
             if current_time >= effect.ends_at {
                 effect_ended = true;
             }
@@ -607,6 +630,7 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
             }
         } else {
             // Update the effect in the DB with the new applied_so_far and next_tick_at
+            // For stub brewing effects, we still need to update next_tick_at so they continue to be checked for expiration
             let mut updated_effect_for_db = effect; // 'effect' is already a clone of effect_row
             updated_effect_for_db.amount_applied_so_far = Some(current_effect_applied_so_far);
             updated_effect_for_db.next_tick_at = current_time + TimeDuration::from_micros(updated_effect_for_db.tick_interval_micros as i64);

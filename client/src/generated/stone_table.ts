@@ -28,6 +28,10 @@ import {
   type TableHandle as __TableHandle,
 } from "spacetimedb";
 import { Stone } from "./stone_type";
+import { OreType } from "./ore_type_type";
+// Mark import as potentially unused
+declare type __keep_OreType = OreType;
+
 import { type EventContext, type Reducer, RemoteReducers, RemoteTables } from ".";
 declare type __keep = [EventContext, Reducer, RemoteReducers, RemoteTables];
 

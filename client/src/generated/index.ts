@@ -921,6 +921,8 @@ import { MinimapCache } from "./minimap_cache_type.ts";
 export { MinimapCache };
 import { MovementPattern } from "./movement_pattern_type.ts";
 export { MovementPattern };
+import { OreType } from "./ore_type_type.ts";
+export { OreType };
 import { PlantType } from "./plant_type_type.ts";
 export { PlantType };
 import { PlantedSeed } from "./planted_seed_type.ts";
