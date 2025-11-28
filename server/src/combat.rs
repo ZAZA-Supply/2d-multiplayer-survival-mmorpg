@@ -24,6 +24,7 @@ use crate::items::{ItemDefinition, ItemCategory};
 use crate::models::{TargetType, DamageType, ImmunityType};
 use crate::tree;
 use crate::stone;
+use crate::rune_stone;
 use crate::wooden_storage_box;
 use crate::player_corpse;
 use crate::broth_pot::{broth_pot, broth_pot_processing_schedule};
@@ -32,12 +33,14 @@ use crate::broth_pot::{broth_pot, broth_pot_processing_schedule};
 // Specific constants needed
 use crate::tree::{MIN_TREE_RESPAWN_TIME_SECS, MAX_TREE_RESPAWN_TIME_SECS, TREE_COLLISION_Y_OFFSET, PLAYER_TREE_COLLISION_DISTANCE_SQUARED, TREE_INITIAL_HEALTH};
 use crate::stone::{MIN_STONE_RESPAWN_TIME_SECS, MAX_STONE_RESPAWN_TIME_SECS, STONE_COLLISION_Y_OFFSET, PLAYER_STONE_COLLISION_DISTANCE_SQUARED};
+use crate::rune_stone::{RUNE_STONE_COLLISION_Y_OFFSET, PLAYER_RUNE_STONE_COLLISION_DISTANCE_SQUARED};
 use crate::wooden_storage_box::{WoodenStorageBox, BOX_COLLISION_RADIUS, BOX_COLLISION_Y_OFFSET, wooden_storage_box as WoodenStorageBoxTableTrait};
 // REMOVED: grass table trait import - grass collision detection removed for performance
 
 // Table trait imports for database access
 use crate::tree::tree as TreeTableTrait;
 use crate::stone::stone as StoneTableTrait;
+use crate::rune_stone::rune_stone as RuneStoneTableTrait;
 use crate::items::item_definition as ItemDefinitionTableTrait;
 use crate::items::inventory_item as InventoryItemTableTrait;
 use crate::player as PlayerTableTrait;
@@ -2968,6 +2971,18 @@ fn resolve_knockback_collision(
         if (dx * dx + dy * dy) < PLAYER_STONE_COLLISION_DISTANCE_SQUARED {
             log::debug!("[KnockbackCollision] Player ID {:?} would collide with Stone ID {} at proposed ({:.1}, {:.1}). Reverting knockback.", 
                        colliding_player_id, stone.id, proposed_x, proposed_y);
+            return (current_x, current_y);
+        }
+    }
+    
+    // Check against rune stones (solid collision)
+    for rune_stone in ctx.db.rune_stone().iter() {
+        let rune_stone_collision_center_y = rune_stone.pos_y - RUNE_STONE_COLLISION_Y_OFFSET;
+        let dx = proposed_x - rune_stone.pos_x;
+        let dy = proposed_y - rune_stone_collision_center_y;
+        if (dx * dx + dy * dy) < PLAYER_RUNE_STONE_COLLISION_DISTANCE_SQUARED {
+            log::debug!("[KnockbackCollision] Player ID {:?} would collide with RuneStone ID {} at proposed ({:.1}, {:.1}). Reverting knockback.", 
+                       colliding_player_id, rune_stone.id, proposed_x, proposed_y);
             return (current_x, current_y);
         }
     }

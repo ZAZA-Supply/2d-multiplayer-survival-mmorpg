@@ -39,6 +39,7 @@ use crate::wild_animal_npc::animal_corpse::{AnimalCorpse, ANIMAL_CORPSE_COLLISIO
 // Import natural obstacle modules for collision detection
 use crate::tree::{Tree, tree as TreeTableTrait};
 use crate::stone::{Stone, stone as StoneTableTrait};
+use crate::rune_stone::rune_stone as RuneStoneTableTrait;
 use crate::basalt_column::{BasaltColumn, basalt_column as BasaltColumnTableTrait};
 
 // Import wild animal module for collision detection
@@ -1111,6 +1112,34 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
                 }
                 
                 // Stones block projectiles but don't take damage - projectile becomes dropped item
+                missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
+                projectiles_to_delete.push(projectile.id);
+                hit_natural_obstacle_this_tick = true;
+                break;
+            }
+        }
+        
+        // Check rune stone collisions
+        for rune_stone in ctx.db.rune_stone().iter() {
+            // Rune stones have a generous collision radius for projectiles (doubled to match visual size)
+            const PROJECTILE_RUNE_STONE_HIT_RADIUS: f32 = 80.0; // Doubled from 40.0 to match doubled visual size
+            const PROJECTILE_RUNE_STONE_Y_OFFSET: f32 = 100.0; // Doubled from 50.0 to match doubled visual size
+            
+            let rune_stone_hit_y = rune_stone.pos_y - PROJECTILE_RUNE_STONE_Y_OFFSET;
+            
+            // Use line segment collision detection for rune stones
+            if line_intersects_circle(prev_x, prev_y, current_x, current_y, rune_stone.pos_x, rune_stone_hit_y, PROJECTILE_RUNE_STONE_HIT_RADIUS) {
+                log::info!(
+                    "[ProjectileUpdate] Projectile {} from owner {:?} hit RuneStone {} along path from ({:.1}, {:.1}) to ({:.1}, {:.1})",
+                    projectile.id, projectile.owner_id, rune_stone.id, prev_x, prev_y, current_x, current_y
+                );
+                
+                // Create fire patch if this is a fire arrow (100% chance)
+                if let Some(ammo_item_def) = item_defs_table.id().find(projectile.ammo_def_id) {
+                    create_fire_patch_if_fire_arrow(ctx, &ammo_item_def, current_x, current_y, projectile.owner_id);
+                }
+                
+                // Rune stones block projectiles but don't take damage - projectile becomes dropped item
                 missed_projectiles_for_drops.push((projectile.id, projectile.ammo_def_id, current_x, current_y));
                 projectiles_to_delete.push(projectile.id);
                 hit_natural_obstacle_this_tick = true;

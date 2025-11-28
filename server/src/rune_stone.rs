@@ -17,9 +17,9 @@ use crate::harvestable_resource::harvestable_resource as HarvestableResourceTabl
 
 // --- Rune Stone Constants ---
 
-// Collision settings
-pub(crate) const RUNE_STONE_RADIUS: f32 = 40.0; // Slightly larger than trees
-pub(crate) const RUNE_STONE_COLLISION_Y_OFFSET: f32 = 50.0;
+// Collision settings (doubled to match visual size - rune stones are now 300px wide)
+pub(crate) const RUNE_STONE_RADIUS: f32 = 80.0; // Doubled from 40.0 to match doubled visual size
+pub(crate) const RUNE_STONE_COLLISION_Y_OFFSET: f32 = 100.0; // Doubled from 50.0
 pub(crate) const PLAYER_RUNE_STONE_COLLISION_DISTANCE_SQUARED: f32 = 
     (PLAYER_RADIUS + RUNE_STONE_RADIUS) * (PLAYER_RADIUS + RUNE_STONE_RADIUS);
 

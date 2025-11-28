@@ -15,7 +15,7 @@ interface DebugPanelProps {
 }
 
 const DebugPanel: React.FC<DebugPanelProps> = ({ localPlayer, worldState, connection }) => {
-    const { showAutotileDebug, toggleAutotileDebug, showChunkBoundaries, toggleChunkBoundaries } = useDebug();
+    const { showAutotileDebug, toggleAutotileDebug, showChunkBoundaries, toggleChunkBoundaries, showInteriorDebug, toggleInteriorDebug } = useDebug();
     const [isMinimized, setIsMinimized] = useState(false);
 
     const cycleWeather = (direction: 'forward' | 'backward') => {
@@ -284,6 +284,47 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ localPlayer, worldState, connec
                         }}
                     >
                         CHUNKS: {showChunkBoundaries ? 'ON' : 'OFF'}
+                    </button>
+
+                    {/* Interior Debug Toggle */}
+                    <button
+                        onClick={(e) => {
+                            toggleInteriorDebug();
+                            e.currentTarget.blur();
+                        }}
+                        onFocus={(e) => e.currentTarget.blur()}
+                        style={{
+                            background: showInteriorDebug 
+                                ? 'linear-gradient(135deg, rgba(0, 255, 136, 0.3), rgba(0, 200, 100, 0.4))' 
+                                : 'linear-gradient(135deg, rgba(60, 30, 30, 0.6), rgba(40, 20, 20, 0.7))',
+                            color: showInteriorDebug ? '#00ff88' : '#ff6b6b',
+                            border: showInteriorDebug ? '1px solid #00ff88' : '1px solid #ff6b6b',
+                            padding: '8px 12px',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            textShadow: showInteriorDebug ? '0 0 5px #00ff88' : '0 0 5px #ff6b6b',
+                            boxShadow: showInteriorDebug 
+                                ? '0 0 10px rgba(0, 255, 136, 0.3)' 
+                                : '0 0 10px rgba(255, 107, 107, 0.2)',
+                            fontFamily: 'inherit',
+                            letterSpacing: '0.5px'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            e.currentTarget.style.boxShadow = showInteriorDebug 
+                                ? '0 0 15px rgba(0, 255, 136, 0.5)' 
+                                : '0 0 15px rgba(255, 107, 107, 0.4)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = showInteriorDebug 
+                                ? '0 0 10px rgba(0, 255, 136, 0.3)' 
+                                : '0 0 10px rgba(255, 107, 107, 0.2)';
+                        }}
+                    >
+                        INTERIOR: {showInteriorDebug ? 'ON' : 'OFF'}
                     </button>
 
                     {/* Position Display */}

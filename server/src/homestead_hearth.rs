@@ -173,9 +173,9 @@ fn validate_hearth_interaction(ctx: &ReducerContext, hearth_id: u32) -> Result<(
         return Err("Cannot interact with destroyed hearth.".to_string());
     }
 
-    // Check interaction distance
+    // Check interaction distance (accounting for visual Y offset)
     let dx = player.position_x - hearth.pos_x;
-    let dy = player.position_y - hearth.pos_y;
+    let dy = player.position_y - (hearth.pos_y + HEARTH_COLLISION_Y_OFFSET);
     let distance_squared = dx * dx + dy * dy;
 
     if distance_squared > PLAYER_HEARTH_INTERACTION_DISTANCE_SQUARED {
@@ -1171,8 +1171,9 @@ pub fn grant_building_privilege_from_hearth(
         let player = players.identity().find(&sender_id)
             .ok_or_else(|| "Player not found".to_string())?;
         
+        // Account for visual Y offset when checking building privilege radius
         let dx = player.position_x - hearth.pos_x;
-        let dy = player.position_y - hearth.pos_y;
+        let dy = player.position_y - (hearth.pos_y + HEARTH_COLLISION_Y_OFFSET);
         let distance_squared = dx * dx + dy * dy;
 
         if distance_squared > BUILDING_PRIVILEGE_RADIUS_SQUARED {

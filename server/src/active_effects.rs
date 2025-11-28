@@ -291,6 +291,12 @@ pub fn process_active_consumable_effects_tick(ctx: &ReducerContext, _args: Proce
         if effect.effect_type == EffectType::Wet || effect.effect_type == EffectType::WaterDrinking || is_stub_brewing_effect {
             // These effects are purely time-based, no per-tick processing needed
             // They just exist until they expire or are removed
+            // Check for time-based expiration (this was missing, causing effects to persist indefinitely!)
+            if current_time >= effect.ends_at {
+                effect_ended = true;
+                log::debug!("[EffectTick] Time-based effect {} ({:?}) for player {:?} expired", 
+                    effect.effect_id, effect.effect_type, effect.player_id);
+            }
         } else if let Some(total_amount_val) = effect.total_amount {
             let total_duration_micros = effect.ends_at.to_micros_since_unix_epoch().saturating_sub(effect.started_at.to_micros_since_unix_epoch());
 

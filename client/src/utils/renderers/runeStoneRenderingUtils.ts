@@ -7,7 +7,7 @@ import { GroundEntityConfig, renderConfiguredGroundEntity } from './genericGroun
 import { imageManager } from './imageManager';
 
 // Configuration constants
-const TARGET_RUNE_STONE_WIDTH_PX = 150; // Target width on screen (slightly larger than stones)
+const TARGET_RUNE_STONE_WIDTH_PX = 300; // Target width on screen (doubled from 150)
 
 // Rune stone type keys
 type RuneStoneTypeKey = 'Green' | 'Red' | 'Blue';
@@ -20,7 +20,7 @@ const RUNE_STONE_IMAGES: Record<RuneStoneTypeKey, string> = {
 };
 
 // Night lighting configuration - AAA quality mythical effects
-const NIGHT_LIGHT_RADIUS = 220; // Radius of the colored light effect (slightly larger)
+const NIGHT_LIGHT_RADIUS = 440; // Radius of the colored light effect (doubled from 220)
 const NIGHT_LIGHT_INTENSITY = 0.7; // Intensity of the light (0-1)
 const TWILIGHT_EVENING_START = 0.76; // Start of twilight evening (76% through day)
 const TWILIGHT_MORNING_END = 1.0; // End of twilight morning (100% through day, wraps around)
@@ -51,24 +51,24 @@ const PARTICLE_COUNT = 18; // More particles for denser magical atmosphere
 const PARTICLE_RISE_SPEED = 12; // Slightly slower for more ethereal feel
 const PARTICLE_DRIFT_SPEED = 10; // More horizontal drift for mystical movement
 const PARTICLE_LIFETIME_SECONDS = 5.0; // Longer lifetime for smoother transitions
-const PARTICLE_SPAWN_RADIUS = 70; // Wider spawn radius
-const PARTICLE_MIN_SIZE = 2; // Minimum particle size
-const PARTICLE_MAX_SIZE = 6; // Larger max for more variation
+const PARTICLE_SPAWN_RADIUS = 140; // Wider spawn radius (doubled from 70)
+const PARTICLE_MIN_SIZE = 4; // Minimum particle size (doubled from 2)
+const PARTICLE_MAX_SIZE = 12; // Larger max for more variation (doubled from 6)
 const PARTICLE_GLOW_INTENSITY = 0.9; // Brighter glow
 
 // Magical ray configuration (vertical light beams)
 const RAY_COUNT = 5; // Number of light rays emanating from runestone
-const RAY_WIDTH_BASE = 8; // Base width of rays in pixels
-const RAY_HEIGHT = 120; // Height of the light rays
-const RAY_SWAY_AMOUNT = 3; // Horizontal sway amount
+const RAY_WIDTH_BASE = 16; // Base width of rays in pixels (doubled from 8)
+const RAY_HEIGHT = 240; // Height of the light rays (doubled from 120)
+const RAY_SWAY_AMOUNT = 6; // Horizontal sway amount (doubled from 3)
 const RAY_SWAY_SPEED = 0.8; // Sway animation speed
 
 // Ground pool configuration (light reflection on ground)
-const GROUND_POOL_RADIUS = 90; // Radius of ground light pool
+const GROUND_POOL_RADIUS = 180; // Radius of ground light pool (doubled from 90)
 const GROUND_POOL_INTENSITY = 0.4; // Intensity of ground pool
 
 // Light center vertical offset (push light up to center around runestone visual mass)
-const LIGHT_CENTER_Y_OFFSET = 70; // Pixels to offset light center upward from base
+const LIGHT_CENTER_Y_OFFSET = 140; // Pixels to offset light center upward from base (doubled from 70)
 
 /**
  * Get the image source for a rune stone based on its type
@@ -180,10 +180,10 @@ function renderMagicalRays(
         const seed = stoneId * 100 + i;
         const baseAngle = (i / RAY_COUNT) * Math.PI - Math.PI / 2; // Spread across top half
         const angleOffset = (seededRandom(seed) - 0.5) * 0.8;
-        const distanceFromCenter = 20 + seededRandom(seed + 1) * 30;
+        const distanceFromCenter = 40 + seededRandom(seed + 1) * 60; // Doubled from 20-50 range
         
         const rayBaseX = runeStone.posX + Math.cos(baseAngle + angleOffset) * distanceFromCenter;
-        const rayBaseY = runeStone.posY - LIGHT_CENTER_Y_OFFSET - 20; // Start above the light center
+        const rayBaseY = runeStone.posY - LIGHT_CENTER_Y_OFFSET - 40; // Start above the light center (doubled from 20)
         
         // Sway animation - each ray has different phase
         const swayPhase = currentTimeSeconds * RAY_SWAY_SPEED + i * 1.2;
@@ -557,8 +557,8 @@ export function renderRuneStoneNightLight(
     const coreRadius = NIGHT_LIGHT_RADIUS * 0.5;
     const corePulse = 1.0 + Math.sin(currentTimeSeconds * 1.5) * 0.1;
     const coreGradient = ctx.createRadialGradient(
-        lightScreenX, lightScreenY - 10, 0, // Slight offset toward runestone top
-        lightScreenX, lightScreenY - 10, coreRadius
+        lightScreenX, lightScreenY - 20, 0, // Slight offset toward runestone top (doubled from 10)
+        lightScreenX, lightScreenY - 20, coreRadius
     );
     
     // Bright accent color core with white-hot center
@@ -570,14 +570,14 @@ export function renderRuneStoneNightLight(
     
     ctx.fillStyle = coreGradient;
     ctx.beginPath();
-    ctx.arc(lightScreenX, lightScreenY - 30, coreRadius, 0, Math.PI * 2);
+    ctx.arc(lightScreenX, lightScreenY - 60, coreRadius, 0, Math.PI * 2); // Doubled from 30
     ctx.fill();
 
     // ═══════════════════════════════════════════════════════════════════════
     // LAYER 4: ACCENT SHIMMER RING - Chromatic ring effect
     // ═══════════════════════════════════════════════════════════════════════
     const ringRadius = NIGHT_LIGHT_RADIUS * 0.65;
-    const ringWidth = 25;
+    const ringWidth = 50; // Doubled from 25
     const ringPulse = Math.sin(currentTimeSeconds * 0.8) * 0.5 + 0.5; // 0 to 1
     
     const ringGradient = ctx.createRadialGradient(
@@ -702,8 +702,64 @@ export function renderRuneStone(
     nowMs: number,
     cycleProgress: number,
     onlyDrawShadow?: boolean,
-    skipDrawingShadow?: boolean
+    skipDrawingShadow?: boolean,
+    localPlayerPosition?: { x: number; y: number } | null // Player position for transparency logic
 ): void {
+    // Calculate if rune stone visually overlaps and occludes the player (same logic as trees/stones)
+    const MIN_ALPHA = 0.3; // Minimum opacity when blocking player
+    const MAX_ALPHA = 1.0; // Full opacity when not blocking
+    const RUNE_STONE_WIDTH = TARGET_RUNE_STONE_WIDTH_PX; // 300px (doubled)
+    
+    let runeStoneAlpha = MAX_ALPHA;
+    
+    if (localPlayerPosition && !onlyDrawShadow) {
+        // Calculate rune stone bounding box (use narrower width for occlusion - actual stone is ~60% of sprite width)
+        const occlusionWidth = RUNE_STONE_WIDTH * 0.6; // ~180px - just the actual stone portion
+        const occlusionHeight = RUNE_STONE_WIDTH * 0.8; // Upper portion that actually occludes
+        
+        const runeStoneLeft = runeStone.posX - occlusionWidth / 2;
+        const runeStoneRight = runeStone.posX + occlusionWidth / 2;
+        const runeStoneTop = runeStone.posY - occlusionHeight; // Only upper portion matters for occlusion
+        const runeStoneBottom = runeStone.posY;
+        
+        // Player bounding box
+        const playerSize = 48;
+        const playerLeft = localPlayerPosition.x - playerSize / 2;
+        const playerRight = localPlayerPosition.x + playerSize / 2;
+        const playerTop = localPlayerPosition.y - playerSize;
+        const playerBottom = localPlayerPosition.y;
+        
+        // Check if player overlaps with rune stone visually
+        const overlapsHorizontally = playerRight > runeStoneLeft && playerLeft < runeStoneRight;
+        const overlapsVertically = playerBottom > runeStoneTop && playerTop < runeStoneBottom;
+        
+        // Rune stone should be transparent if:
+        // 1. It overlaps with player visually
+        // 2. Rune stone renders AFTER player (runeStone.posY > player.posY means rune stone is in front in Y-sort)
+        if (overlapsHorizontally && overlapsVertically && runeStone.posY > localPlayerPosition.y) {
+            // Calculate how much the player is behind the rune stone (for smooth fade)
+            const depthDifference = runeStone.posY - localPlayerPosition.y;
+            const maxDepthForFade = 100; // Max distance for fade effect
+            
+            if (depthDifference > 0 && depthDifference < maxDepthForFade) {
+                // Closer to rune stone = more transparent
+                const fadeFactor = 1 - (depthDifference / maxDepthForFade);
+                runeStoneAlpha = MAX_ALPHA - (fadeFactor * (MAX_ALPHA - MIN_ALPHA));
+                runeStoneAlpha = Math.max(MIN_ALPHA, Math.min(MAX_ALPHA, runeStoneAlpha));
+            } else if (depthDifference >= maxDepthForFade) {
+                // Very close - use minimum alpha
+                runeStoneAlpha = MIN_ALPHA;
+            }
+        }
+    }
+    
+    // Apply transparency if needed
+    const needsTransparency = runeStoneAlpha < MAX_ALPHA;
+    if (needsTransparency) {
+        ctx.save();
+        ctx.globalAlpha = runeStoneAlpha;
+    }
+    
     renderConfiguredGroundEntity({
         ctx,
         entity: runeStone,
@@ -715,5 +771,10 @@ export function renderRuneStone(
         onlyDrawShadow,
         skipDrawingShadow,
     });
+    
+    // Restore context if transparency was applied
+    if (needsTransparency) {
+        ctx.restore();
+    }
 }
 

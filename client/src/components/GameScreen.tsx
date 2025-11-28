@@ -279,7 +279,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
     }, []);
 
     // Debug context
-    const { showAutotileDebug, toggleAutotileDebug, showMusicDebug, toggleMusicDebug, showChunkBoundaries, toggleChunkBoundaries } = useDebug();
+    const { showAutotileDebug, toggleAutotileDebug, showMusicDebug, toggleMusicDebug, showChunkBoundaries, toggleChunkBoundaries, showInteriorDebug, toggleInteriorDebug } = useDebug();
 
 
 
@@ -766,6 +766,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 shelters={shelters}
                 showAutotileDebug={showAutotileDebug}
                 showChunkBoundaries={showChunkBoundaries}
+                showInteriorDebug={showInteriorDebug}
                 minimapCache={minimapCache}
                 isGameMenuOpen={currentMenu !== null}
                 onAutoActionStatesChange={handleAutoActionStatesChange}

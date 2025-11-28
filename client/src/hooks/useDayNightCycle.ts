@@ -629,12 +629,14 @@ export function useDayNightCycle({
             
             if (isNightTime) {
                 runeStones.forEach(runeStone => {
-                    // Center exactly on the rune stone position
+                    // Center on the rune stone light center (offset upward to match visual mass)
+                    // LIGHT_CENTER_Y_OFFSET = 140 (doubled from 70) - matches runeStoneRenderingUtils.ts
+                    const LIGHT_CENTER_Y_OFFSET = 140;
                     const screenX = runeStone.posX + cameraOffsetX;
-                    const screenY = runeStone.posY + cameraOffsetY;
+                    const screenY = runeStone.posY + cameraOffsetY - LIGHT_CENTER_Y_OFFSET;
                     
-                    // 3x larger cutout radius (was 200, now 600)
-                    const RUNE_STONE_CUTOUT_RADIUS = 600;
+                    // Larger cutout radius to match doubled rune stone size (was 600, now 880 to match NIGHT_LIGHT_RADIUS * 2)
+                    const RUNE_STONE_CUTOUT_RADIUS = 880;
                     const lightRadius = RUNE_STONE_CUTOUT_RADIUS;
                     
                     // FIRST: Create the transparent cutout hole

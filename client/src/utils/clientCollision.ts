@@ -1,5 +1,5 @@
 // AAA-Quality Client-side Collision Detection System
-import { Player, Tree, Stone, WoodenStorageBox, Shelter, RainCollector, WildAnimal, Barrel, Furnace, WallCell, FoundationCell, HomesteadHearth, BasaltColumn, Door } from '../generated';
+import { Player, Tree, Stone, RuneStone, WoodenStorageBox, Shelter, RainCollector, WildAnimal, Barrel, Furnace, WallCell, FoundationCell, HomesteadHearth, BasaltColumn, Door } from '../generated';
 import { gameConfig, FOUNDATION_TILE_SIZE, foundationCellToWorldCenter } from '../config/gameConfig';
 
 // Add at top after imports:
@@ -225,6 +225,25 @@ function getCollisionCandidates(
       x: stone.posX + COLLISION_OFFSETS.STONE.x,
       y: stone.posY + COLLISION_OFFSETS.STONE.y,
       radius: COLLISION_RADII.STONE
+    });
+  }
+  
+  // Filter rune stones
+  const nearbyRuneStones = filterEntitiesByDistance(
+    entities.runeStones,
+    playerX,
+    playerY,
+    COLLISION_PERF.STONE_CULL_DISTANCE_SQ, // Use same cull distance as stones
+    COLLISION_PERF.MAX_STONES_TO_CHECK
+  );
+  
+  for (const runeStone of nearbyRuneStones) {
+    shapes.push({
+      id: runeStone.id.toString(),
+      type: `runeStone-${runeStone.id.toString()}`,
+      x: runeStone.posX + COLLISION_OFFSETS.RUNE_STONE.x,
+      y: runeStone.posY + COLLISION_OFFSETS.RUNE_STONE.y,
+      radius: COLLISION_RADII.RUNE_STONE
     });
   }
   
@@ -716,6 +735,7 @@ function getCollisionCandidates(
 const COLLISION_RADII = {
   TREE: 38,
   STONE: 28,       // Smaller radius for flattened stones
+  RUNE_STONE: 80,  // Doubled from 40 to match doubled visual size (matches server-side RUNE_STONE_RADIUS)
   STORAGE_BOX: 25, // Much tighter radius for boxes
   RAIN_COLLECTOR: 30, // Increased to match server-side for easier targeting
   FURNACE: 20, // Adjusted radius for easier bottom approach while keeping top collision
@@ -731,6 +751,7 @@ const COLLISION_RADII = {
 const COLLISION_OFFSETS = {
   TREE: { x: 0, y: -68 },      // Adjusted to keep top boundary similar while squishing from bottom
   STONE: { x: 0, y: -72 },     // Small circle positioned at visual stone base
+  RUNE_STONE: { x: 0, y: -100 }, // Doubled from -50 to match doubled visual size (matches server-side RUNE_STONE_COLLISION_Y_OFFSET)
   STORAGE_BOX: { x: 0, y: -70 }, // Small circle positioned at visual box base
   RAIN_COLLECTOR: { x: 0, y: 0 }, // Pushed down to align with visual base
   FURNACE: { x: 0, y: -50 }, // Adjusted center to extend collision below while keeping top boundary
@@ -768,6 +789,7 @@ export interface CollisionResult {
 export interface GameEntities {
   trees: Map<string, Tree>;
   stones: Map<string, Stone>;
+  runeStones: Map<string, RuneStone>; // Add rune stones for collision
   boxes: Map<string, WoodenStorageBox>;
   rainCollectors: Map<string, RainCollector>;
   furnaces: Map<string, Furnace>;

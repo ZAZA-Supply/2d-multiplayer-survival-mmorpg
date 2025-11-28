@@ -28,8 +28,8 @@ pub const DOOR_TYPE_METAL: u8 = 1;
 /// Door collision thickness (same as walls)
 pub const DOOR_COLLISION_THICKNESS: f32 = 6.0;
 
-/// Door interaction distance (increased significantly for flawless E interaction)
-pub const DOOR_INTERACTION_DISTANCE: f32 = 180.0; // Increased from 96px to 180px (generous for visual offset)
+/// Door interaction distance (same as other building objects like campfires, storage boxes)
+pub const DOOR_INTERACTION_DISTANCE: f32 = 96.0; // Standard interaction distance (matches campfire, storage box, etc.)
 pub const DOOR_INTERACTION_DISTANCE_SQUARED: f32 = DOOR_INTERACTION_DISTANCE * DOOR_INTERACTION_DISTANCE;
 
 // --- Door Table ---

@@ -48,6 +48,7 @@ interface UpgradeRadialMenuProps {
   onDestroy?: () => void; // Destroy callback (only shown for Twig tier)
   activeConsumableEffects?: Map<string, ActiveConsumableEffect>; // ADDED: For building privilege check
   localPlayerId?: string | null; // ADDED: Local player ID for privilege check
+  homesteadHearths?: Map<string, any>; // ADDED: For checking if privilege is required (no hearths = free for all)
 }
 
 interface UpgradeOption {
@@ -129,6 +130,7 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
   onDestroy,
   activeConsumableEffects,
   localPlayerId,
+  homesteadHearths,
 }) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -136,8 +138,20 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const isSelectingRef = useRef(false);
 
+  // Check if any non-destroyed Homestead Hearths exist in the world
+  const anyHearthsExist = useMemo(() => {
+    if (!homesteadHearths) return false;
+    return Array.from(homesteadHearths.values()).some((hearth) => !hearth.isDestroyed);
+  }, [homesteadHearths]);
+
   // Check if player has building privilege
+  // EARLY GAME: If no hearths exist, anyone can upgrade (free for all)
+  // LATE GAME: Once hearths exist, require building privilege
   const hasBuildingPrivilege = useMemo(() => {
+    // If no hearths exist, privilege is NOT required - allow anyone to upgrade
+    if (!anyHearthsExist) return true;
+    
+    // Hearths exist - need to check for building privilege effect
     if (!activeConsumableEffects || !localPlayerId || !connection) return false;
     
     // Convert localPlayerId string to Identity for comparison
@@ -149,7 +163,7 @@ export const UpgradeRadialMenu: React.FC<UpgradeRadialMenuProps> = ({
       const effectPlayerId = effect.playerId;
       return effectTypeTag === 'BuildingPrivilege' && effectPlayerId.isEqual(localPlayerIdentity);
     });
-  }, [activeConsumableEffects, localPlayerId, connection]);
+  }, [anyHearthsExist, activeConsumableEffects, localPlayerId, connection]);
 
   // Get resource counts (from inventory and hotbar - only local player's items)
   const getResourceCount = (resourceName: string): number => {

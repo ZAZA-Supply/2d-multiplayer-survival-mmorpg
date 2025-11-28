@@ -191,6 +191,7 @@ interface GameCanvasProps {
   shelters: Map<string, SpacetimeDBShelter>;
   showAutotileDebug: boolean;
   showChunkBoundaries: boolean;
+  showInteriorDebug: boolean;
   minimapCache: any; // Add this for minimapCache
   isGameMenuOpen: boolean; // Add this prop
   onAutoActionStatesChange?: (isAutoAttacking: boolean) => void;
@@ -277,6 +278,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   shelters,
   showAutotileDebug,
   showChunkBoundaries,
+  showInteriorDebug,
   minimapCache,
   isGameMenuOpen,
   onAutoActionStatesChange,
@@ -2366,6 +2368,62 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     }
     // --- End Render Chunk Boundaries ---
 
+    // --- Render Interior Debug Overlay ---
+    if (showInteriorDebug && buildingClusters.size > 0) {
+      const FOUNDATION_SIZE = gameConfig.foundationTileSize; // 96px per foundation cell
+      
+      // Loop through all building clusters
+      for (const [clusterId, cluster] of buildingClusters) {
+        // Only render enclosed buildings
+        if (!cluster.isEnclosed) continue;
+        
+        // Determine color based on whether player is inside this cluster
+        const isPlayerInside = playerBuildingClusterId === clusterId;
+        const fillColor = isPlayerInside 
+          ? 'rgba(0, 255, 136, 0.35)' // Green for player's current building
+          : 'rgba(0, 212, 255, 0.25)'; // Cyan for other enclosed buildings
+        const strokeColor = isPlayerInside
+          ? 'rgba(0, 255, 136, 0.8)'
+          : 'rgba(0, 212, 255, 0.6)';
+        
+        ctx.fillStyle = fillColor;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 2;
+        
+        // Loop through all cells in the cluster
+        for (const cellKey of cluster.cellCoords) {
+          const [cellXStr, cellYStr] = cellKey.split(',');
+          const cellX = parseInt(cellXStr, 10);
+          const cellY = parseInt(cellYStr, 10);
+          
+          // Convert cell coordinates to world pixels
+          const worldX = cellX * FOUNDATION_SIZE;
+          const worldY = cellY * FOUNDATION_SIZE;
+          
+          // Draw filled rectangle
+          ctx.fillRect(worldX, worldY, FOUNDATION_SIZE, FOUNDATION_SIZE);
+          // Draw border for visibility
+          ctx.strokeRect(worldX, worldY, FOUNDATION_SIZE, FOUNDATION_SIZE);
+        }
+        
+        // Draw cluster info label at the first cell of each cluster
+        const firstCellKey = cluster.cellCoords.values().next().value;
+        if (firstCellKey) {
+          const [firstCellXStr, firstCellYStr] = firstCellKey.split(',');
+          const labelX = parseInt(firstCellXStr, 10) * FOUNDATION_SIZE + 4;
+          const labelY = parseInt(firstCellYStr, 10) * FOUNDATION_SIZE + 16;
+          
+          ctx.font = '10px monospace';
+          ctx.fillStyle = isPlayerInside ? 'rgba(0, 255, 136, 1)' : 'rgba(0, 212, 255, 1)';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          const label = isPlayerInside ? 'INSIDE' : 'ENCLOSED';
+          ctx.fillText(label, labelX, labelY);
+        }
+      }
+    }
+    // --- End Render Interior Debug Overlay ---
+
     ctx.restore(); // This is the restore from translate(currentCameraOffsetX, currentCameraOffsetY)
 
     // --- Render Rain Before Color Overlay ---
@@ -3078,6 +3136,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           tileType="foundation"
           activeConsumableEffects={activeConsumableEffects}
           localPlayerId={localPlayerId}
+          homesteadHearths={homesteadHearths}
           onSelect={(tier: BuildingTier) => {
             if (connection && upgradeMenuFoundationRef.current) {
               console.log('[UpgradeRadialMenu] Upgrading foundation', upgradeMenuFoundationRef.current.id, 'to tier', tier);
@@ -3120,6 +3179,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           tileType="wall"
           activeConsumableEffects={activeConsumableEffects}
           localPlayerId={localPlayerId}
+          homesteadHearths={homesteadHearths}
           onSelect={(tier: BuildingTier) => {
             if (connection && upgradeMenuWallRef.current) {
               console.log('[UpgradeRadialMenu] Upgrading wall', upgradeMenuWallRef.current.id, 'to tier', tier);

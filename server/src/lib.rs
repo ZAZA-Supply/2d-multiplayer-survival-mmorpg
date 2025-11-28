@@ -327,6 +327,7 @@ pub use torch::toggle_torch;
 // Import Table Traits needed in this module
 use crate::tree::tree as TreeTableTrait;
 use crate::stone::stone as StoneTableTrait;
+use crate::rune_stone::rune_stone as RuneStoneTableTrait;
 use crate::campfire::campfire as CampfireTableTrait;
 use crate::furnace::furnace as FurnaceTableTrait;
 use crate::lantern::lantern as LanternTableTrait;
@@ -922,6 +923,7 @@ pub fn register_player(ctx: &ReducerContext, username: String) -> Result<(), Str
     // Get tables needed for spawn check only if registering new player
     let trees = ctx.db.tree();
     let stones = ctx.db.stone();
+    let rune_stones = ctx.db.rune_stone();
     let campfires = ctx.db.campfire();
     let wooden_storage_boxes = ctx.db.wooden_storage_box();
 
@@ -1185,6 +1187,18 @@ pub fn register_player(ctx: &ReducerContext, username: String) -> Result<(), Str
                         if distance_sq < (crate::stone::PLAYER_STONE_COLLISION_DISTANCE_SQUARED * 0.8) {
                             collision = true;
                             last_collision_reason = format!("Stone collision at ({:.1}, {:.1})", stone.pos_x, stone.pos_y);
+                            break;
+                        }
+                    }
+                },
+                crate::spatial_grid::EntityType::RuneStone(rune_stone_id) => {
+                    if let Some(rune_stone) = rune_stones.id().find(&rune_stone_id) {
+                        let dx = spawn_x - rune_stone.pos_x;
+                        let dy = spawn_y - (rune_stone.pos_y - crate::rune_stone::RUNE_STONE_COLLISION_Y_OFFSET);
+                        let distance_sq = dx * dx + dy * dy;
+                        if distance_sq < (crate::rune_stone::PLAYER_RUNE_STONE_COLLISION_DISTANCE_SQUARED * 0.8) {
+                            collision = true;
+                            last_collision_reason = format!("RuneStone collision at ({:.1}, {:.1})", rune_stone.pos_x, rune_stone.pos_y);
                             break;
                         }
                     }

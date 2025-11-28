@@ -7,6 +7,7 @@ use crate::{PLAYER_RADIUS, WORLD_WIDTH_PX, WORLD_HEIGHT_PX, get_effective_player
 use crate::player as PlayerTableTrait;
 use crate::tree::tree as TreeTableTrait;
 use crate::stone::stone as StoneTableTrait;
+use crate::rune_stone::{rune_stone as RuneStoneTableTrait, RUNE_STONE_RADIUS, RUNE_STONE_COLLISION_Y_OFFSET};
 use crate::wooden_storage_box::wooden_storage_box as WoodenStorageBoxTableTrait;
 use crate::player_corpse::{PlayerCorpse, CORPSE_COLLISION_RADIUS, PLAYER_CORPSE_COLLISION_DISTANCE_SQUARED, CORPSE_COLLISION_Y_OFFSET}; // Assuming CORPSE_COLLISION_RADIUS is what we need for simple circle vs circle.
 use crate::player_corpse::player_corpse as PlayerCorpseTableTrait; // Ensure trait for fetching
@@ -70,6 +71,7 @@ pub fn calculate_slide_collision_with_grid(
     let players = ctx.db.player();
     let trees = ctx.db.tree();
     let stones = ctx.db.stone();
+    let rune_stones = ctx.db.rune_stone(); // Access rune stone table
     let wooden_storage_boxes = ctx.db.wooden_storage_box();
     let player_corpses = ctx.db.player_corpse(); // Access player_corpse table
     let shelters = ctx.db.shelter(); // Access shelter table
@@ -283,6 +285,55 @@ pub fn calculate_slide_collision_with_grid(
                                      };
                                      final_x = basalt.pos_x + separation_direction.0 * min_dist;
                                      final_y = basalt_collision_y + separation_direction.1 * min_dist;
+                                 }
+                             }
+                             final_x = final_x.max(current_player_radius).min(WORLD_WIDTH_PX - current_player_radius);
+                             final_y = final_y.max(current_player_radius).min(WORLD_HEIGHT_PX - current_player_radius);
+                         }
+                     }
+                 }
+            },
+            spatial_grid::EntityType::RuneStone(rune_stone_id) => {
+                 if let Some(rune_stone) = rune_stones.id().find(rune_stone_id) {
+                     let rune_stone_collision_y = rune_stone.pos_y - RUNE_STONE_COLLISION_Y_OFFSET;
+                     let dx = final_x - rune_stone.pos_x;
+                     let dy = final_y - rune_stone_collision_y;
+                     let dist_sq = dx * dx + dy * dy;
+                     let min_dist = current_player_radius + RUNE_STONE_RADIUS + SLIDE_SEPARATION_DISTANCE; // Add separation
+                     let min_dist_sq = min_dist * min_dist;
+                     
+                     if dist_sq < min_dist_sq {
+                        log::debug!("Player-RuneStone collision for slide: {:?} vs rune stone {}", sender_id, rune_stone.id);
+                         let collision_normal_x = dx;
+                         let collision_normal_y = dy;
+                         let normal_mag_sq = dist_sq;
+                         if normal_mag_sq > 0.0 {
+                             let normal_mag = normal_mag_sq.sqrt();
+                             let norm_x = collision_normal_x / normal_mag;
+                             let norm_y = collision_normal_y / normal_mag;
+                             let dot_product = server_dx * norm_x + server_dy * norm_y;
+                             
+                             // Only slide if moving toward the object (dot_product < 0)
+                             if dot_product < 0.0 {
+                                 let projection_x = dot_product * norm_x;
+                                 let projection_y = dot_product * norm_y;
+                                 let slide_dx = server_dx - projection_x;
+                                 let slide_dy = server_dy - projection_y;
+                                 final_x = current_player_pos_x + slide_dx;
+                                 final_y = current_player_pos_y + slide_dy;
+                                 
+                                 // 🛡️ SEPARATION ENFORCEMENT: Ensure minimum separation after sliding
+                                 let final_dx = final_x - rune_stone.pos_x;
+                                 let final_dy = final_y - rune_stone_collision_y;
+                                 let final_dist = (final_dx * final_dx + final_dy * final_dy).sqrt();
+                                 if final_dist < min_dist {
+                                     let separation_direction = if final_dist > 0.001 {
+                                         (final_dx / final_dist, final_dy / final_dist)
+                                     } else {
+                                         (1.0, 0.0) // Default direction
+                                     };
+                                     final_x = rune_stone.pos_x + separation_direction.0 * min_dist;
+                                     final_y = rune_stone_collision_y + separation_direction.1 * min_dist;
                                  }
                              }
                              final_x = final_x.max(current_player_radius).min(WORLD_WIDTH_PX - current_player_radius);

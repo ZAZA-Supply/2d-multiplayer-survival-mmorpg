@@ -13,8 +13,8 @@ export const DOOR_TYPE_METAL = 1;
 export const DOOR_EDGE_NORTH = 0;
 export const DOOR_EDGE_SOUTH = 2;
 
-// Door interaction distance (matches server-side for flawless interaction)
-export const PLAYER_DOOR_INTERACTION_DISTANCE = 180.0; // Matches server-side 180px for generous interaction range
+// Door interaction distance (matches server-side, same as other building objects)
+export const PLAYER_DOOR_INTERACTION_DISTANCE = 96.0; // Standard interaction distance (matches campfire, storage box, etc.)
 export const PLAYER_DOOR_INTERACTION_DISTANCE_SQUARED = PLAYER_DOOR_INTERACTION_DISTANCE * PLAYER_DOOR_INTERACTION_DISTANCE;
 
 // Door rendering offset (doors are rendered 44px higher than their actual position)

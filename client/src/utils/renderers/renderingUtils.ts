@@ -864,7 +864,7 @@ export const renderYSortedEntities = ({
             renderStone(ctx, entity as SpacetimeDBStone, nowMs, cycleProgress, false, false);
         } else if (type === 'rune_stone') {
             // Render rune stone with its shadow in the normal order (shadow first, then rune stone)
-            renderRuneStone(ctx, entity as SpacetimeDBRuneStone, nowMs, cycleProgress, false, false);
+            renderRuneStone(ctx, entity as SpacetimeDBRuneStone, nowMs, cycleProgress, false, false, localPlayerPosition);
         } else if (type === 'shelter') {
             const shelter = entity as SpacetimeDBShelter;
             if (shelterImage) { 
