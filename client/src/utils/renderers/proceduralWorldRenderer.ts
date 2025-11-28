@@ -327,6 +327,7 @@ export class ProceduralWorldRenderer {
         }
         
         // Get sprite coordinates from the autotile sheet
+        // Pass isSecondaryInterior flag to use row 0 col 0 for Sea/HotSpringWater interior tiles
         const spriteCoords = getAutotileSpriteCoords(
             autotileResult.config, 
             autotileResult.bitmask,
@@ -343,12 +344,10 @@ export class ProceduralWorldRenderer {
         
         // Render the specific sprite from the autotile sheet with pixel-perfect alignment
         // Use exact source dimensions and destination dimensions
-        // NEW FORMAT: 128×128 tiles from 512×640 tileset
-        // LEGACY FORMAT: ~213×160 tiles from 1280×1280 tileset
         ctx.drawImage(
             autotileImg,
             Math.floor(spriteCoords.x), Math.floor(spriteCoords.y), 
-            Math.floor(spriteCoords.width), Math.floor(spriteCoords.height), // Source rectangle (size varies by format)
+            Math.floor(spriteCoords.width), Math.floor(spriteCoords.height), // Source rectangle (16x16 from autotile sheet)
             Math.floor(pixelX), Math.floor(pixelY), 
             Math.floor(pixelSize), Math.floor(pixelSize) // Destination rectangle (game tile size)
         );

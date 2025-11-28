@@ -3,11 +3,14 @@ import { WorldTile } from '../generated/world_tile_type';
 // Import NEW 512×640 autotile images (15-tile hierarchical format)
 import grassBeachAutotile from '../assets/tiles/new/tileset_grass_beach_autotile.png';
 import beachSeaAutotile from '../assets/tiles/new/tileset_beach_sea_autotile.png';
+import grassDirtAutotile from '../assets/tiles/new/tileset_grass_dirt_autotile.png';
+import dirtBeachAutotile from '../assets/tiles/new/tileset_dirt_beach_autotile.png';
+import grassDirtRoadAutotile from '../assets/tiles/new/tileset_grass_dirtroad_autotile.png';
+import beachDirtRoadAutotile from '../assets/tiles/new/tileset_beach_dirtroad_autotile.png';
+import dirtDirtRoadAutotile from '../assets/tiles/new/tileset_dirt_dirtroad_autotile.png';
 
 // Import legacy autotile images (for tile types that don't have new format yet)
-import grassDirtAutotile from '../assets/tiles/tileset_grass_dirt_autotile.png';
-import grassDirtRoadAutotile from '../assets/tiles/tileset_grass_dirtroad_autotile.png';
-import dirtRoadDirtAutotile from '../assets/tiles/tileset_dirtroad_dirt_autotile.png';
+import dirtRoadDirtAutotile from '../assets/tiles/new/tileset_dirtroad_dirt_autotile.png';
 
 /**
  * NEW 15-Tile Hierarchical Autotile System
@@ -206,8 +209,8 @@ export const AUTOTILE_CONFIGS: { [key: string]: AutotileConfig } = {
         columns: TILESET_COLS,
         rows: TILESET_ROWS,
         isNewFormat: true,
-        primaryInterior: { row: 1, col: 2 },
-        secondaryInterior: { row: 0, col: 0 },
+        primaryInterior: { row: 1, col: 2 },    // A5 - Grass interior
+        secondaryInterior: { row: 0, col: 0 },  // HotSpringWater interior (column 0, row 0)
     },
     'Beach_Sea': {
         primaryType: 'Beach',
@@ -227,48 +230,78 @@ export const AUTOTILE_CONFIGS: { [key: string]: AutotileConfig } = {
         tileSize: NEW_TILE_SIZE,
         columns: TILESET_COLS,
         rows: TILESET_ROWS,
-        primaryInterior: { row: 1, col: 2 },
-        secondaryInterior: { row: 0, col: 0 },
         isNewFormat: true,
+        primaryInterior: { row: 1, col: 2 },    // A5 - Beach interior
+        secondaryInterior: { row: 0, col: 0 },  // HotSpringWater interior (column 0, row 0)
     },
-    
-    // LEGACY FORMAT (1280×1280, 48-tile bitmask) - kept for compatibility
     'Grass_Dirt': {
         primaryType: 'Grass',
         secondaryType: 'Dirt',
         tilesetPath: grassDirtAutotile,
-        tileSize: 213,
-        columns: 6,
-        rows: 8,
-        isNewFormat: false,
+        tileSize: NEW_TILE_SIZE,
+        columns: TILESET_COLS,
+        rows: TILESET_ROWS,
+        isNewFormat: true,
+        primaryInterior: { row: 1, col: 2 },    // A5 - Grass interior
+        secondaryInterior: { row: 0, col: 0 },  // Dirt interior (column 0, row 4)
+    },
+    'Dirt_Beach': {
+        primaryType: 'Dirt',
+        secondaryType: 'Beach',
+        tilesetPath: dirtBeachAutotile,
+        tileSize: NEW_TILE_SIZE,
+        columns: TILESET_COLS,
+        rows: TILESET_ROWS,
+        isNewFormat: true,
+        primaryInterior: { row: 1, col: 2 },    // A5 - Dirt interior
+        secondaryInterior: { row: 0, col: 0 },  // Beach interior (column 0, row 0)
     },
     'Grass_DirtRoad': {
         primaryType: 'Grass',
         secondaryType: 'DirtRoad',
         tilesetPath: grassDirtRoadAutotile,
-        tileSize: 213,
-        columns: 6,
-        rows: 8,
-        isNewFormat: false,
+        tileSize: NEW_TILE_SIZE,
+        columns: TILESET_COLS,
+        rows: TILESET_ROWS,
+        isNewFormat: true,
+        primaryInterior: { row: 1, col: 2 },    // A5 - Grass interior
+        secondaryInterior: { row: 0, col: 0 },  // DirtRoad interior (column 0, row 0)
     },
-    'DirtRoad_Dirt': {
-        primaryType: 'DirtRoad',
-        secondaryType: 'Dirt',
-        tilesetPath: dirtRoadDirtAutotile,
-        tileSize: 213,
-        columns: 6,
-        rows: 8,
-        isNewFormat: false,
+    'Beach_DirtRoad': {
+        primaryType: 'Beach',
+        secondaryType: 'DirtRoad',
+        tilesetPath: beachDirtRoadAutotile,
+        tileSize: NEW_TILE_SIZE,
+        columns: TILESET_COLS,
+        rows: TILESET_ROWS,
+        isNewFormat: true,
+        primaryInterior: { row: 1, col: 2 },    // A5 - Beach interior
+        secondaryInterior: { row: 0, col: 0 },  // DirtRoad interior (column 0, row 0)
     },
     'Dirt_DirtRoad': {
         primaryType: 'Dirt',
         secondaryType: 'DirtRoad',
-        tilesetPath: dirtRoadDirtAutotile,
-        tileSize: 213,
-        columns: 6,
-        rows: 8,
-        isNewFormat: false,
+        tilesetPath: dirtDirtRoadAutotile,
+        tileSize: NEW_TILE_SIZE,
+        columns: TILESET_COLS,
+        rows: TILESET_ROWS,
+        isNewFormat: true,
+        primaryInterior: { row: 1, col: 2 },    // A5 - Dirt interior
+        secondaryInterior: { row: 0, col: 0 },  // DirtRoad interior (column 0, row 0)
     },
+    'DirtRoad_Dirt': {
+        primaryType: 'DirtRoad',
+        secondaryType: 'Dirt',
+        tilesetPath: dirtDirtRoadAutotile, // Use same tileset as Dirt_DirtRoad
+        tileSize: NEW_TILE_SIZE,
+        columns: TILESET_COLS,
+        rows: TILESET_ROWS,
+        isNewFormat: true,
+        primaryInterior: { row: 0, col: 0 },   // DirtRoad interior (column 0, row 0)
+        secondaryInterior: { row: 1, col: 2 }, // Dirt interior (A5) - swapped from Dirt_DirtRoad
+    },
+    
+    // LEGACY FORMAT (1280×1280, 48-tile bitmask) - kept for compatibility
 };
 
 // =============================================================================
@@ -773,7 +806,16 @@ export function shouldUseAutotiling(
     }
     
     // First pass: Look for configs where this tile is PRIMARY and has secondary neighbors
-    for (const [configKey, config] of Object.entries(AUTOTILE_CONFIGS)) {
+    // IMPORTANT: Check Grass_Dirt BEFORE Grass_Beach to prioritize dirt transitions
+    const configEntries = Object.entries(AUTOTILE_CONFIGS);
+    // Sort to check Grass_Dirt first if it exists
+    configEntries.sort((a, b) => {
+        if (a[0] === 'Grass_Dirt') return -1;
+        if (b[0] === 'Grass_Dirt') return 1;
+        return 0;
+    });
+    
+    for (const [configKey, config] of configEntries) {
         if (autotileTileType === config.primaryType) {
             // Skip special cases
             if (config.primaryType === 'DirtRoad' && config.secondaryType === 'Grass') continue;
@@ -791,11 +833,14 @@ export function shouldUseAutotiling(
     }
     
     // Second pass: For NEW FORMAT tilesets, use primaryInterior for interior PRIMARY tiles
+    // IMPORTANT: Skip this pass for HotSpringWater and Sea - they should be handled as secondary types
     for (const [configKey, config] of Object.entries(AUTOTILE_CONFIGS)) {
         if (autotileTileType === config.primaryType && config.isNewFormat) {
             // Skip special cases
             if (config.primaryType === 'DirtRoad' && config.secondaryType === 'Grass') continue;
             if (config.primaryType === 'HotSpringWater') continue;
+            // Skip Sea and HotSpringWater tiles - they should be handled as secondary types in third pass
+            if (autotileTileType === 'Sea' || autotileTileType === 'HotSpringWater') continue;
             
             // Return config with bitmask 0 - will use primaryInterior
             return { config, bitmask: 0 };
@@ -804,7 +849,18 @@ export function shouldUseAutotiling(
     
     // Third pass: Look for configs where this tile is SECONDARY (e.g., Sea in Beach_Sea)
     // Use secondaryInterior tile position for interior secondary tiles
-    for (const [configKey, config] of Object.entries(AUTOTILE_CONFIGS)) {
+    // IMPORTANT: Prioritize Beach_HotSpringWater over Grass_HotSpringWater for HotSpringWater tiles
+    const secondaryConfigEntries = Object.entries(AUTOTILE_CONFIGS);
+    // Sort to check Beach_HotSpringWater before Grass_HotSpringWater
+    secondaryConfigEntries.sort((a, b) => {
+        if (a[0] === 'Beach_HotSpringWater') return -1;
+        if (b[0] === 'Beach_HotSpringWater') return 1;
+        if (a[0] === 'Beach_Sea') return -1;
+        if (b[0] === 'Beach_Sea') return 1;
+        return 0;
+    });
+    
+    for (const [configKey, config] of secondaryConfigEntries) {
         if (autotileTileType === config.secondaryType && config.isNewFormat && config.secondaryInterior) {
             // Return config with special flag for secondary interior
             return { config, bitmask: -1, isSecondaryInterior: true };
