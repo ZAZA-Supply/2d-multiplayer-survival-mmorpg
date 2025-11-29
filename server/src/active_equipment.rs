@@ -525,6 +525,9 @@ pub fn load_ranged_weapon(ctx: &ReducerContext) -> Result<(), String> {
         log::info!("[LoadRangedWeapon] Player {:?} loaded {} rounds of {} into {} (total: {}/{}).", 
             sender_id, rounds_to_load, selected_ammo.0, item_def.name, 
             current_loaded + rounds_to_load, magazine_capacity);
+        
+        // Emit reload sound for magazine-based weapons (pistol)
+        sound_events::emit_reload_pistol_sound(ctx, player.position_x, player.position_y, sender_id);
     } else {
         // Single-shot weapon (bow, crossbow) - existing behavior
         // Just mark as ready to fire, ammo consumed on fire
@@ -536,6 +539,13 @@ pub fn load_ranged_weapon(ctx: &ReducerContext) -> Result<(), String> {
 
         log::info!("[LoadRangedWeapon] Player {:?} loaded {} with {} (ready to fire).", 
             sender_id, item_def.name, selected_ammo.0);
+        
+        // Emit reload sound based on weapon type
+        if item_def.name == "Hunting Bow" {
+            sound_events::emit_reload_bow_sound(ctx, player.position_x, player.position_y, sender_id);
+        } else if item_def.name == "Crossbow" {
+            sound_events::emit_reload_crossbow_sound(ctx, player.position_x, player.position_y, sender_id);
+        }
     }
     
     Ok(())

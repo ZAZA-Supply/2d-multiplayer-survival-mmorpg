@@ -176,49 +176,93 @@ pub fn seed_items(ctx: &ReducerContext) -> Result<(), String> {
 #[spacetimedb::reducer]
 pub fn seed_ranged_weapon_stats(ctx: &ReducerContext) -> Result<(), String> {
     let ranged_stats = ctx.db.ranged_weapon_stats();
-    if ranged_stats.iter().count() > 0 {
-        log::info!("Ranged weapon stats already seeded ({}). Skipping.", ranged_stats.iter().count());
-        return Ok(());
-    }
 
-    log::info!("Seeding initial ranged weapon stats...");
+    log::info!("Seeding/updating ranged weapon stats...");
 
+    // RANGED WEAPON PROGRESSION (Early → Mid → Late Game)
+    // ================================================
+    // Hunting Bow: Easy to craft, short range, slower arrows, good for early hunting
+    // Crossbow: Harder to craft, longer range, faster bolts, very accurate, slow reload
+    // Makarov PM: End-game, longest range, fastest projectile, rapid fire, requires ammo
+    
     let initial_ranged_stats = vec![
+        // TIER 1: Hunting Bow (Early Game)
+        // - Easy materials (wood, plant fiber)
+        // - Short effective range forces closer engagement
+        // - Slower arrows with visible arc
+        // - Decent accuracy for hunting animals
         RangedWeaponStats {
             item_name: "Hunting Bow".to_string(),
-            weapon_range: 800.0,      // Increased from 300 to 400 world units
-            projectile_speed: 800.0,  // Fast projectile
-            accuracy: 0.8,            // 80% accuracy base
-            reload_time_secs: 1.0,    // 1 second between shots
-            magazine_capacity: 0,     // Single-shot (arrows loaded one at a time)
+            weapon_range: 450.0,       // Short range - need to get relatively close
+            projectile_speed: 650.0,   // Slower arrows with noticeable arc
+            accuracy: 0.78,            // 78% accuracy - good enough for hunting
+            reload_time_secs: 1.2,     // Moderate fire rate
+            magazine_capacity: 0,      // Single-shot (arrows loaded one at a time)
         },
+        
+        // TIER 2: Crossbow (Mid Game)
+        // - Requires metal fragments to craft
+        // - Significantly longer range than bow
+        // - Much faster, flatter trajectory
+        // - Highest accuracy but slowest reload (trade-off)
         RangedWeaponStats {
             item_name: "Crossbow".to_string(),
-            weapon_range: 800.0,      // Longer range than hunting bow
-            projectile_speed: 1200.0, // Much faster projectile - travels in straight line
-            accuracy: 0.95,           // 95% accuracy - very precise
-            reload_time_secs: 2.0,    // Slower reload time (2 seconds)
-            magazine_capacity: 0,     // Single-shot (bolts loaded one at a time)
+            weapon_range: 700.0,       // Good range - can engage from safety
+            projectile_speed: 1000.0,  // Fast bolts, flatter trajectory
+            accuracy: 0.92,            // 92% accuracy - mechanical precision
+            reload_time_secs: 2.5,     // Slow reload (cranking mechanism)
+            magazine_capacity: 0,      // Single-shot (bolts loaded one at a time)
         },
+        
+        // TIER 3: Makarov PM (Late Game)
+        // - Expensive crafting cost (lots of metal)
+        // - Longest effective range
+        // - Fastest projectile (nearly hitscan)
+        // - Good accuracy but recoil makes rapid fire less precise
+        // - Magazine-fed for sustained fire
         RangedWeaponStats {
             item_name: "Makarov PM".to_string(),
-            weapon_range: 1200.0,      // Long range - pistol is effective at distance
-            projectile_speed: 1500.0, // Very fast projectile (faster than crossbow)
-            accuracy: 0.85,           // Good base accuracy, decays on rapid fire
-            reload_time_secs: 0.3,    // Time between shots (fire rate, not reload time)
-            magazine_capacity: 6,     // 6-round magazine
+            weapon_range: 900.0,       // Longest range - can engage at distance
+            projectile_speed: 1400.0,  // Very fast bullets
+            accuracy: 0.82,            // 82% accuracy - recoil affects precision
+            reload_time_secs: 0.4,     // Fast semi-auto fire rate
+            magazine_capacity: 8,      // 8-round magazine
         },
     ];
 
     let mut seeded_count = 0;
+    let mut updated_count = 0;
+    
     for stats in initial_ranged_stats {
-        match ranged_stats.try_insert(stats) {
-            Ok(_) => seeded_count += 1,
-            Err(e) => log::error!("Failed to insert ranged weapon stats during seeding: {}", e),
+        // Check if this weapon already exists in the database
+        if let Some(existing) = ranged_stats.item_name().find(&stats.item_name) {
+            // Update if any values differ (allows hot-updating stats without clean deploy)
+            if existing.weapon_range != stats.weapon_range 
+                || existing.projectile_speed != stats.projectile_speed
+                || existing.accuracy != stats.accuracy
+                || existing.reload_time_secs != stats.reload_time_secs
+                || existing.magazine_capacity != stats.magazine_capacity 
+            {
+                log::info!("Updating ranged stats for '{}': range {:.0}->{:.0}", 
+                    stats.item_name, existing.weapon_range, stats.weapon_range);
+                ranged_stats.item_name().update(stats);
+                updated_count += 1;
+            }
+        } else {
+            // Insert new entry
+            match ranged_stats.try_insert(stats) {
+                Ok(inserted) => {
+                    log::info!("Seeded ranged stats for '{}': range={:.0}", inserted.item_name, inserted.weapon_range);
+                    seeded_count += 1;
+                },
+                Err(e) => log::error!("Failed to seed ranged stats: {}", e),
+            }
         }
     }
 
-    log::info!("Finished seeding {} ranged weapon stats.", seeded_count);
+    if seeded_count > 0 || updated_count > 0 {
+        log::info!("Ranged weapon stats: {} new, {} updated.", seeded_count, updated_count);
+    }
     Ok(())
 }
 
@@ -1117,29 +1161,8 @@ pub fn equip_armor_from_inventory(ctx: &ReducerContext, item_instance_id: u64) -
     Ok(())
 }
 
-pub fn init_ranged_weapon_stats(ctx: &ReducerContext) {
-    if ctx.db.ranged_weapon_stats().count() > 0 {
-        log::info!("RangedWeaponStats table already populated.");
-        return;
-    }
-
-    let initial_stats = vec![
-        RangedWeaponStats {
-            item_name: "Hunting Bow".to_string(),
-            weapon_range: 400.0,      // Increased from 300 to 400 world units
-            projectile_speed: 500.0,  // world units per second
-            accuracy: 0.8,            // 80% base
-            reload_time_secs: 1.0,    // 1 second between shots
-            magazine_capacity: 0,     // Single-shot (arrows loaded one at a time)
-        },
-        // Add stats for other ranged weapons here if any
-    ];
-
-    for stats in initial_stats {
-        ctx.db.ranged_weapon_stats().insert(stats);
-    }
-    log::info!("Populated RangedWeaponStats table with initial data.");
-}
+// NOTE: init_ranged_weapon_stats was REMOVED - use seed_ranged_weapon_stats() instead
+// which is called during module initialization and supports hot-updating stats on redeploy
 
 // --- Helper functions for item data management ---
 

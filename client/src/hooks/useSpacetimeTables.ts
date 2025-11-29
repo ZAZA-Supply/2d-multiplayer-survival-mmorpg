@@ -1062,10 +1062,13 @@ export const useSpacetimeTables = ({
                 setKnockedOutStatus(prev => { const newMap = new Map(prev); newMap.delete(status.playerId.toHexString()); return newMap; });
             };
 
-            // --- RangedWeaponStats Callbacks --- Added
-            const handleRangedWeaponStatsInsert = (ctx: any, stats: SpacetimeDBRangedWeaponStats) => setRangedWeaponStats(prev => new Map(prev).set(stats.itemName, stats));
-            const handleRangedWeaponStatsUpdate = (ctx: any, oldStats: SpacetimeDBRangedWeaponStats, newStats: SpacetimeDBRangedWeaponStats) => setRangedWeaponStats(prev => new Map(prev).set(newStats.itemName, newStats));
-            const handleRangedWeaponStatsDelete = (ctx: any, stats: SpacetimeDBRangedWeaponStats) => setRangedWeaponStats(prev => { const newMap = new Map(prev); newMap.delete(stats.itemName); return newMap; });
+            // --- RangedWeaponStats Callbacks ---
+            const handleRangedWeaponStatsInsert = (ctx: any, stats: SpacetimeDBRangedWeaponStats) => 
+                setRangedWeaponStats(prev => new Map(prev).set(stats.itemName, stats));
+            const handleRangedWeaponStatsUpdate = (ctx: any, oldStats: SpacetimeDBRangedWeaponStats, newStats: SpacetimeDBRangedWeaponStats) => 
+                setRangedWeaponStats(prev => new Map(prev).set(newStats.itemName, newStats));
+            const handleRangedWeaponStatsDelete = (ctx: any, stats: SpacetimeDBRangedWeaponStats) => 
+                setRangedWeaponStats(prev => { const newMap = new Map(prev); newMap.delete(stats.itemName); return newMap; });
 
             // --- Projectile Callbacks --- Added
             const handleProjectileInsert = (ctx: any, projectile: SpacetimeDBProjectile) => {

@@ -365,8 +365,14 @@ export function renderWildAnimal({
     const useImageFallback = !animalImage || !animalImage.complete;
 
     const props = getSpeciesRenderingProps(animal.species);
-    const renderX = renderPosX - props.width / 2 + shakeX; // Apply shake to X (using interpolated position)
-    const renderY = renderPosY - props.height / 2 + shakeY; // Apply shake to Y (using interpolated position)
+    
+    // Double the render size for flying birds
+    const flyingSizeMultiplier = useFlying ? 2.0 : 1.0;
+    const renderWidth = props.width * flyingSizeMultiplier;
+    const renderHeight = props.height * flyingSizeMultiplier;
+    
+    const renderX = renderPosX - renderWidth / 2 + shakeX; // Apply shake to X (using interpolated position)
+    const renderY = renderPosY - renderHeight / 2 + shakeY; // Apply shake to Y (using interpolated position)
 
     // No animals hide anymore - always fully visible
     const alpha = 1.0;
@@ -405,9 +411,9 @@ export function renderWildAnimal({
                     ctx,
                     entityImage: shadowCanvas as unknown as HTMLImageElement,
                     entityCenterX: renderPosX,
-                    entityBaseY: renderPosY + props.height / 2,
-                    imageDrawWidth: props.width,
-                    imageDrawHeight: props.height,
+                    entityBaseY: renderPosY + renderHeight / 2,
+                    imageDrawWidth: renderWidth,
+                    imageDrawHeight: renderHeight,
                     cycleProgress: cycleProgress,
                     baseShadowColor: '0,0,0',
                     maxShadowAlpha: 0.6,
@@ -425,9 +431,9 @@ export function renderWildAnimal({
                 ctx,
                 entityImage: animalImage,
                 entityCenterX: renderPosX,
-                entityBaseY: renderPosY + props.height / 2,
-                imageDrawWidth: props.width,
-                imageDrawHeight: props.height,
+                entityBaseY: renderPosY + renderHeight / 2,
+                imageDrawWidth: renderWidth,
+                imageDrawHeight: renderHeight,
                 cycleProgress: cycleProgress,
                 baseShadowColor: '0,0,0',
                 maxShadowAlpha: 0.6,
@@ -444,9 +450,9 @@ export function renderWildAnimal({
             ctx.beginPath();
             ctx.ellipse(
                 renderPosX + shakeX, 
-                renderPosY + props.height / 2 - 5 + shakeY,
-                props.width / 2.5,
-                props.height / 8,
+                renderPosY + renderHeight / 2 - 5 + shakeY,
+                renderWidth / 2.5,
+                renderHeight / 8,
                 0, 0, Math.PI * 2
             );
             ctx.fill();
@@ -458,7 +464,7 @@ export function renderWildAnimal({
         // Draw fallback colored circle with shake applied
         const centerX = renderPosX + shakeX; // Use interpolated position
         const centerY = renderPosY + shakeY; // Use interpolated position
-        const radius = Math.min(props.width, props.height) / 3;
+        const radius = Math.min(renderWidth, renderHeight) / 3;
         
         // Apply white flash to fallback color
         let fillColor = getFallbackColor(animal.species);
@@ -519,8 +525,8 @@ export function renderWildAnimal({
                     offscreenCanvas,
                     renderX,
                     renderY,
-                    props.width,
-                    props.height
+                    renderWidth,
+                    renderHeight
                 );
             } else {
                 // Static image mode (original behavior)
@@ -544,8 +550,8 @@ export function renderWildAnimal({
                     offscreenCanvas,
                     renderX,
                     renderY,
-                    props.width,
-                    props.height
+                    renderWidth,
+                    renderHeight
                 );
             }
         } else {
@@ -557,16 +563,16 @@ export function renderWildAnimal({
                     spriteRect.sx, spriteRect.sy, spriteRect.sw, spriteRect.sh,
                     renderX,
                     renderY,
-                    props.width,
-                    props.height
+                    renderWidth,
+                    renderHeight
                 );
             } else {
                 ctx.drawImage(
                     animalImage!,
                     renderX,
                     renderY,
-                    props.width,
-                    props.height
+                    renderWidth,
+                    renderHeight
                 );
             }
         }

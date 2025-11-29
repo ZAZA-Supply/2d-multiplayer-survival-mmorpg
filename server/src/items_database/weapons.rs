@@ -115,56 +115,64 @@ pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
         // === RANGED WEAPONS ===
         // Projectile-firing weapons that use ammunition
 
-        // Hunting Bow - Basic ranged weapon
-        ItemBuilder::new("Hunting Bow", "A sturdy wooden bow for hunting game and self-defense. Requires arrows to fire.", ItemCategory::RangedWeapon)
+        // === TIER 1: Hunting Bow - Early Game Ranged Weapon ===
+        // Easy to craft with basic materials, good for hunting animals
+        // Lower damage, shorter range - encourages progression to better weapons
+        ItemBuilder::new("Hunting Bow", "A sturdy wooden bow for hunting game and self-defense. Short range but easy to craft. Requires arrows to fire.", ItemCategory::RangedWeapon)
             .icon("bow.png")
             .stackable(1)
-            .weapon(50, 50, 0.0) // 50 base damage, no melee speed (ranged only)
-            .damage_type(DamageType::Projectile) // Projectile weapon
-            .equippable(None) // RangedWeapons are equippable
+            .weapon(35, 45, 0.0) // Lower damage than crossbow (35-45)
+            .damage_type(DamageType::Projectile)
+            .equippable(None)
             .crafting_cost(vec![
-                CostIngredient { item_name: "Wood".to_string(), quantity: 400 },
-                CostIngredient { item_name: "Plant Fiber".to_string(), quantity: 50 },
-                CostIngredient { item_name: "Rope".to_string(), quantity: 2 },
+                CostIngredient { item_name: "Wood".to_string(), quantity: 200 },
+                CostIngredient { item_name: "Plant Fiber".to_string(), quantity: 30 },
+                CostIngredient { item_name: "Rope".to_string(), quantity: 1 },
             ])
-            .crafting_output(1, 60)
-            .respawn_time(900)
+            .crafting_output(1, 45) // 45 seconds to craft
+            .respawn_time(600) // 10 min respawn in world
             .build(),
 
-        // Crossbow - Advanced ranged weapon
-        ItemBuilder::new("Crossbow", "A mechanical crossbow with superior accuracy and power. Fires bolts in straight lines with minimal gravity effect.", ItemCategory::RangedWeapon)
+        // === TIER 2: Crossbow - Mid Game Ranged Weapon ===
+        // Requires metal, more powerful and accurate than bow
+        // Slow reload but hits hard - tactical choice
+        ItemBuilder::new("Crossbow", "A mechanical crossbow with superior accuracy and power. Longer range and faster bolts than a bow, but slow to reload.", ItemCategory::RangedWeapon)
             .icon("crossbow.png")
             .stackable(1)
-            .weapon(75, 75, 0.0) // 75 base damage, no melee speed (ranged only)
-            .damage_type(DamageType::Projectile) // Projectile weapon
-            .equippable(None) // RangedWeapons are equippable
+            .weapon(65, 80, 0.0) // Higher damage (65-80)
+            .damage_type(DamageType::Projectile)
+            .equippable(None)
             .crafting_cost(vec![
-                CostIngredient { item_name: "Wood".to_string(), quantity: 600 },
-                CostIngredient { item_name: "Metal Fragments".to_string(), quantity: 150 },
-                CostIngredient { item_name: "Rope".to_string(), quantity: 3 },
-                CostIngredient { item_name: "Cloth".to_string(), quantity: 20 },
+                CostIngredient { item_name: "Wood".to_string(), quantity: 300 },
+                CostIngredient { item_name: "Metal Fragments".to_string(), quantity: 100 },
+                CostIngredient { item_name: "Rope".to_string(), quantity: 2 },
+                CostIngredient { item_name: "Cloth".to_string(), quantity: 10 },
             ])
-            .crafting_output(1, 120)
-            .respawn_time(1200)
+            .crafting_output(1, 90) // 90 seconds to craft
+            .respawn_time(900) // 15 min respawn in world
             .build(),
 
         // === FIREARMS ===
         // Soviet-era firearms that use bullet ammunition
 
-        // Makarov PM - Classic Soviet pistol
-        ItemBuilder::new("Makarov PM", "A reliable Soviet-era semi-automatic pistol. Compact, accurate at medium range, but requires time to re-aim between shots. Uses 9x18mm ammunition.", ItemCategory::RangedWeapon)
+        // === TIER 3: Makarov PM - Late Game Firearm ===
+        // Expensive to craft, requires significant metal investment
+        // Fastest fire rate, longest range, uses 9x18mm ammunition
+        // The ultimate ranged weapon - worth the grind
+        ItemBuilder::new("Makarov PM", "A reliable Soviet-era semi-automatic pistol. Longest range, fastest fire rate, but burns through ammo. Uses 9x18mm ammunition.", ItemCategory::RangedWeapon)
             .icon("makarov_pm.png")
             .stackable(1)
-            .weapon(40, 45, 0.0) // Mid-range damage, no melee speed (ranged only)
-            .damage_type(DamageType::Projectile) // Projectile weapon
-            .equippable(None) // RangedWeapons are equippable
+            .weapon(50, 60, 0.0) // Per-shot damage (50-60) - compensated by fire rate
+            .damage_type(DamageType::Projectile)
+            .equippable(None)
             .crafting_cost(vec![
-                CostIngredient { item_name: "Metal Fragments".to_string(), quantity: 300 },
-                CostIngredient { item_name: "Wood".to_string(), quantity: 100 },
-                CostIngredient { item_name: "Cloth".to_string(), quantity: 20 },
+                CostIngredient { item_name: "Metal Fragments".to_string(), quantity: 400 },
+                CostIngredient { item_name: "Wood".to_string(), quantity: 50 },
+                CostIngredient { item_name: "Cloth".to_string(), quantity: 15 },
+                CostIngredient { item_name: "Bone Fragments".to_string(), quantity: 25 }, // For grip/springs
             ])
-            .crafting_output(1, 90)
-            .respawn_time(1200)
+            .crafting_output(1, 120) // 2 minutes to craft
+            .respawn_time(1800) // 30 min respawn in world (rare find)
             .build(),
     ]
 }

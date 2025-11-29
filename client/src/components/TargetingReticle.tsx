@@ -52,7 +52,7 @@ const TargetingReticle: React.FC<TargetingReticleProps> = ({
   
   // Get weapon stats - use actual weapon range from stats
   const weaponStats = activeItemDef ? rangedWeaponStats.get(activeItemDef.name || '') : null;
-  const weaponRange = weaponStats?.weaponRange ?? 0; // Use actual weapon range, default 500
+  const weaponRange = weaponStats?.weaponRange ?? 0;
 
   // Update rotation continuously for animation
   useEffect(() => {
@@ -104,6 +104,7 @@ const TargetingReticle: React.FC<TargetingReticleProps> = ({
       if (distance <= weaponRange) {
         setReticlePosition({ x: viewportMouseX, y: viewportMouseY });
       } else {
+        // Constrain reticle to max weapon range
         const angle = Math.atan2(deltaY, deltaX);
         const constrainedX = playerViewportX + Math.cos(angle) * weaponRange;
         const constrainedY = playerViewportY + Math.sin(angle) * weaponRange;

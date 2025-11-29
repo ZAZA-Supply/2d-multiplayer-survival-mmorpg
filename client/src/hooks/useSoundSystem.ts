@@ -55,6 +55,10 @@ const SOUND_DEFINITIONS = {
     arrow_hit: { strategy: SoundStrategy.SERVER_ONLY, volume: 1.1, maxDistance: 550 }, // Arrow hits on players/corpses
     shoot_bow: { strategy: SoundStrategy.SERVER_ONLY, volume: 1.0, maxDistance: 800 }, // Hunting bow firing
     shoot_crossbow: { strategy: SoundStrategy.SERVER_ONLY, volume: 1.1, maxDistance: 850 }, // Crossbow firing
+    shoot_pistol: { strategy: SoundStrategy.SERVER_ONLY, volume: 1.2, maxDistance: 3000 }, // Pistol firing
+    reload_bow: { strategy: SoundStrategy.SERVER_ONLY, volume: 0.8, maxDistance: 400 }, // Bow nocking arrow
+    reload_crossbow: { strategy: SoundStrategy.SERVER_ONLY, volume: 0.9, maxDistance: 450 }, // Crossbow loading bolt
+    reload_pistol: { strategy: SoundStrategy.SERVER_ONLY, volume: 0.85, maxDistance: 400 }, // Pistol magazine loading
     bandaging: { strategy: SoundStrategy.SERVER_ONLY, volume: 0.8, maxDistance: 300 }, // Bandaging (5-second duration, non-looping)
     stop_bandaging: { strategy: SoundStrategy.SERVER_ONLY, volume: 0.0, maxDistance: 300 }, // Stop bandaging sound
     barrel_hit: { strategy: SoundStrategy.SERVER_ONLY, volume: 1.0, maxDistance: 600 }, // Barrel hit sound
@@ -300,7 +304,11 @@ const PRELOAD_SOUNDS = [
     'item_thrown.mp3',                                      // 1 item thrown variation
     'arrow_hit.mp3',                                        // 1 arrow hit variation
     'shoot_bow.mp3',                                        // 1 shoot bow variation
-    'shoot_crossbow.mp3',                                    // 1 shoot crossbow variation
+    'shoot_crossbow.mp3',                                   // 1 shoot crossbow variation
+    'shoot_pistol.mp3',                                     // 1 shoot pistol variation
+    'reload_bow.mp3',                                       // 1 reload bow variation
+    'reload_crossbow.mp3',                                  // 1 reload crossbow variation
+    'reload_pistol.mp3',                                    // 1 reload pistol variation
     'bandaging.mp3',                                        // 1 bandaging variation
     'barrel_hit.mp3',                                       // 1 barrel hit variation
     'barrel_destroyed.mp3',                                 // 1 barrel destroyed variation
@@ -593,6 +601,14 @@ const playLocalSound = async (
                 variationCount = 1; // shoot_bow.mp3
             } else if (soundType === 'shoot_crossbow') {
                 variationCount = 1; // shoot_crossbow.mp3
+            } else if (soundType === 'shoot_pistol') {
+                variationCount = 1; // shoot_pistol.mp3
+            } else if (soundType === 'reload_bow') {
+                variationCount = 1; // reload_bow.mp3
+            } else if (soundType === 'reload_crossbow') {
+                variationCount = 1; // reload_crossbow.mp3
+            } else if (soundType === 'reload_pistol') {
+                variationCount = 1; // reload_pistol.mp3
             } else if (soundType === 'bandaging') {
                 variationCount = 1; // bandaging.mp3
             } else if (soundType === 'stop_bandaging') {

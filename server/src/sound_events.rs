@@ -37,6 +37,9 @@ pub enum SoundType {
     ShootBow,       // shoot_bow.mp3 (1 variation - when hunting bow is fired)
     ShootCrossbow,  // shoot_crossbow.mp3 (1 variation - when crossbow is fired)
     ShootPistol,    // shoot_pistol.mp3 (1 variation - when pistol is fired)
+    ReloadBow,      // reload_bow.mp3 (1 variation - when hunting bow is nocked with an arrow)
+    ReloadCrossbow, // reload_crossbow.mp3 (1 variation - when crossbow is loaded with a bolt)
+    ReloadPistol,   // reload_pistol.mp3 (1 variation - when pistol magazine is loaded)
     Bandaging,      // bandaging.mp3 (1 variation - when player starts bandaging, stops if interrupted)
     StopBandaging,  // Special signal to stop bandaging sound
     BarrelHit,      // barrel_hit.mp3 (1 variation - when barrels are hit but not destroyed)
@@ -101,6 +104,9 @@ impl SoundType {
             SoundType::ShootBow => "shoot_bow",
             SoundType::ShootCrossbow => "shoot_crossbow",
             SoundType::ShootPistol => "shoot_pistol",
+            SoundType::ReloadBow => "reload_bow",
+            SoundType::ReloadCrossbow => "reload_crossbow",
+            SoundType::ReloadPistol => "reload_pistol",
             SoundType::Bandaging => "bandaging",
             SoundType::StopBandaging => "stop_bandaging",
             SoundType::BarrelHit => "barrel_hit",
@@ -564,6 +570,21 @@ pub fn emit_shoot_crossbow_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, p
 /// Emit a pistol shooting sound (when pistol is fired)
 pub fn emit_shoot_pistol_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, player_id: Identity) {
     let _ = emit_sound_at_position_with_distance(ctx, SoundType::ShootPistol, pos_x, pos_y, 1.2, 900.0, player_id);
+}
+
+/// Emit a bow reload sound (when hunting bow is nocked with an arrow)
+pub fn emit_reload_bow_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, player_id: Identity) {
+    let _ = emit_sound_at_position_with_distance(ctx, SoundType::ReloadBow, pos_x, pos_y, 0.8, 400.0, player_id);
+}
+
+/// Emit a crossbow reload sound (when crossbow is loaded with a bolt)
+pub fn emit_reload_crossbow_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, player_id: Identity) {
+    let _ = emit_sound_at_position_with_distance(ctx, SoundType::ReloadCrossbow, pos_x, pos_y, 0.9, 450.0, player_id);
+}
+
+/// Emit a pistol reload sound (when pistol magazine is loaded)
+pub fn emit_reload_pistol_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, player_id: Identity) {
+    let _ = emit_sound_at_position_with_distance(ctx, SoundType::ReloadPistol, pos_x, pos_y, 0.85, 400.0, player_id);
 }
 
 /// Emit a bandaging sound (when player starts bandaging)
