@@ -31,6 +31,8 @@ import {
 export type FireProjectile = {
   targetWorldX: number,
   targetWorldY: number,
+  clientPlayerX: number,
+  clientPlayerY: number,
 };
 let _cached_FireProjectile_type_value: __AlgebraicTypeType | null = null;
 
@@ -48,6 +50,8 @@ export const FireProjectile = {
     _cached_FireProjectile_type_value.value.elements.push(
       { name: "targetWorldX", algebraicType: __AlgebraicTypeValue.F32 },
       { name: "targetWorldY", algebraicType: __AlgebraicTypeValue.F32 },
+      { name: "clientPlayerX", algebraicType: __AlgebraicTypeValue.F32 },
+      { name: "clientPlayerY", algebraicType: __AlgebraicTypeValue.F32 },
     );
     return _cached_FireProjectile_type_value;
   },

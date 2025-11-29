@@ -143,7 +143,13 @@ pub fn init_projectile_system(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 #[reducer]
-pub fn fire_projectile(ctx: &ReducerContext, target_world_x: f32, target_world_y: f32) -> Result<(), String> {
+pub fn fire_projectile(
+    ctx: &ReducerContext, 
+    target_world_x: f32, 
+    target_world_y: f32,
+    client_player_x: f32,  // Client's predicted position
+    client_player_y: f32,
+) -> Result<(), String> {
     let player_id = ctx.sender;
     
     // Find the player
@@ -153,6 +159,24 @@ pub fn fire_projectile(ctx: &ReducerContext, target_world_x: f32, target_world_y
     if player.is_dead {
         return Err("Dead players cannot fire projectiles".to_string());
     }
+    
+    // Anti-cheat: Validate client position is within reasonable distance of server position
+    // Allow up to ~150 units of desync (accounts for network latency + movement speed)
+    const MAX_POSITION_DESYNC: f32 = 150.0;
+    const MAX_POSITION_DESYNC_SQ: f32 = MAX_POSITION_DESYNC * MAX_POSITION_DESYNC;
+    
+    let dx = client_player_x - player.position_x;
+    let dy = client_player_y - player.position_y;
+    let desync_sq = dx * dx + dy * dy;
+    
+    // Use client position if within tolerance, otherwise fall back to server position
+    let (spawn_x, spawn_y) = if desync_sq <= MAX_POSITION_DESYNC_SQ {
+        (client_player_x, client_player_y)
+    } else {
+        log::warn!("Player {:?} fire_projectile position desync too large ({:.1} units), using server position", 
+            player_id, desync_sq.sqrt());
+        (player.position_x, player.position_y)
+    };
 
     // Get the equipped item and its definition
     let mut equipment = ctx.db.active_equipment().player_identity().find(&player_id)
@@ -176,111 +200,111 @@ pub fn fire_projectile(ctx: &ReducerContext, target_world_x: f32, target_world_y
     let loaded_ammo_def_id = equipment.loaded_ammo_def_id
         .ok_or("Weapon is not loaded correctly (missing ammo def ID).")?;
 
-    // --- Consume Ammunition ---
-    // Use the EXACT same search pattern as load_ranged_weapon_reducer to ensure consistency
-    let inventory_items_table = ctx.db.inventory_item();
-    
-    // DIAGNOSTIC: Log what we're looking for and what the player actually has
-    log::info!("[FireProjectile] Player {:?} firing with loaded_ammo_def_id={}", player_id, loaded_ammo_def_id);
-    
-    // Count all arrows player has (for debugging)
-    let mut all_player_arrows: Vec<(u64, u32, String)> = Vec::new(); // (def_id, quantity, location_desc)
-    for item_instance in inventory_items_table.iter() {
-        // Check if this is any type of arrow/ammunition
-        if let Some(item_def) = ctx.db.item_definition().id().find(item_instance.item_def_id) {
-            if item_def.category == crate::items::ItemCategory::Ammunition {
+    // Get weapon stats for magazine capacity
+    let weapon_stats_for_magazine = ctx.db.ranged_weapon_stats().item_name().find(&item_def.name);
+    let magazine_capacity = weapon_stats_for_magazine.as_ref().map(|s| s.magazine_capacity).unwrap_or(0);
+
+    // --- Consume Ammunition based on weapon type ---
+    if magazine_capacity > 0 {
+        // Magazine-based weapon (e.g., pistol) - ammo already consumed during load
+        // Just decrement the loaded count
+        if equipment.loaded_ammo_count == 0 {
+            equipment.is_ready_to_fire = false;
+            equipment.loaded_ammo_def_id = None;
+            ctx.db.active_equipment().player_identity().update(equipment);
+            return Err("Magazine is empty. Press R to reload.".to_string());
+        }
+        
+        // Decrement loaded ammo count
+        equipment.loaded_ammo_count -= 1;
+        
+        // Only set is_ready_to_fire = false when magazine is empty
+        if equipment.loaded_ammo_count == 0 {
+            equipment.is_ready_to_fire = false;
+            equipment.loaded_ammo_def_id = None;
+        }
+        
+        // Update swing_start_time_ms for weapon cooldown tracking (fire rate)
+        equipment.swing_start_time_ms = (ctx.timestamp.to_micros_since_unix_epoch() / 1000) as u64;
+        ctx.db.active_equipment().player_identity().update(equipment.clone());
+        
+        log::info!("[FireProjectile] Player {:?} fired {} (magazine: {}/{}).", 
+            player_id, item_def.name, equipment.loaded_ammo_count, magazine_capacity);
+    } else {
+        // Single-shot weapon (bow, crossbow) - consume ammo from inventory on fire
+        let inventory_items_table = ctx.db.inventory_item();
+        
+        log::info!("[FireProjectile] Player {:?} firing with loaded_ammo_def_id={}", player_id, loaded_ammo_def_id);
+        
+        let mut ammo_item_instance_id_to_consume: Option<u64> = None;
+        let mut matching_items_found = 0;
+        let mut items_in_wrong_location = 0;
+
+        for item_instance in inventory_items_table.iter() {
+            if item_instance.item_def_id == loaded_ammo_def_id && item_instance.quantity > 0 {
+                matching_items_found += 1;
                 let is_player_owned = match &item_instance.location {
                     crate::models::ItemLocation::Inventory(data) => data.owner_id == player_id,
                     crate::models::ItemLocation::Hotbar(data) => data.owner_id == player_id,
                     _ => false,
                 };
+                
                 if is_player_owned {
-                    let location_desc = format!("{:?}", item_instance.location);
-                    all_player_arrows.push((item_instance.item_def_id, item_instance.quantity, location_desc));
+                    ammo_item_instance_id_to_consume = Some(item_instance.instance_id);
+                    log::debug!("Found ammunition for player {:?}: instance_id={}, quantity={}, location={:?}", 
+                        player_id, item_instance.instance_id, item_instance.quantity, item_instance.location);
+                    break;
+                } else {
+                    items_in_wrong_location += 1;
                 }
             }
         }
-    }
-    log::info!("[FireProjectile] Player {:?} has {} arrow type(s) in inventory/hotbar: {:?}", 
-        player_id, all_player_arrows.len(), all_player_arrows);
-    
-    let mut ammo_item_instance_id_to_consume: Option<u64> = None;
-    
-    // Debug: Log all matching items to help diagnose the issue
-    let mut matching_items_found = 0;
-    let mut items_in_wrong_location = 0;
 
-    for item_instance in inventory_items_table.iter() {
-        if item_instance.item_def_id == loaded_ammo_def_id && item_instance.quantity > 0 {
-            matching_items_found += 1;
-            // Use EXACT same pattern as load_ranged_weapon_reducer (lines 326-330 in active_equipment.rs)
-            let is_player_owned = match &item_instance.location {
-                crate::models::ItemLocation::Inventory(data) => data.owner_id == player_id,
-                crate::models::ItemLocation::Hotbar(data) => data.owner_id == player_id,
-                _ => false,
+        if let Some(instance_id) = ammo_item_instance_id_to_consume {
+            if let Some(mut item_to_update) = inventory_items_table.instance_id().find(instance_id) {
+                if item_to_update.quantity > 1 {
+                    item_to_update.quantity -= 1;
+                    let remaining_quantity = item_to_update.quantity;
+                    inventory_items_table.instance_id().update(item_to_update);
+                    log::info!("Player {:?} consumed 1 ammunition (def_id: {}). {} remaining.", 
+                        player_id, loaded_ammo_def_id, remaining_quantity);
+                } else {
+                    inventory_items_table.instance_id().delete(instance_id);
+                    log::info!("Player {:?} consumed last ammunition (def_id: {}). Item instance deleted.", 
+                        player_id, loaded_ammo_def_id);
+                }
+            } else {
+                equipment.is_ready_to_fire = false;
+                equipment.loaded_ammo_def_id = None;
+                equipment.loaded_ammo_count = 0;
+                ctx.db.active_equipment().player_identity().update(equipment);
+                return Err("No loaded ammunition found in inventory to consume (item disappeared). Weapon unloaded.".to_string());
+            }
+        } else {
+            let error_msg = if matching_items_found > 0 {
+                format!("No loaded ammunition found in inventory to consume (found {} matching item(s) but {} in wrong location). Weapon unloaded.", 
+                    matching_items_found, items_in_wrong_location)
+            } else {
+                format!("No loaded ammunition found in inventory to consume (def_id: {}). Weapon unloaded.", loaded_ammo_def_id)
             };
             
-            if is_player_owned {
-                ammo_item_instance_id_to_consume = Some(item_instance.instance_id);
-                log::debug!("Found ammunition for player {:?}: instance_id={}, quantity={}, location={:?}", 
-                    player_id, item_instance.instance_id, item_instance.quantity, item_instance.location);
-                break; // Found valid ammo, stop searching
-            } else {
-                items_in_wrong_location += 1;
-                log::debug!("Found matching ammo but not owned by player: instance_id={}, location={:?}, player_id={:?}", 
-                    item_instance.instance_id, item_instance.location, player_id);
-            }
-        }
-    }
-
-    if let Some(instance_id) = ammo_item_instance_id_to_consume {
-        // Double-check the item still exists before consuming (race condition protection)
-        if let Some(mut item_to_update) = inventory_items_table.instance_id().find(instance_id) {
-            if item_to_update.quantity > 1 {
-                item_to_update.quantity -= 1;
-                let remaining_quantity = item_to_update.quantity; // Capture before move
-                inventory_items_table.instance_id().update(item_to_update);
-                log::info!("Player {:?} consumed 1 ammunition (def_id: {}). {} remaining.", 
-                    player_id, loaded_ammo_def_id, remaining_quantity);
-            } else {
-                inventory_items_table.instance_id().delete(instance_id);
-                log::info!("Player {:?} consumed last ammunition (def_id: {}). Item instance deleted.", 
-                    player_id, loaded_ammo_def_id);
-            }
-        } else {
-            // Item disappeared between finding it and consuming it (race condition)
-            log::warn!("Ammunition item {} disappeared between search and consumption for player {:?}", 
-                instance_id, player_id);
+            log::warn!("Player {:?} tried to fire but ammunition not found. Matching items: {}, Wrong location: {}", 
+                player_id, matching_items_found, items_in_wrong_location);
+            
             equipment.is_ready_to_fire = false;
             equipment.loaded_ammo_def_id = None;
+            equipment.loaded_ammo_count = 0;
             ctx.db.active_equipment().player_identity().update(equipment);
-            // Use error message pattern that client recognizes as consumption error (no sound)
-            return Err("No loaded ammunition found in inventory to consume (item disappeared). Weapon unloaded.".to_string());
+            return Err(error_msg);
         }
-    } else {
-        // Enhanced error message with diagnostic information
-        // Use error message pattern that client recognizes as consumption error (no sound)
-        let error_msg = if matching_items_found > 0 {
-            format!("No loaded ammunition found in inventory to consume (found {} matching item(s) but {} in wrong location). Weapon unloaded.", 
-                matching_items_found, items_in_wrong_location)
-        } else {
-            format!("No loaded ammunition found in inventory to consume (def_id: {}). Weapon unloaded.", loaded_ammo_def_id)
-        };
-        
-        log::warn!("Player {:?} tried to fire but ammunition not found. Matching items: {}, Wrong location: {}", 
-            player_id, matching_items_found, items_in_wrong_location);
-        
+
+        // Single-shot weapon - unload after firing
         equipment.is_ready_to_fire = false;
         equipment.loaded_ammo_def_id = None;
-        ctx.db.active_equipment().player_identity().update(equipment);
-        return Err(error_msg);
+        equipment.loaded_ammo_count = 0;
+        equipment.swing_start_time_ms = (ctx.timestamp.to_micros_since_unix_epoch() / 1000) as u64;
+        ctx.db.active_equipment().player_identity().update(equipment.clone());
     }
-
-    equipment.is_ready_to_fire = false;
-    equipment.loaded_ammo_def_id = None;
-    // Update swing_start_time_ms for weapon cooldown tracking (same as melee weapons)
-    equipment.swing_start_time_ms = (ctx.timestamp.to_micros_since_unix_epoch() / 1000) as u64; // Convert to milliseconds and cast to u64
-    ctx.db.active_equipment().player_identity().update(equipment);
  
     let weapon_stats = ctx.db.ranged_weapon_stats().item_name().find(&item_def.name)
         .ok_or(format!("Ranged weapon stats not found for: {}", item_def.name))?;
@@ -300,7 +324,8 @@ pub fn fire_projectile(ctx: &ReducerContext, target_world_x: f32, target_world_y
 
     // --- NEW: Check shelter protection rule for ranged attacks ---
     // Players inside their own shelter cannot fire projectiles outside
-    if let Some(shelter_id) = shelter::is_owner_inside_shelter(ctx, player_id, player.position_x, player.position_y) {
+    // Use spawn position (client-predicted with validation) for consistency
+    if let Some(shelter_id) = shelter::is_owner_inside_shelter(ctx, player_id, spawn_x, spawn_y) {
         // Check if target is outside the shelter
         if !shelter::is_player_inside_shelter(target_world_x, target_world_y, &ctx.db.shelter().id().find(shelter_id).unwrap()) {
             return Err("Cannot fire from inside your shelter to targets outside. Leave your shelter to attack.".to_string());
@@ -311,12 +336,12 @@ pub fn fire_projectile(ctx: &ReducerContext, target_world_x: f32, target_world_y
     // --- Check if projectile path would immediately hit a wall very close to player ---
     if let Some((wall_id, collision_x, collision_y)) = crate::building::check_projectile_wall_collision(
         ctx,
-        player.position_x,
-        player.position_y,
+        spawn_x,
+        spawn_y,
         target_world_x,
         target_world_y,
     ) {
-        let collision_distance = ((collision_x - player.position_x).powi(2) + (collision_y - player.position_y).powi(2)).sqrt();
+        let collision_distance = ((collision_x - spawn_x).powi(2) + (collision_y - spawn_y).powi(2)).sqrt();
         const MIN_FIRING_DISTANCE: f32 = 80.0; // About 2 tiles
         
         if collision_distance < MIN_FIRING_DISTANCE {
@@ -325,8 +350,8 @@ pub fn fire_projectile(ctx: &ReducerContext, target_world_x: f32, target_world_y
     }
     
     // --- Check if projectile path would immediately hit a closed door very close to player ---
-    if let Some((door_id, collision_x, collision_y)) = crate::door::check_door_projectile_collision(ctx, player.position_x, player.position_y, target_world_x, target_world_y) {
-        let collision_distance = ((collision_x - player.position_x).powi(2) + (collision_y - player.position_y).powi(2)).sqrt();
+    if let Some((door_id, collision_x, collision_y)) = crate::door::check_door_projectile_collision(ctx, spawn_x, spawn_y, target_world_x, target_world_y) {
+        let collision_distance = ((collision_x - spawn_x).powi(2) + (collision_y - spawn_y).powi(2)).sqrt();
         const MIN_FIRING_DISTANCE: f32 = 80.0;
         
         if collision_distance < MIN_FIRING_DISTANCE {
@@ -337,14 +362,14 @@ pub fn fire_projectile(ctx: &ReducerContext, target_world_x: f32, target_world_y
     // --- Check if projectile path would immediately hit a shelter wall very close to player ---
     if let Some((shelter_id, collision_x, collision_y)) = shelter::check_projectile_shelter_collision(
         ctx,
-        player.position_x,
-        player.position_y,
+        spawn_x,
+        spawn_y,
         target_world_x,
         target_world_y,
     ) {
         // Only block the shot if the collision happens very close to the player
         // This allows intentional targeting of shelters while preventing immediate wall hits
-        let collision_distance = ((collision_x - player.position_x).powi(2) + (collision_y - player.position_y).powi(2)).sqrt();
+        let collision_distance = ((collision_x - spawn_x).powi(2) + (collision_y - spawn_y).powi(2)).sqrt();
         const MIN_FIRING_DISTANCE: f32 = 80.0; // About 2 tiles
         
         if collision_distance < MIN_FIRING_DISTANCE {
@@ -356,8 +381,9 @@ pub fn fire_projectile(ctx: &ReducerContext, target_world_x: f32, target_world_y
     }
 
     // --- Physics Calculation for Initial Velocity to Hit Target ---
-    let delta_x = target_world_x - player.position_x;
-    let delta_y = target_world_y - player.position_y;
+    // Use spawn position (client-predicted with anti-cheat validation)
+    let delta_x = target_world_x - spawn_x;
+    let delta_y = target_world_y - spawn_y;
     
     // Apply ammunition-specific speed modifications
     let mut v0 = weapon_stats.projectile_speed;
@@ -491,15 +517,15 @@ pub fn fire_projectile(ctx: &ReducerContext, target_world_x: f32, target_world_y
     // --- End Physics Calculation ---
 
 
-    // Create projectile
+    // Create projectile using validated spawn position
     let projectile = Projectile {
         id: 0, // auto_inc
         owner_id: player_id,
         item_def_id: equipped_item_def_id,
         ammo_def_id: loaded_ammo_def_id, 
         start_time: ctx.timestamp,
-        start_pos_x: player.position_x,
-        start_pos_y: player.position_y,
+        start_pos_x: spawn_x,  // Use client-predicted position (with anti-cheat)
+        start_pos_y: spawn_y,
         velocity_x: final_vx, // Use calculated velocity
         velocity_y: final_vy, // Use calculated velocity
         max_range: max_range, // Use modified max_range for ammunition-specific flight limit
@@ -507,13 +533,13 @@ pub fn fire_projectile(ctx: &ReducerContext, target_world_x: f32, target_world_y
 
     ctx.db.projectile().insert(projectile);
 
-    // Play weapon-specific shooting sound
+    // Play weapon-specific shooting sound at spawn position
     if item_def.name == "Crossbow" {
-        sound_events::emit_shoot_crossbow_sound(ctx, player.position_x, player.position_y, player_id);
+        sound_events::emit_shoot_crossbow_sound(ctx, spawn_x, spawn_y, player_id);
     } else if item_def.name == "Hunting Bow" {
-        sound_events::emit_shoot_bow_sound(ctx, player.position_x, player.position_y, player_id);
+        sound_events::emit_shoot_bow_sound(ctx, spawn_x, spawn_y, player_id);
     } else if item_def.name == "Makarov PM" {
-        sound_events::emit_shoot_pistol_sound(ctx, player.position_x, player.position_y, player_id);
+        sound_events::emit_shoot_pistol_sound(ctx, spawn_x, spawn_y, player_id);
     }
 
     // Update last attack timestamp

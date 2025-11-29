@@ -1078,9 +1078,16 @@ export const useInputHandler = ({
                         // 1. Ranged Weapon Firing
                         if (equippedItemDef.category?.tag === "RangedWeapon") {
                             if (localPlayerActiveEquipment.isReadyToFire) {
-                                if (connectionRef.current?.reducers && worldMousePosRefInternal.current.x !== null && worldMousePosRefInternal.current.y !== null) {
+                                const currentPlayer = localPlayerRef.current;
+                                if (connectionRef.current?.reducers && worldMousePosRefInternal.current.x !== null && worldMousePosRefInternal.current.y !== null && currentPlayer) {
                                     // console.log("[InputHandler MOUSEDOWN] Ranged weapon loaded. Firing!");
-                                    connectionRef.current.reducers.fireProjectile(worldMousePosRefInternal.current.x, worldMousePosRefInternal.current.y);
+                                    // Send client's current predicted position for accurate projectile spawn during movement
+                                    connectionRef.current.reducers.fireProjectile(
+                                        worldMousePosRefInternal.current.x, 
+                                        worldMousePosRefInternal.current.y,
+                                        currentPlayer.positionX,
+                                        currentPlayer.positionY
+                                    );
                                 } else {
                                     console.warn("[InputHandler MOUSEDOWN] Cannot fire ranged weapon: No connection/reducers or invalid mouse position.");
                                 }
@@ -1359,12 +1366,19 @@ export const useInputHandler = ({
             // Use existing refs directly
             if (connectionRef.current?.reducers && localPlayerId && localPlayerRef.current && activeEquipmentsRef.current && itemDefinitionsRef.current && worldMousePosRefInternal.current.x !== null && worldMousePosRefInternal.current.y !== null) {
                 const localEquipment = activeEquipmentsRef.current.get(localPlayerId);
-                if (localEquipment?.equippedItemDefId) {
+                const currentPlayer = localPlayerRef.current;
+                if (localEquipment?.equippedItemDefId && currentPlayer) {
                     const itemDef = itemDefinitionsRef.current.get(String(localEquipment.equippedItemDefId));
 
                     if (itemDef && (itemDef.name === "Hunting Bow" || itemDef.category === SpacetimeDB.ItemCategory.RangedWeapon)) {
                         try {
-                            connectionRef.current.reducers.fireProjectile(worldMousePosRefInternal.current.x, worldMousePosRefInternal.current.y);
+                            // Send client's current predicted position for accurate projectile spawn during movement
+                            connectionRef.current.reducers.fireProjectile(
+                                worldMousePosRefInternal.current.x, 
+                                worldMousePosRefInternal.current.y,
+                                currentPlayer.positionX,
+                                currentPlayer.positionY
+                            );
                             lastClientSwingAttemptRef.current = Date.now();
                             lastServerSwingTimestampRef.current = Date.now();
                             return;

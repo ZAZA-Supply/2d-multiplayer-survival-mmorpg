@@ -190,20 +190,23 @@ pub fn seed_ranged_weapon_stats(ctx: &ReducerContext) -> Result<(), String> {
             projectile_speed: 800.0,  // Fast projectile
             accuracy: 0.8,            // 80% accuracy base
             reload_time_secs: 1.0,    // 1 second between shots
+            magazine_capacity: 0,     // Single-shot (arrows loaded one at a time)
         },
         RangedWeaponStats {
             item_name: "Crossbow".to_string(),
-            weapon_range: 700.0,      // Longer range than hunting bow
+            weapon_range: 650.0,      // Longer range than hunting bow
             projectile_speed: 1200.0, // Much faster projectile - travels in straight line
             accuracy: 0.95,           // 95% accuracy - very precise
             reload_time_secs: 2.0,    // Slower reload time (2 seconds)
+            magazine_capacity: 0,     // Single-shot (bolts loaded one at a time)
         },
         RangedWeaponStats {
             item_name: "Makarov PM".to_string(),
-            weapon_range: 450.0,      // Shorter range than bow/crossbow
+            weapon_range: 800.0,      // Long range - pistol is effective at distance
             projectile_speed: 1500.0, // Very fast projectile (faster than crossbow)
             accuracy: 0.85,           // Good base accuracy, decays on rapid fire
-            reload_time_secs: 1.8,    // Longer reload (recoil recovery time)
+            reload_time_secs: 0.3,    // Time between shots (fire rate, not reload time)
+            magazine_capacity: 6,     // 6-round magazine
         },
     ];
 
@@ -1127,6 +1130,7 @@ pub fn init_ranged_weapon_stats(ctx: &ReducerContext) {
             projectile_speed: 500.0,  // world units per second
             accuracy: 0.8,            // 80% base
             reload_time_secs: 1.0,    // 1 second between shots
+            magazine_capacity: 0,     // Single-shot (arrows loaded one at a time)
         },
         // Add stats for other ranged weapons here if any
     ];

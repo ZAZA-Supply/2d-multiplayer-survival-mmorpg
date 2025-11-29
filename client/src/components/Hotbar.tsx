@@ -75,6 +75,8 @@ interface TooltipState {
     waterContentMl?: number; // Water content in mL for water containers
     waterCapacityMl?: number; // Water capacity in mL for water containers
     isSaltWater?: boolean; // Whether the water container has salt water
+    ammoLoaded?: number; // Current ammo loaded in magazine (for firearms)
+    ammoCapacity?: number; // Magazine capacity (for firearms)
   } | null;
   position: {
     x: number;
@@ -273,7 +275,15 @@ const Hotbar: React.FC<HotbarProps> = ({
            itemInSlot.definition.isEquippable;
   }, [localPlayer?.isOnWater, findItemForSlot]);
 
+  // Helper to check if a weapon uses magazine system (no cooldown overlay)
+  const usesMagazineSystem = useCallback((itemDef: ItemDefinition): boolean => {
+    if (itemDef.category.tag !== 'RangedWeapon') return false;
+    const weaponStats = rangedWeaponStats.get(itemDef.name);
+    return (weaponStats?.magazineCapacity ?? 0) > 0;
+  }, [rangedWeaponStats]);
+
   // Effect to track weapon cooldowns based on activeEquipment swingStartTimeMs - simplified
+  // Skip cooldown overlay for magazine-based weapons (they use ammo bar instead)
   useEffect(() => {
     if (!activeEquipment || !playerIdentity) {
       return;
@@ -297,6 +307,11 @@ const Hotbar: React.FC<HotbarProps> = ({
           for (let slotIndex = 0; slotIndex < numSlots; slotIndex++) {
             const itemInSlot = findItemForSlot(slotIndex);
             if (itemInSlot && BigInt(itemInSlot.instance.instanceId) === activeEquipment.equippedItemInstanceId) {
+              
+              // Skip cooldown overlay for magazine-based weapons (use ammo bar instead)
+              if (usesMagazineSystem(itemInSlot.definition)) {
+                break; // Don't show cooldown overlay for firearms with magazines
+              }
               
               if (isWeaponWithCooldown(itemInSlot.definition)) {
                 const attackIntervalMs = getWeaponCooldownDurationMs(itemInSlot.definition);
@@ -343,6 +358,11 @@ const Hotbar: React.FC<HotbarProps> = ({
               const itemInSlot = findItemForSlot(slotIndex);
               if (itemInSlot && BigInt(itemInSlot.instance.instanceId) === activeEquipment.equippedItemInstanceId) {
                 
+                // Skip cooldown overlay for magazine-based weapons
+                if (usesMagazineSystem(itemInSlot.definition)) {
+                  break;
+                }
+                
                 if (isWeaponWithCooldown(itemInSlot.definition)) {
                   const attackIntervalMs = getWeaponCooldownDurationMs(itemInSlot.definition);
                   
@@ -374,7 +394,7 @@ const Hotbar: React.FC<HotbarProps> = ({
         }
       }
     }
-  }, [activeEquipment, findItemForSlot, isWeaponWithCooldown, playerIdentity, numSlots]);
+  }, [activeEquipment, findItemForSlot, isWeaponWithCooldown, usesMagazineSystem, playerIdentity, numSlots]);
 
   // Weapon cooldown animation loop - simplified to match consumable system
   useEffect(() => {
@@ -1117,6 +1137,23 @@ const Hotbar: React.FC<HotbarProps> = ({
       }
     }
 
+    // Calculate ammo info for magazine-based ranged weapons
+    let ammoLoaded: number | undefined = undefined;
+    let ammoCapacity: number | undefined = undefined;
+    if (item.definition.category.tag === 'RangedWeapon') {
+      const weaponStats = rangedWeaponStats.get(item.definition.name);
+      const magazineCapacity = weaponStats?.magazineCapacity ?? 0;
+      
+      if (magazineCapacity > 0) {
+        ammoCapacity = magazineCapacity;
+        // Check if this weapon is currently equipped
+        const isEquipped = activeEquipment?.equippedItemInstanceId === BigInt(item.instance.instanceId);
+        ammoLoaded = isEquipped 
+          ? (activeEquipment as any)?.loadedAmmoCount ?? 0 
+          : 0;
+      }
+    }
+
     // Update tracking ref if requested
     if (updateRef) {
       lastTooltipItemRef.current = {
@@ -1135,11 +1172,13 @@ const Hotbar: React.FC<HotbarProps> = ({
         consumableStats,
         waterContentMl,
         waterCapacityMl,
-        isSaltWater: isSaltWaterValue
+        isSaltWater: isSaltWaterValue,
+        ammoLoaded,
+        ammoCapacity
       },
       position: position || prev.position
     }));
-  }, [findItemForSlot]);
+  }, [findItemForSlot, rangedWeaponStats, activeEquipment]);
 
   // Effect to update tooltip in real-time when item data changes (water content, quantity, etc.)
   useEffect(() => {
@@ -1364,6 +1403,72 @@ const Hotbar: React.FC<HotbarProps> = ({
                   </div>
                 );
               })()}
+              
+              {/* Ammo bar indicator for magazine-based ranged weapons (pistols, etc.) */}
+              {populatedItem && populatedItem.definition.category.tag === 'RangedWeapon' && (() => {
+                // Get weapon stats to check for magazine capacity
+                const weaponStats = rangedWeaponStats.get(populatedItem.definition.name);
+                const magazineCapacity = weaponStats?.magazineCapacity ?? 0;
+                
+                // Only show ammo bar for magazine-based weapons (capacity > 0)
+                if (magazineCapacity === 0) return null;
+                
+                // Check if this weapon is currently equipped (to show loaded ammo count)
+                const isEquipped = activeEquipment?.equippedItemInstanceId === BigInt(populatedItem.instance.instanceId);
+                
+                // Get loaded ammo count from active equipment (only if this weapon is equipped)
+                // loadedAmmoCount is a u8 field we added - it will appear after bindings regeneration
+                const loadedAmmoCount = isEquipped 
+                  ? (activeEquipment as any)?.loadedAmmoCount ?? 0 
+                  : 0;
+                
+                // Calculate bar dimensions
+                const barHeight = SLOT_SIZE - 8; // 4px padding top and bottom
+                const notchHeight = barHeight / magazineCapacity;
+                
+                return (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: '3px',
+                      top: '4px',
+                      bottom: '4px',
+                      width: '6px',
+                      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                      borderRadius: '2px',
+                      zIndex: 4,
+                      pointerEvents: 'none',
+                      display: 'flex',
+                      flexDirection: 'column-reverse', // Stack from bottom to top
+                      padding: '1px',
+                      boxSizing: 'border-box',
+                      border: '1px solid rgba(255, 200, 100, 0.4)',
+                    }}
+                  >
+                    {/* Render individual ammo notches */}
+                    {Array.from({ length: magazineCapacity }).map((_, bulletIndex) => {
+                      const isFilled = bulletIndex < loadedAmmoCount;
+                      return (
+                        <div
+                          key={`ammo-${bulletIndex}`}
+                          style={{
+                            flex: 1,
+                            marginTop: bulletIndex > 0 ? '1px' : '0px',
+                            backgroundColor: isFilled 
+                              ? 'rgba(255, 200, 80, 0.95)' // Brass/gold color for loaded rounds
+                              : 'rgba(60, 60, 60, 0.6)', // Dark gray for empty chambers
+                            borderRadius: '1px',
+                            boxShadow: isFilled 
+                              ? '0 0 3px rgba(255, 180, 50, 0.8)' 
+                              : 'none',
+                            transition: 'background-color 0.2s ease, box-shadow 0.2s ease',
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                );
+              })()}
               {/* Debug info for consumable cooldowns */}
               {cooldownSlot === index && (
                 <div style={{
@@ -1542,6 +1647,11 @@ const Hotbar: React.FC<HotbarProps> = ({
           {tooltip.content.waterContentMl !== undefined && tooltip.content.waterCapacityMl !== undefined && (
             <div style={{ fontSize: '10px', color: 'rgba(100, 200, 255, 0.9)', marginBottom: '2px' }}>
               {tooltip.content.isSaltWater ? '🌊' : '💧'} {tooltip.content.waterContentMl} / {tooltip.content.waterCapacityMl} mL
+            </div>
+          )}
+          {tooltip.content.ammoCapacity !== undefined && (
+            <div style={{ fontSize: '10px', color: 'rgba(255, 200, 100, 0.9)', marginBottom: '2px' }}>
+              🔫 Ammo: {tooltip.content.ammoLoaded ?? 0} / {tooltip.content.ammoCapacity}
             </div>
           )}
           <div style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.7)' }}>

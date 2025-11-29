@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Player, ItemDefinition, RangedWeaponStats } from '../generated';
+import { Player, ItemDefinition, RangedWeaponStats, ActiveEquipment } from '../generated';
 import { Identity } from 'spacetimedb';
 
 interface TargetingReticleProps {
   localPlayer: Player | null;
   playerIdentity: Identity | null;
   activeItemDef: ItemDefinition | null;
+  activeEquipment: ActiveEquipment | null;
   rangedWeaponStats: Map<string, RangedWeaponStats>;
   gameCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   cameraOffsetX: number;
@@ -18,6 +19,7 @@ const TargetingReticle: React.FC<TargetingReticleProps> = ({
   localPlayer,
   playerIdentity,
   activeItemDef,
+  activeEquipment,
   rangedWeaponStats,
   gameCanvasRef,
   cameraOffsetX,
@@ -40,20 +42,13 @@ const TargetingReticle: React.FC<TargetingReticleProps> = ({
     )
   );
   
-  // useEffect(() => {
-  //   console.log('[TargetingReticle] Visibility check:', {
-  //     shouldShowReticle,
-  //     hasActiveItemDef: !!activeItemDef,
-  //     isRangedCategory: activeItemDef?.category?.tag === 'RangedWeapon',
-  //     isHuntingBowName: activeItemDef?.name === 'Hunting Bow',
-  //     hasLocalPlayer: !!localPlayer,
-  //     isPlayerAlive: localPlayer ? !localPlayer.isDead : false,
-  //     activeItemName: activeItemDef?.name,
-  //     activeItemCategoryTag: activeItemDef?.category?.tag,
-  //     cameraOffsetX,
-  //     cameraOffsetY,
-  //   });
-  // }, [activeItemDef, localPlayer, shouldShowReticle, cameraOffsetX, cameraOffsetY]);
+  // Check if weapon is ready to fire (loaded with ammo)
+  const isReadyToFire = activeEquipment?.isReadyToFire ?? false;
+  
+  // Reticle color: red when not loaded, white when ready to fire
+  const reticleColor = isReadyToFire ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 80, 80, 0.9)';
+  const reticleCenterColor = isReadyToFire ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 50, 50, 0.8)';
+  const reticleSecondaryColor = isReadyToFire ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 100, 100, 0.7)';
   
   // Get weapon stats
   const weaponStats = activeItemDef ? rangedWeaponStats.get(activeItemDef.name || '') : null;
@@ -152,7 +147,10 @@ const TargetingReticle: React.FC<TargetingReticleProps> = ({
         height="40"
         viewBox="0 0 40 40"
         style={{
-          filter: 'drop-shadow(0 0 2px rgba(0, 0, 0, 0.8))',
+          filter: isReadyToFire 
+            ? 'drop-shadow(0 0 2px rgba(0, 0, 0, 0.8))'
+            : 'drop-shadow(0 0 4px rgba(255, 0, 0, 0.6))',
+          transition: 'filter 0.2s ease',
         }}
       >
         {/* Outer circle */}
@@ -161,8 +159,9 @@ const TargetingReticle: React.FC<TargetingReticleProps> = ({
           cy="20"
           r="18"
           fill="none"
-          stroke="rgba(255, 255, 255, 0.8)"
+          stroke={reticleColor}
           strokeWidth="2"
+          style={{ transition: 'stroke 0.2s ease' }}
         />
         
         {/* Inner circle */}
@@ -170,7 +169,8 @@ const TargetingReticle: React.FC<TargetingReticleProps> = ({
           cx="20"
           cy="20"
           r="3"
-          fill="rgba(255, 255, 255, 0.6)"
+          fill={reticleCenterColor}
+          style={{ transition: 'fill 0.2s ease' }}
         />
         
         {/* Crosshair lines */}
@@ -179,32 +179,36 @@ const TargetingReticle: React.FC<TargetingReticleProps> = ({
           y1="2"
           x2="20"
           y2="10"
-          stroke="rgba(255, 255, 255, 0.8)"
+          stroke={reticleColor}
           strokeWidth="2"
+          style={{ transition: 'stroke 0.2s ease' }}
         />
         <line
           x1="20"
           y1="30"
           x2="20"
           y2="38"
-          stroke="rgba(255, 255, 255, 0.8)"
+          stroke={reticleColor}
           strokeWidth="2"
+          style={{ transition: 'stroke 0.2s ease' }}
         />
         <line
           x1="2"
           y1="20"
           x2="10"
           y2="20"
-          stroke="rgba(255, 255, 255, 0.8)"
+          stroke={reticleColor}
           strokeWidth="2"
+          style={{ transition: 'stroke 0.2s ease' }}
         />
         <line
           x1="30"
           y1="20"
           x2="38"
           y2="20"
-          stroke="rgba(255, 255, 255, 0.8)"
+          stroke={reticleColor}
           strokeWidth="2"
+          style={{ transition: 'stroke 0.2s ease' }}
         />
         
         {/* Corner indicators */}
@@ -213,32 +217,36 @@ const TargetingReticle: React.FC<TargetingReticleProps> = ({
           y1="6"
           x2="10"
           y2="10"
-          stroke="rgba(255, 255, 255, 0.6)"
+          stroke={reticleSecondaryColor}
           strokeWidth="1.5"
+          style={{ transition: 'stroke 0.2s ease' }}
         />
         <line
           x1="34"
           y1="6"
           x2="30"
           y2="10"
-          stroke="rgba(255, 255, 255, 0.6)"
+          stroke={reticleSecondaryColor}
           strokeWidth="1.5"
+          style={{ transition: 'stroke 0.2s ease' }}
         />
         <line
           x1="6"
           y1="34"
           x2="10"
           y2="30"
-          stroke="rgba(255, 255, 255, 0.6)"
+          stroke={reticleSecondaryColor}
           strokeWidth="1.5"
+          style={{ transition: 'stroke 0.2s ease' }}
         />
         <line
           x1="34"
           y1="34"
           x2="30"
           y2="30"
-          stroke="rgba(255, 255, 255, 0.6)"
+          stroke={reticleSecondaryColor}
           strokeWidth="1.5"
+          style={{ transition: 'stroke 0.2s ease' }}
         />
       </svg>
     </div>

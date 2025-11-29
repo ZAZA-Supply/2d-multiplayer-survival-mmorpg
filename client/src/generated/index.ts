@@ -4029,19 +4029,19 @@ export class RemoteReducers {
     this.connection.offReducer("finish_fishing", callback);
   }
 
-  fireProjectile(targetWorldX: number, targetWorldY: number) {
-    const __args = { targetWorldX, targetWorldY };
+  fireProjectile(targetWorldX: number, targetWorldY: number, clientPlayerX: number, clientPlayerY: number) {
+    const __args = { targetWorldX, targetWorldY, clientPlayerX, clientPlayerY };
     let __writer = new __BinaryWriter(1024);
     FireProjectile.serialize(__writer, __args);
     let __argsBuffer = __writer.getBuffer();
     this.connection.callReducer("fire_projectile", __argsBuffer, this.setCallReducerFlags.fireProjectileFlags);
   }
 
-  onFireProjectile(callback: (ctx: ReducerEventContext, targetWorldX: number, targetWorldY: number) => void) {
+  onFireProjectile(callback: (ctx: ReducerEventContext, targetWorldX: number, targetWorldY: number, clientPlayerX: number, clientPlayerY: number) => void) {
     this.connection.onReducer("fire_projectile", callback);
   }
 
-  removeOnFireProjectile(callback: (ctx: ReducerEventContext, targetWorldX: number, targetWorldY: number) => void) {
+  removeOnFireProjectile(callback: (ctx: ReducerEventContext, targetWorldX: number, targetWorldY: number, clientPlayerX: number, clientPlayerY: number) => void) {
     this.connection.offReducer("fire_projectile", callback);
   }
 

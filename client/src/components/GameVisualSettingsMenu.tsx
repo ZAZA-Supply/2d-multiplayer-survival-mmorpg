@@ -1,12 +1,13 @@
 import React from 'react';
 import styles from './MenuComponents.module.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTree, faCloudRain } from '@fortawesome/free-solid-svg-icons';
+import { faTree, faCloudRain, faHeartPulse } from '@fortawesome/free-solid-svg-icons';
 
 // Default visual settings based on optimal neural rendering thresholds
 export const DEFAULT_VISUAL_SETTINGS = {
     treeShadowsEnabled: true,        // Enable tree shadows
     weatherOverlayEnabled: true,     // Enable weather overlay effects
+    statusOverlaysEnabled: true,     // Enable cold/low health screen overlays
 } as const;
 
 interface GameVisualSettingsMenuProps {
@@ -16,6 +17,8 @@ interface GameVisualSettingsMenuProps {
     onTreeShadowsChange: (enabled: boolean) => void;
     weatherOverlayEnabled: boolean;
     onWeatherOverlayChange: (enabled: boolean) => void;
+    statusOverlaysEnabled: boolean;
+    onStatusOverlaysChange: (enabled: boolean) => void;
 }
 
 const GameVisualSettingsMenu: React.FC<GameVisualSettingsMenuProps> = ({
@@ -25,6 +28,8 @@ const GameVisualSettingsMenu: React.FC<GameVisualSettingsMenuProps> = ({
     onTreeShadowsChange,
     weatherOverlayEnabled,
     onWeatherOverlayChange,
+    statusOverlaysEnabled,
+    onStatusOverlaysChange,
 }) => {
     const handleBackdropClick = (e: React.MouseEvent) => {
         if (e.target === e.currentTarget) {
@@ -238,6 +243,74 @@ const GameVisualSettingsMenu: React.FC<GameVisualSettingsMenuProps> = ({
                                     }}
                                 />
                                 ENABLE RAIN
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Status Overlays Setting (Cold/Low Health) */}
+                    <div style={{ marginBottom: '25px' }}>
+                        <div style={{
+                            fontFamily: '"Press Start 2P", cursive',
+                            fontSize: '16px',
+                            color: '#ff5566',
+                            marginBottom: '12px',
+                            textShadow: '0 0 8px #ff5566',
+                            letterSpacing: '1px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                        }}>
+                            <FontAwesomeIcon 
+                                icon={faHeartPulse} 
+                                style={{
+                                    color: '#ff5566',
+                                    textShadow: '0 0 8px #ff5566',
+                                    fontSize: '14px',
+                                }}
+                            />
+                            STATUS OVERLAYS: {statusOverlaysEnabled ? 'ENABLED' : 'DISABLED'}
+                        </div>
+                        <div style={{
+                            fontFamily: '"Press Start 2P", cursive',
+                            fontSize: '12px',
+                            color: '#ffaaaa',
+                            marginBottom: '8px',
+                            opacity: 0.7,
+                            letterSpacing: '0.5px',
+                            textAlign: 'left',
+                        }}>
+                            {statusOverlaysEnabled 
+                                ? 'Screen effects show when cold or low health' 
+                                : 'Cold/health screen effects disabled'
+                            }
+                        </div>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-start',
+                            gap: '15px',
+                        }}>
+                            <label style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                cursor: 'pointer',
+                                fontFamily: '"Press Start 2P", cursive',
+                                fontSize: '14px',
+                                color: statusOverlaysEnabled ? '#ff5566' : '#666',
+                                textShadow: statusOverlaysEnabled ? '0 0 5px #ff5566' : 'none',
+                                transition: 'all 0.3s ease',
+                            }}>
+                                <input
+                                    type="checkbox"
+                                    checked={statusOverlaysEnabled}
+                                    onChange={(e) => onStatusOverlaysChange(e.target.checked)}
+                                    style={{
+                                        marginRight: '10px',
+                                        transform: 'scale(1.5)',
+                                        accentColor: '#ff5566',
+                                    }}
+                                />
+                                ENABLE OVERLAYS
                             </label>
                         </div>
                     </div>

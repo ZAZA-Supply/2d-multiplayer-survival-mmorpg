@@ -49,6 +49,7 @@ use crate::active_equipment as ActiveEquipmentTableTrait;
 use crate::player; // Added to bring Player table accessors into scope
 use crate::PlayerLastAttackTimestamp; // Import the new table
 use crate::player_last_attack_timestamp as PlayerLastAttackTimestampTableTrait; // Import the trait for the new table
+use crate::ranged_weapon_stats::ranged_weapon_stats as RangedWeaponStatsTableTrait; // For magazine capacity lookup
 
 // Models imports
 use crate::models::{ItemLocation, EquipmentSlotType};
@@ -80,6 +81,7 @@ pub struct ActiveEquipment {
     pub swing_start_time_ms: u64, // Timestamp (ms) when the current swing started, 0 if not swinging
     // Ranged weapon ammunition tracking
     pub loaded_ammo_def_id: Option<u64>, // ID of loaded ammunition (e.g., arrow)
+    pub loaded_ammo_count: u8, // How many rounds are currently loaded in the magazine (0-255)
     pub is_ready_to_fire: bool, // Whether the ranged weapon is loaded and ready
     pub preferred_arrow_type: Option<String>, // Player's preferred arrow type for cycling (e.g., "Wooden Arrow")
     // Fields for worn armor
@@ -321,6 +323,7 @@ pub fn clear_active_item_reducer(ctx: &ReducerContext, player_identity: Identity
 /// If the weapon is already loaded, cycles to the next available ammo type.
 /// Remembers the player's preferred ammo type for future loading.
 /// Filters ammunition by compatible type (arrows for bows/crossbows, bullets for pistols).
+/// For magazine-based weapons, consumes ammo from inventory and tracks loaded count.
 #[spacetimedb::reducer]
 pub fn load_ranged_weapon(ctx: &ReducerContext) -> Result<(), String> {
     let sender_id = ctx.sender;
@@ -330,6 +333,7 @@ pub fn load_ranged_weapon(ctx: &ReducerContext) -> Result<(), String> {
     let players_table = ctx.db.player();
     let item_defs = ctx.db.item_definition();
     let inventory_items = ctx.db.inventory_item();
+    let ranged_weapon_stats = ctx.db.ranged_weapon_stats();
 
     // --- Check player state first ---
     let player = players_table.identity().find(&sender_id)
@@ -356,6 +360,10 @@ pub fn load_ranged_weapon(ctx: &ReducerContext) -> Result<(), String> {
     if item_def.category != crate::items::ItemCategory::RangedWeapon {
         return Err("Equipped item is not a ranged weapon.".to_string());
     }
+
+    // Get weapon stats for magazine capacity
+    let weapon_stats = ranged_weapon_stats.item_name().find(&item_def.name);
+    let magazine_capacity = weapon_stats.as_ref().map(|s| s.magazine_capacity).unwrap_or(0);
 
     // Determine the compatible ammo type based on weapon
     // Bows and Crossbows use Arrow ammunition, Pistols/Firearms use Bullet ammunition
@@ -396,8 +404,9 @@ pub fn load_ranged_weapon(ctx: &ReducerContext) -> Result<(), String> {
         return Err(format!("You need at least 1 {} to load the weapon.", ammo_type_name));
     }
 
-    let selected_ammo = if current_equipment.is_ready_to_fire {
-        // Weapon is already loaded - cycle to next ammo type
+    let selected_ammo = if current_equipment.is_ready_to_fire && current_equipment.loaded_ammo_count > 0 {
+        // Weapon already has ammo loaded - cycle to next ammo type (magazine weapons)
+        // For single-shot weapons, this allows switching arrow types
         if let Some(current_ammo_id) = current_equipment.loaded_ammo_def_id {
             // Find current ammo in available list
             let current_index = available_ammo.iter()
@@ -429,14 +438,103 @@ pub fn load_ranged_weapon(ctx: &ReducerContext) -> Result<(), String> {
         }
     };
 
-    // Load the weapon with selected ammo
-    current_equipment.loaded_ammo_def_id = Some(selected_ammo.1);
-    current_equipment.is_ready_to_fire = true;
-    current_equipment.preferred_arrow_type = Some(selected_ammo.0.clone());
-    active_equipments.player_identity().update(current_equipment);
+    // --- Magazine-based loading (firearms) vs single-shot loading (bows) ---
+    if magazine_capacity > 0 {
+        // Magazine-based weapon (e.g., pistol)
+        // Calculate how many rounds to load
+        let current_loaded = current_equipment.loaded_ammo_count;
+        let space_available = magazine_capacity.saturating_sub(current_loaded);
+        
+        if space_available == 0 {
+            // Magazine is full - just cycle ammo type
+            current_equipment.loaded_ammo_def_id = Some(selected_ammo.1);
+            current_equipment.preferred_arrow_type = Some(selected_ammo.0.clone());
+            active_equipments.player_identity().update(current_equipment);
+            log::info!("[LoadRangedWeapon] Player {:?} cycled {} ammo to {} (magazine full at {}).", 
+                sender_id, item_def.name, selected_ammo.0, current_loaded);
+            return Ok(());
+        }
+        
+        // Count total available ammo of selected type in player's inventory/hotbar
+        let total_available_ammo: u32 = inventory_items.iter()
+            .filter(|item| {
+                item.item_def_id == selected_ammo.1 
+                && item.quantity > 0
+                && match &item.location {
+                    crate::models::ItemLocation::Inventory(data) => data.owner_id == sender_id,
+                    crate::models::ItemLocation::Hotbar(data) => data.owner_id == sender_id,
+                    _ => false,
+                }
+            })
+            .map(|item| item.quantity)
+            .sum();
+        
+        // Calculate how many to load (min of available space and available ammo)
+        let rounds_to_load = std::cmp::min(space_available as u32, total_available_ammo) as u8;
+        
+        if rounds_to_load == 0 {
+            return Err(format!("No {} available to load.", ammo_type_name));
+        }
+        
+        // Consume rounds from inventory
+        let mut rounds_remaining = rounds_to_load as u32;
+        let inventory_items_table = ctx.db.inventory_item();
+        
+        // Collect items to consume from
+        let mut items_to_consume: Vec<(u64, u32)> = Vec::new(); // (instance_id, amount_to_consume)
+        for item in inventory_items_table.iter() {
+            if rounds_remaining == 0 { break; }
+            if item.item_def_id == selected_ammo.1 
+                && item.quantity > 0
+                && match &item.location {
+                    crate::models::ItemLocation::Inventory(data) => data.owner_id == sender_id,
+                    crate::models::ItemLocation::Hotbar(data) => data.owner_id == sender_id,
+                    _ => false,
+                }
+            {
+                let consume_amount = std::cmp::min(item.quantity, rounds_remaining);
+                items_to_consume.push((item.instance_id, consume_amount));
+                rounds_remaining -= consume_amount;
+            }
+        }
+        
+        // Actually consume the rounds
+        for (instance_id, consume_amount) in items_to_consume {
+            if let Some(mut item) = inventory_items_table.instance_id().find(instance_id) {
+                if item.quantity <= consume_amount {
+                    // Delete the item entirely
+                    inventory_items_table.instance_id().delete(instance_id);
+                } else {
+                    // Reduce quantity
+                    item.quantity -= consume_amount;
+                    inventory_items_table.instance_id().update(item);
+                }
+            }
+        }
+        
+        // Update equipment state
+        current_equipment.loaded_ammo_def_id = Some(selected_ammo.1);
+        current_equipment.loaded_ammo_count = current_loaded + rounds_to_load;
+        current_equipment.is_ready_to_fire = true;
+        current_equipment.preferred_arrow_type = Some(selected_ammo.0.clone());
+        active_equipments.player_identity().update(current_equipment);
 
-    log::info!("[LoadRangedWeapon] Player {:?} loaded {} with {} (ready to fire).", 
-        sender_id, item_def.name, selected_ammo.0);
+        log::info!("[LoadRangedWeapon] Player {:?} loaded {} rounds of {} into {} (total: {}/{}).", 
+            sender_id, rounds_to_load, selected_ammo.0, item_def.name, 
+            current_loaded + rounds_to_load, magazine_capacity);
+    } else {
+        // Single-shot weapon (bow, crossbow) - existing behavior
+        // Just mark as ready to fire, ammo consumed on fire
+        current_equipment.loaded_ammo_def_id = Some(selected_ammo.1);
+        current_equipment.loaded_ammo_count = 1; // Mark as having 1 "virtual" round for display purposes
+        current_equipment.is_ready_to_fire = true;
+        current_equipment.preferred_arrow_type = Some(selected_ammo.0.clone());
+        active_equipments.player_identity().update(current_equipment);
+
+        log::info!("[LoadRangedWeapon] Player {:?} loaded {} with {} (ready to fire).", 
+            sender_id, item_def.name, selected_ammo.0);
+    }
+    
     Ok(())
 }
 
@@ -743,6 +841,7 @@ fn get_or_create_active_equipment(ctx: &ReducerContext, player_id: Identity) -> 
             icon_asset_name: None,
             swing_start_time_ms: 0,
             loaded_ammo_def_id: None,
+            loaded_ammo_count: 0,
             is_ready_to_fire: false,
             preferred_arrow_type: None,
             head_item_instance_id: None,

@@ -223,6 +223,8 @@ interface GameScreenProps {
     onTreeShadowsChange: (enabled: boolean) => void;
     weatherOverlayEnabled: boolean;
     onWeatherOverlayChange: (enabled: boolean) => void;
+    statusOverlaysEnabled: boolean;
+    onStatusOverlaysChange: (enabled: boolean) => void;
 
     // Sound system for immediate sound effects
     soundSystem: ReturnType<typeof import('../hooks/useSoundSystem').useSoundSystem>;
@@ -326,6 +328,8 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
         onTreeShadowsChange,
         weatherOverlayEnabled,
         onWeatherOverlayChange,
+        statusOverlaysEnabled,
+        onStatusOverlaysChange,
         soundSystem,
         playerDrinkingCooldowns,
         playerDodgeRollStates,
@@ -580,6 +584,8 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                     onTreeShadowsChange={onTreeShadowsChange}
                     weatherOverlayEnabled={weatherOverlayEnabled}
                     onWeatherOverlayChange={onWeatherOverlayChange}
+                    statusOverlaysEnabled={statusOverlaysEnabled}
+                    onStatusOverlaysChange={onStatusOverlaysChange}
                 />
             )}
 
@@ -781,6 +787,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 treeShadowsEnabled={treeShadowsEnabled}
                 chunkWeather={chunkWeather}
                 showWeatherOverlay={weatherOverlayEnabled}
+                showStatusOverlays={statusOverlaysEnabled}
             />
 
             {/* Use our camera offsets for SpeechBubbleManager */}
@@ -864,6 +871,7 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 localPlayer={localPlayer || null}
                 playerIdentity={playerIdentity}
                 activeItemDef={activeItemDef}
+                activeEquipment={localPlayerActiveEquipment || null}
                 rangedWeaponStats={rangedWeaponStats || new Map()}
                 gameCanvasRef={canvasRef}
                 cameraOffsetX={cameraOffsetX}

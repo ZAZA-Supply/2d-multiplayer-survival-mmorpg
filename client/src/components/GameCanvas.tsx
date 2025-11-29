@@ -220,6 +220,8 @@ interface GameCanvasProps {
   chunkWeather: Map<string, any>;
   // Weather overlay toggle for main game canvas atmospheric effects
   showWeatherOverlay?: boolean;
+  // Status overlays toggle for cold/low health screen effects
+  showStatusOverlays?: boolean;
 }
 
 /**
@@ -301,6 +303,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   treeShadowsEnabled, // NEW: Destructure treeShadowsEnabled for visual cortex module setting
   chunkWeather, // Chunk-based weather data
   showWeatherOverlay, // Weather overlay toggle for main game canvas atmospheric effects (managed internally if not provided)
+  showStatusOverlays = true, // Status overlays toggle for cold/low health screen effects
 }) => {
   // console.log('[GameCanvas IS RUNNING] showInventory:', showInventory);
 
@@ -2493,7 +2496,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
     // --- Render Health/Frost Overlays (Above Day/Night, Below UI) ---
     // These overlays render AFTER day/night so they're visible at night
-    if (localPlayer && !localPlayer.isDead && !localPlayer.isKnockedOut) {
+    if (showStatusOverlays && localPlayer && !localPlayer.isDead && !localPlayer.isKnockedOut) {
       const healthPercent = localPlayer.health / 100.0; // Health is 0-100
       const warmthPercent = localPlayer.warmth / 100.0; // Warmth is 0-100
       
