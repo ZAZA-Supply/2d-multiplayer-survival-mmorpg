@@ -192,6 +192,9 @@ impl SoundType {
             SoundType::ErrorJarPlacement => 1, // error_jar_placement.mp3 (single variation)
             SoundType::ErrorBrothNotCompatible => 1, // error_broth_not_compatible.mp3 (single variation)
             SoundType::DoorOpening => 1, // door_opening.mp3 (single variation)
+            SoundType::ReloadBow => 1, // reload_bow.mp3 (single variation)
+            SoundType::ReloadCrossbow => 1, // reload_crossbow.mp3 (single variation)
+            SoundType::ReloadPistol => 1, // reload_pistol.mp3 (single variation)
         }
     }
 

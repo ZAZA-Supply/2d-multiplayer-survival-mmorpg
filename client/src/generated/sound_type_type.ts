@@ -61,6 +61,9 @@ export type SoundType = SoundTypeVariants.TreeChop |
   SoundTypeVariants.ShootBow |
   SoundTypeVariants.ShootCrossbow |
   SoundTypeVariants.ShootPistol |
+  SoundTypeVariants.ReloadBow |
+  SoundTypeVariants.ReloadCrossbow |
+  SoundTypeVariants.ReloadPistol |
   SoundTypeVariants.Bandaging |
   SoundTypeVariants.StopBandaging |
   SoundTypeVariants.BarrelHit |
@@ -127,6 +130,9 @@ export const SoundType = {
   ShootBow: { tag: "ShootBow" } as const,
   ShootCrossbow: { tag: "ShootCrossbow" } as const,
   ShootPistol: { tag: "ShootPistol" } as const,
+  ReloadBow: { tag: "ReloadBow" } as const,
+  ReloadCrossbow: { tag: "ReloadCrossbow" } as const,
+  ReloadPistol: { tag: "ReloadPistol" } as const,
   Bandaging: { tag: "Bandaging" } as const,
   StopBandaging: { tag: "StopBandaging" } as const,
   BarrelHit: { tag: "BarrelHit" } as const,
@@ -187,6 +193,9 @@ export const SoundType = {
       { name: "ShootBow", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "ShootCrossbow", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "ShootPistol", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "ReloadBow", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "ReloadCrossbow", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      { name: "ReloadPistol", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "Bandaging", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "StopBandaging", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
       { name: "BarrelHit", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
