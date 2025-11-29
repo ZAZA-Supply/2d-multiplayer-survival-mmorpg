@@ -145,8 +145,6 @@ import { IdentityDisconnected } from "./identity_disconnected_reducer.ts";
 export { IdentityDisconnected };
 import { InitProjectileSystem } from "./init_projectile_system_reducer.ts";
 export { InitProjectileSystem };
-import { InitViperSpittleSystem } from "./init_viper_spittle_system_reducer.ts";
-export { InitViperSpittleSystem };
 import { InitializePlayerMemoryGrid } from "./initialize_player_memory_grid_reducer.ts";
 export { InitializePlayerMemoryGrid };
 import { InteractDoor } from "./interact_door_reducer.ts";
@@ -539,8 +537,6 @@ import { UpdateProjectiles } from "./update_projectiles_reducer.ts";
 export { UpdateProjectiles };
 import { UpdateViewport } from "./update_viewport_reducer.ts";
 export { UpdateViewport };
-import { UpdateViperSpittle } from "./update_viper_spittle_reducer.ts";
-export { UpdateViperSpittle };
 import { UpgradeFoundation } from "./upgrade_foundation_reducer.ts";
 export { UpgradeFoundation };
 import { UpgradeWall } from "./upgrade_wall_reducer.ts";
@@ -737,10 +733,6 @@ import { ThunderEventCleanupScheduleTableHandle } from "./thunder_event_cleanup_
 export { ThunderEventCleanupScheduleTableHandle };
 import { TreeTableHandle } from "./tree_table.ts";
 export { TreeTableHandle };
-import { ViperSpittleTableHandle } from "./viper_spittle_table.ts";
-export { ViperSpittleTableHandle };
-import { ViperSpittleUpdateScheduleTableHandle } from "./viper_spittle_update_schedule_table.ts";
-export { ViperSpittleUpdateScheduleTableHandle };
 import { WallCellTableHandle } from "./wall_cell_table.ts";
 export { WallCellTableHandle };
 import { WaterContainerFillScheduleTableHandle } from "./water_container_fill_schedule_table.ts";
@@ -1019,10 +1011,6 @@ import { Tree } from "./tree_type.ts";
 export { Tree };
 import { TreeType } from "./tree_type_type.ts";
 export { TreeType };
-import { ViperSpittle } from "./viper_spittle_type.ts";
-export { ViperSpittle };
-import { ViperSpittleUpdateSchedule } from "./viper_spittle_update_schedule_type.ts";
-export { ViperSpittleUpdateSchedule };
 import { WallCell } from "./wall_cell_type.ts";
 export { WallCell };
 import { WaterContainerFillSchedule } from "./water_container_fill_schedule_type.ts";
@@ -1878,24 +1866,6 @@ const REMOTE_MODULE = {
         colType: (Tree.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
       },
     },
-    viper_spittle: {
-      tableName: "viper_spittle" as const,
-      rowType: ViperSpittle.getTypeScriptAlgebraicType(),
-      primaryKey: "id",
-      primaryKeyInfo: {
-        colName: "id",
-        colType: (ViperSpittle.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
-      },
-    },
-    viper_spittle_update_schedule: {
-      tableName: "viper_spittle_update_schedule" as const,
-      rowType: ViperSpittleUpdateSchedule.getTypeScriptAlgebraicType(),
-      primaryKey: "id",
-      primaryKeyInfo: {
-        colName: "id",
-        colType: (ViperSpittleUpdateSchedule.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
-      },
-    },
     wall_cell: {
       tableName: "wall_cell" as const,
       rowType: WallCell.getTypeScriptAlgebraicType(),
@@ -2215,10 +2185,6 @@ const REMOTE_MODULE = {
     init_projectile_system: {
       reducerName: "init_projectile_system",
       argsType: InitProjectileSystem.getTypeScriptAlgebraicType(),
-    },
-    init_viper_spittle_system: {
-      reducerName: "init_viper_spittle_system",
-      argsType: InitViperSpittleSystem.getTypeScriptAlgebraicType(),
     },
     initialize_player_memory_grid: {
       reducerName: "initialize_player_memory_grid",
@@ -3004,10 +2970,6 @@ const REMOTE_MODULE = {
       reducerName: "update_viewport",
       argsType: UpdateViewport.getTypeScriptAlgebraicType(),
     },
-    update_viper_spittle: {
-      reducerName: "update_viper_spittle",
-      argsType: UpdateViperSpittle.getTypeScriptAlgebraicType(),
-    },
     upgrade_foundation: {
       reducerName: "upgrade_foundation",
       argsType: UpgradeFoundation.getTypeScriptAlgebraicType(),
@@ -3115,7 +3077,6 @@ export type Reducer = never
 | { name: "IdentityConnected", args: IdentityConnected }
 | { name: "IdentityDisconnected", args: IdentityDisconnected }
 | { name: "InitProjectileSystem", args: InitProjectileSystem }
-| { name: "InitViperSpittleSystem", args: InitViperSpittleSystem }
 | { name: "InitializePlayerMemoryGrid", args: InitializePlayerMemoryGrid }
 | { name: "InteractDoor", args: InteractDoor }
 | { name: "InteractWithBrothPot", args: InteractWithBrothPot }
@@ -3312,7 +3273,6 @@ export type Reducer = never
 | { name: "UpdatePlayerPositionSimple", args: UpdatePlayerPositionSimple }
 | { name: "UpdateProjectiles", args: UpdateProjectiles }
 | { name: "UpdateViewport", args: UpdateViewport }
-| { name: "UpdateViperSpittle", args: UpdateViperSpittle }
 | { name: "UpgradeFoundation", args: UpgradeFoundation }
 | { name: "UpgradeWall", args: UpgradeWall }
 | { name: "UseEquippedItem", args: UseEquippedItem }
@@ -4181,18 +4141,6 @@ export class RemoteReducers {
 
   removeOnInitProjectileSystem(callback: (ctx: ReducerEventContext) => void) {
     this.connection.offReducer("init_projectile_system", callback);
-  }
-
-  initViperSpittleSystem() {
-    this.connection.callReducer("init_viper_spittle_system", new Uint8Array(0), this.setCallReducerFlags.initViperSpittleSystemFlags);
-  }
-
-  onInitViperSpittleSystem(callback: (ctx: ReducerEventContext) => void) {
-    this.connection.onReducer("init_viper_spittle_system", callback);
-  }
-
-  removeOnInitViperSpittleSystem(callback: (ctx: ReducerEventContext) => void) {
-    this.connection.offReducer("init_viper_spittle_system", callback);
   }
 
   initializePlayerMemoryGrid() {
@@ -7259,22 +7207,6 @@ export class RemoteReducers {
     this.connection.offReducer("update_viewport", callback);
   }
 
-  updateViperSpittle(args: ViperSpittleUpdateSchedule) {
-    const __args = { args };
-    let __writer = new __BinaryWriter(1024);
-    UpdateViperSpittle.serialize(__writer, __args);
-    let __argsBuffer = __writer.getBuffer();
-    this.connection.callReducer("update_viper_spittle", __argsBuffer, this.setCallReducerFlags.updateViperSpittleFlags);
-  }
-
-  onUpdateViperSpittle(callback: (ctx: ReducerEventContext, args: ViperSpittleUpdateSchedule) => void) {
-    this.connection.onReducer("update_viper_spittle", callback);
-  }
-
-  removeOnUpdateViperSpittle(callback: (ctx: ReducerEventContext, args: ViperSpittleUpdateSchedule) => void) {
-    this.connection.offReducer("update_viper_spittle", callback);
-  }
-
   upgradeFoundation(foundationId: bigint, newTier: number) {
     const __args = { foundationId, newTier };
     let __writer = new __BinaryWriter(1024);
@@ -7627,11 +7559,6 @@ export class SetReducerFlags {
   initProjectileSystemFlags: __CallReducerFlags = 'FullUpdate';
   initProjectileSystem(flags: __CallReducerFlags) {
     this.initProjectileSystemFlags = flags;
-  }
-
-  initViperSpittleSystemFlags: __CallReducerFlags = 'FullUpdate';
-  initViperSpittleSystem(flags: __CallReducerFlags) {
-    this.initViperSpittleSystemFlags = flags;
   }
 
   initializePlayerMemoryGridFlags: __CallReducerFlags = 'FullUpdate';
@@ -8614,11 +8541,6 @@ export class SetReducerFlags {
     this.updateViewportFlags = flags;
   }
 
-  updateViperSpittleFlags: __CallReducerFlags = 'FullUpdate';
-  updateViperSpittle(flags: __CallReducerFlags) {
-    this.updateViperSpittleFlags = flags;
-  }
-
   upgradeFoundationFlags: __CallReducerFlags = 'FullUpdate';
   upgradeFoundation(flags: __CallReducerFlags) {
     this.upgradeFoundationFlags = flags;
@@ -9107,16 +9029,6 @@ export class RemoteTables {
   get tree(): TreeTableHandle<'tree'> {
     // clientCache is a private property
     return new TreeTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<Tree>(REMOTE_MODULE.tables.tree));
-  }
-
-  get viperSpittle(): ViperSpittleTableHandle<'viper_spittle'> {
-    // clientCache is a private property
-    return new ViperSpittleTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<ViperSpittle>(REMOTE_MODULE.tables.viper_spittle));
-  }
-
-  get viperSpittleUpdateSchedule(): ViperSpittleUpdateScheduleTableHandle<'viper_spittle_update_schedule'> {
-    // clientCache is a private property
-    return new ViperSpittleUpdateScheduleTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<ViperSpittleUpdateSchedule>(REMOTE_MODULE.tables.viper_spittle_update_schedule));
   }
 
   get wallCell(): WallCellTableHandle<'wall_cell'> {

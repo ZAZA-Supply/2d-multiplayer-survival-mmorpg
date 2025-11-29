@@ -41,9 +41,22 @@ const SPRITE_SHEET_CONFIG = {
     } as Record<string, { row: number; col: number }>,
 };
 
+// Flying sprite sheet configuration - same 3x3 grid format, same 320x320 size
+// Flying sprites should match the walking sprite sheet dimensions for consistent rendering
+const FLYING_SPRITE_SHEET_CONFIG = {
+    sheetWidth: 320,
+    sheetHeight: 320,
+    sheetCols: 3,
+    sheetRows: 3,
+    // Same direction mapping as walking sprites
+    directionMap: SPRITE_SHEET_CONFIG.directionMap,
+};
+
 // Calculate frame dimensions from sheet size
 const FRAME_WIDTH = Math.floor(SPRITE_SHEET_CONFIG.sheetWidth / SPRITE_SHEET_CONFIG.sheetCols);
 const FRAME_HEIGHT = Math.floor(SPRITE_SHEET_CONFIG.sheetHeight / SPRITE_SHEET_CONFIG.sheetRows);
+const FLYING_FRAME_WIDTH = Math.floor(FLYING_SPRITE_SHEET_CONFIG.sheetWidth / FLYING_SPRITE_SHEET_CONFIG.sheetCols);
+const FLYING_FRAME_HEIGHT = Math.floor(FLYING_SPRITE_SHEET_CONFIG.sheetHeight / FLYING_SPRITE_SHEET_CONFIG.sheetRows);
 
 // Map species to their sprite sheets (all animals now have sprite sheets)
 const speciesSpriteSheets: Record<string, string> = {
@@ -122,9 +135,13 @@ function getSpriteSheet(species: AnimalSpecies, isFlying: boolean = false): stri
 
 // Get the source rectangle for a sprite from the sheet based on direction (no animation)
 function getSpriteSourceRect(
-    direction: string
+    direction: string,
+    isFlying: boolean = false
 ): { sx: number; sy: number; sw: number; sh: number } {
-    const { directionMap } = SPRITE_SHEET_CONFIG;
+    const config = isFlying ? FLYING_SPRITE_SHEET_CONFIG : SPRITE_SHEET_CONFIG;
+    const frameWidth = isFlying ? FLYING_FRAME_WIDTH : FRAME_WIDTH;
+    const frameHeight = isFlying ? FLYING_FRAME_HEIGHT : FRAME_HEIGHT;
+    const { directionMap } = config;
     
     // Normalize direction to 4-way (map 8-way to 4-way)
     let normalizedDir = direction.toLowerCase();
@@ -148,10 +165,10 @@ function getSpriteSourceRect(
     const { row, col } = directionMap[normalizedDir];
     
     return {
-        sx: col * FRAME_WIDTH,
-        sy: row * FRAME_HEIGHT,
-        sw: FRAME_WIDTH,
-        sh: FRAME_HEIGHT,
+        sx: col * frameWidth,
+        sy: row * frameHeight,
+        sw: frameWidth,
+        sh: frameHeight,
     };
 }
 
@@ -318,9 +335,13 @@ export function renderWildAnimal({
     const spriteSheetSrc = getSpriteSheet(animal.species, useFlying);
     const spriteSheetImage = imageManager.getImage(spriteSheetSrc);
     
-    // Debug logging for bird sprite selection (uncomment to debug)
-    // if (isBird) {
-    //     console.log(`${animal.species.tag} #${animal.id}: isFlying=${animal.isFlying}, useFlying=${useFlying}`);
+    // Get the appropriate frame dimensions based on flying state
+    const currentFrameWidth = useFlying ? FLYING_FRAME_WIDTH : FRAME_WIDTH;
+    const currentFrameHeight = useFlying ? FLYING_FRAME_HEIGHT : FRAME_HEIGHT;
+    
+    // Debug logging for bird sprite selection (enable to debug)
+    // if (isBird && Math.random() < 0.001) { // Log 0.1% of frames to avoid spam
+    //     console.log(`🐦 ${animal.species.tag} #${animal.id}: isFlying=${animal.isFlying}, state=${animal.state.tag}, sprite=${useFlying ? 'FLYING' : 'WALKING'}`);
     // }
     
     // Check if sprite sheet is loaded
@@ -367,16 +388,16 @@ export function renderWildAnimal({
         if (useSpriteSheet && animalImage) {
             // Create a temporary canvas to extract the current frame for shadow
             const shadowCanvas = document.createElement('canvas');
-            shadowCanvas.width = FRAME_WIDTH;
-            shadowCanvas.height = FRAME_HEIGHT;
+            shadowCanvas.width = currentFrameWidth;
+            shadowCanvas.height = currentFrameHeight;
             const shadowCtx = shadowCanvas.getContext('2d');
             
             if (shadowCtx) {
-                const spriteRect = getSpriteSourceRect(animal.facingDirection);
+                const spriteRect = getSpriteSourceRect(animal.facingDirection, useFlying);
                 shadowCtx.drawImage(
                     animalImage,
                     spriteRect.sx, spriteRect.sy, spriteRect.sw, spriteRect.sh,
-                    0, 0, FRAME_WIDTH, FRAME_HEIGHT
+                    0, 0, currentFrameWidth, currentFrameHeight
                 );
                 
                 // Use the extracted frame for dynamic shadow
@@ -466,7 +487,7 @@ export function renderWildAnimal({
         if (offscreenCtx && animalImage) {
             // Get sprite frame info for sprite sheets
             const spriteRect = useSpriteSheet 
-                ? getSpriteSourceRect(animal.facingDirection)
+                ? getSpriteSourceRect(animal.facingDirection, useFlying)
                 : null;
             
             if (useSpriteSheet && spriteRect) {
@@ -530,7 +551,7 @@ export function renderWildAnimal({
         } else {
             // Fallback: draw image directly without flash effect
             if (useSpriteSheet) {
-                const spriteRect = getSpriteSourceRect(animal.facingDirection);
+                const spriteRect = getSpriteSourceRect(animal.facingDirection, useFlying);
                 ctx.drawImage(
                     animalImage!,
                     spriteRect.sx, spriteRect.sy, spriteRect.sw, spriteRect.sh,

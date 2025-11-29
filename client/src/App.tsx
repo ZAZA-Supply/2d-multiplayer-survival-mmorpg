@@ -244,7 +244,6 @@ function AppContent() {
       localPlayerIdentity, // <<< ADD localPlayerIdentity HERE
       playerDrinkingCooldowns, // <<< ADD playerDrinkingCooldowns HERE
       wildAnimals, // <<< ADD wildAnimals HERE
-      viperSpittles, // <<< ADD viperSpittles HERE
       animalCorpses, // <<< ADD animalCorpses HERE (NON-SPATIAL)
       barrels, // <<< ADD barrels HERE
       fumaroles, // <<< ADD fumaroles HERE
@@ -915,7 +914,6 @@ function AppContent() {
                             plantedSeeds={plantedSeeds}
                             minimapCache={minimapCache}
                             wildAnimals={wildAnimals}
-                            viperSpittles={viperSpittles}
                             animalCorpses={animalCorpses}
                             barrels={barrels}
                             fumaroles={fumaroles}

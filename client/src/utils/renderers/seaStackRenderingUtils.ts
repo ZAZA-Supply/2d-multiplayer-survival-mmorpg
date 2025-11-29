@@ -278,6 +278,8 @@ function getImageContourAtLevel(
 
 /**
  * Draws animated water line effects that follow the actual sea stack contour
+ * Note: The underwater base is now rendered with transparency so the actual 
+ * water tile texture shows through - no more fixed blue gradient overlay
  */
 function drawWaterLineEffects(
   ctx: CanvasRenderingContext2D,
@@ -287,8 +289,8 @@ function drawWaterLineEffects(
   height: number,
   currentTimeMs: number
 ): void {
-  // Position water line at the exact split between base and tower (11% from bottom)
-  const BASE_PORTION = 0.11; // Must match the BASE_PORTION in renderSeaStack
+  // Position water line at the exact split between base and tower
+  const BASE_PORTION = 0.22; // Must match the BASE_PORTION in renderSeaStack
   const baseHeight = height * BASE_PORTION;
   const waterLineY = -baseHeight; // Negative because we're measuring from stack.y (anchor point)
   const time = currentTimeMs;
@@ -304,58 +306,10 @@ function drawWaterLineEffects(
   
   ctx.save();
   
-  // 1. Draw underwater tinting using a clipping path that follows the image shape
-  ctx.save();
-  ctx.beginPath();
+  // NOTE: Removed blue gradient underwater tinting - the water tile texture now shows 
+  // through naturally via the transparent base portion rendering
   
-  // Create clipping path that follows the contour and extends downward
-  if (contourPoints.length > 0) {
-    // Find leftmost and rightmost points to ensure we cover the full detected width
-    const leftMost = Math.min(...contourPoints);
-    const rightMost = Math.max(...contourPoints);
-    
-    // Create a simple rectangular clipping area that covers the full detected width
-    // This ensures we don't miss any parts of the sea stack base
-    const waveOffset1 = baseWaveOffset + Math.sin(time * WATER_LINE_CONFIG.WAVE_FREQUENCY * 2) * 1;
-    const waveOffset2 = baseWaveOffset + Math.sin(time * WATER_LINE_CONFIG.WAVE_FREQUENCY * 2 + 1) * 1;
-    
-    // Create a clipping path that's constrained to the sea stack bounds
-    const stackBounds = {
-      left: -width / 2,
-      right: width / 2,
-      top: -height,
-      bottom: 0
-    };
-    
-    // Constrain the clipping area to not extend beyond the sea stack image bounds
-    const constrainedLeft = Math.max(leftMost, stackBounds.left);
-    const constrainedRight = Math.min(rightMost, stackBounds.right);
-    
-    // Create a rectangular clipping path that's bounded by the sea stack image
-    ctx.moveTo(constrainedLeft, waterLineY + waveOffset1);
-    ctx.lineTo(constrainedRight, waterLineY + waveOffset2);
-    ctx.lineTo(constrainedRight, Math.min(waterLineY + 100, stackBounds.bottom)); // Don't extend beyond image bottom
-    ctx.lineTo(constrainedLeft, Math.min(waterLineY + 100, stackBounds.bottom)); // Don't extend beyond image bottom
-    ctx.closePath();
-    
-    // Apply clipping and fill with gradient underwater tint
-    ctx.clip();
-    
-    // Create gradient that gets fully opaque sooner for better underwater effect
-    const underwaterGradient = ctx.createLinearGradient(0, waterLineY, 0, waterLineY + 60);
-    underwaterGradient.addColorStop(0, 'rgba(25, 59, 88, 0.3)'); // Light tint at water line (#193B58)
-    underwaterGradient.addColorStop(0.2, 'rgba(25, 59, 88, 0.6)'); // Medium tint (#193B58)
-    underwaterGradient.addColorStop(0.4, 'rgba(25, 59, 88, 0.9)'); // Strong tint - reaches 90% much sooner (#193B58)
-    underwaterGradient.addColorStop(0.6, 'rgba(25, 59, 88, 1.0)'); // Fully opaque at 60% instead of 100% (#193B58)
-    underwaterGradient.addColorStop(1, 'rgba(25, 59, 88, 1.0)'); // Stay fully opaque to bottom (#193B58)
-    
-    ctx.fillStyle = underwaterGradient;
-    ctx.fillRect(constrainedLeft, waterLineY, constrainedRight - constrainedLeft, Math.min(100, stackBounds.bottom - waterLineY));
-  }
-  
-  ctx.restore();
-  
-  // 2. Draw the animated water line following the contour
+  // Draw the animated water line following the contour
   if (contourPoints.length > 0) {
     ctx.strokeStyle = `rgba(100, 200, 255, ${0.6 + shimmerIntensity * 0.3})`;
     ctx.lineWidth = 2;
@@ -412,7 +366,7 @@ function renderSeaStack(
   // Draw dynamic ground shadow first (before the sea stack)
   if (!skipDrawingShadow && cycleProgress !== undefined) {
     // Position shadow at the base of the sea stack (where base and tower split)
-    const BASE_PORTION = 0.11; // Must match the BASE_PORTION below
+    const BASE_PORTION = 0.22; // Must match the BASE_PORTION below
     const baseHeight = height * BASE_PORTION;
     const shadowBaseY = stack.y - baseHeight; // Shadow at the actual base level
     
@@ -444,23 +398,48 @@ function renderSeaStack(
   // Draw the sea stack centered (simple and clean) with optional base/tower rendering
   const halfMode = renderHalfMode || 'full';
   
-  // The "base" is the underwater portion - roughly player height (~48-64 pixels)
-  // For sea stacks that are 800-1200px tall, this is about 1/15th to 1/20th
-  const BASE_PORTION = 0.15; // Bottom 8% is the underwater base
+  // The "base" is the underwater portion - needs to cover the sea stack base graphics
+  // This value must be consistent with BASE_PORTION in drawWaterLineEffects
+  const BASE_PORTION = 0.22; // Bottom 22% is the underwater base - covers the wide base
   
   if (halfMode === 'bottom') {
     // Render only the small underwater base (bottom ~15% of sea stack)
-    // NO water effects here - those render later with the top portion
+    // Use gradient transparency: fully transparent at water line, opaque halfway down
     const baseHeight = height * BASE_PORTION;
     const sourceBaseHeight = image.naturalHeight * BASE_PORTION;
+    const savedAlpha = ctx.globalAlpha;
     
-    ctx.drawImage(
-      image,
-      0, image.naturalHeight - sourceBaseHeight, // Source: bottom 15% of image
-      image.naturalWidth, sourceBaseHeight,
-      -width / 2, -baseHeight, // Destination: bottom portion at water level
-      width, baseHeight
-    );
+    // Draw the base in horizontal slices with gradient transparency
+    // Top of base (at water line) = fully transparent, halfway down = fully opaque
+    const numSlices = 16; // More slices for smoother gradient
+    const sliceHeight = baseHeight / numSlices;
+    const sourceSliceHeight = sourceBaseHeight / numSlices;
+    
+    for (let i = 0; i < numSlices; i++) {
+      // Calculate opacity: 0.0 at top (water line), 1.0 at halfway (slice 8), stay at 1.0 after
+      // Use easeIn curve for more natural underwater look
+      const normalizedPos = i / (numSlices / 2); // 0 to 2 over full height
+      const clampedPos = Math.min(1.0, normalizedPos); // Clamp at 1.0 after halfway
+      // Ease-in quadratic for smooth transition
+      const sliceOpacity = clampedPos * clampedPos; // 0.0 -> 1.0 with ease-in
+      
+      ctx.globalAlpha = savedAlpha * sliceOpacity;
+      
+      // Source Y: starts from top of base portion in source image
+      const sourceY = image.naturalHeight - sourceBaseHeight + (i * sourceSliceHeight);
+      // Destination Y: starts from top of base (negative, going down toward 0)
+      const destY = -baseHeight + (i * sliceHeight);
+      
+      ctx.drawImage(
+        image,
+        0, sourceY, // Source position
+        image.naturalWidth, sourceSliceHeight + 1, // Source size (+1 to avoid gaps)
+        -width / 2, destY, // Destination position
+        width, sliceHeight + 1 // Destination size (+1 to avoid gaps)
+      );
+    }
+    
+    ctx.globalAlpha = savedAlpha; // Restore original alpha
   } else if (halfMode === 'top') {
     // Render only the tower portion (top ~85% of sea stack)
     // NO water effects here - those are rendered separately in Step 3.5
@@ -675,7 +654,7 @@ function drawWaterLineOnly(
   currentTimeMs: number
 ): void {
   // Position water line at the exact split between base and tower (11% from bottom)
-  const BASE_PORTION = 0.11;
+  const BASE_PORTION = 0.22; // Must match the BASE_PORTION in renderSeaStack
   const baseHeight = height * BASE_PORTION;
   const waterLineY = -baseHeight;
   const time = currentTimeMs;
@@ -724,62 +703,20 @@ function drawWaterLineOnly(
 }
 
 /**
- * Renders only the water line effects for sea stacks (blue gradient overlay)
- * This should be called AFTER swimming players to ensure the water appears over them
+ * Renders only the water effects for sea stacks
+ * NOTE: The blue gradient overlay has been removed - the actual water tile texture
+ * now shows through via the transparent base rendering. The water line is rendered
+ * separately by renderSeaStackWaterLineOnly.
+ * This function is kept as a no-op for backward compatibility.
  */
 export function renderSeaStackWaterEffectsOnly(
-  ctx: CanvasRenderingContext2D,
-  seaStack: any, // Server-provided sea stack entity
-  doodadImages: Map<string, HTMLImageElement> | null,
-  currentTimeMs?: number // Current time for animations
+  _ctx: CanvasRenderingContext2D,
+  _seaStack: any, // Server-provided sea stack entity
+  _doodadImages: Map<string, HTMLImageElement> | null,
+  _currentTimeMs?: number // Current time for animations
 ): void {
-  // Trigger image preloading on first call
-  preloadSeaStackImages();
-  
-  // Early exit if images not loaded yet
-  if (!imagesLoaded || preloadedImages.length === 0) return;
-    
-  // Map server variant to image index
-  let imageIndex = 0;
-  if (seaStack.variant && seaStack.variant.tag) {
-    switch (seaStack.variant.tag) {
-      case 'Tall': imageIndex = 0; break;
-      case 'Medium': imageIndex = 1; break;
-      case 'Wide': imageIndex = 2; break;
-      default: imageIndex = 0; break;
-    }
-  }
-  
-  // Ensure valid image index
-  imageIndex = Math.min(imageIndex, preloadedImages.length - 1);
-  const stackImage = preloadedImages[imageIndex];
-  
-  if (stackImage && stackImage.complete) {
-    // Create client-side rendering object from server data
-    const clientStack: SeaStack = {
-      x: seaStack.posX,
-      y: seaStack.posY,
-      scale: seaStack.scale || 1.0,
-      rotation: 0.0,
-      opacity: seaStack.opacity || 1.0,
-      imageIndex: imageIndex
-    };
-    
-    const width = SEA_STACK_CONFIG.BASE_WIDTH * clientStack.scale;
-    const height = (stackImage.naturalHeight / stackImage.naturalWidth) * width;
-    
-    // Draw ONLY the water effects in the stack's coordinate space
-    ctx.save();
-    ctx.translate(clientStack.x, clientStack.y);
-    ctx.rotate(clientStack.rotation);
-    ctx.globalAlpha = clientStack.opacity;
-    
-    if (currentTimeMs !== undefined) {
-      drawWaterLineEffects(ctx, clientStack, stackImage, width, height, currentTimeMs);
-    }
-    
-    ctx.restore();
-  }
+  // No-op: Water effects (blue gradient) removed in favor of transparent base + water tile texture
+  // The animated water line is now rendered by renderSeaStackWaterLineOnly
 }
 
 /**

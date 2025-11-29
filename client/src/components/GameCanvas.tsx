@@ -35,7 +35,6 @@ import {
   PlantType as SpacetimeDBPlantType,
   PlayerDrinkingCooldown as SpacetimeDBPlayerDrinkingCooldown,
   WildAnimal as SpacetimeDBWildAnimal,
-  ViperSpittle as SpacetimeDBViperSpittle,
   AnimalCorpse as SpacetimeDBAnimalCorpse,
   Barrel as SpacetimeDBBarrel,
   Fumarole as SpacetimeDBFumarole, // ADDED: Fumarole type
@@ -113,7 +112,6 @@ import { renderWaterPatches } from '../utils/renderers/waterPatchRenderingUtils'
 import { renderFirePatches } from '../utils/renderers/firePatchRenderingUtils';
 import { drawUnderwaterShadowOnly } from '../utils/renderers/swimmingEffectsUtils';
 import { renderWildAnimal, preloadWildAnimalImages } from '../utils/renderers/wildAnimalRenderingUtils';
-import { renderViperSpittle } from '../utils/renderers/viperSpittleRenderingUtils';
 import { renderAnimalCorpse, preloadAnimalCorpseImages } from '../utils/renderers/animalCorpseRenderingUtils';
 import { renderEquippedItem } from '../utils/renderers/equippedItemRenderingUtils';
 import { renderFumarole, preloadFumaroleImages } from '../utils/renderers/fumaroleRenderingUtils'; // ADDED: Fumarole rendering
@@ -199,8 +197,7 @@ interface GameCanvasProps {
   plantedSeeds: Map<string, SpacetimeDBPlantedSeed>;
   playerDrinkingCooldowns: Map<string, SpacetimeDBPlayerDrinkingCooldown>; // Add player drinking cooldowns
   wildAnimals: Map<string, SpacetimeDBWildAnimal>;
-    viperSpittles: Map<string, SpacetimeDBViperSpittle>;
-    animalCorpses: Map<string, SpacetimeDBAnimalCorpse>; // Add viper spittles
+  animalCorpses: Map<string, SpacetimeDBAnimalCorpse>;
   barrels: Map<string, SpacetimeDBBarrel>; // Add barrels
   fumaroles: Map<string, SpacetimeDBFumarole>; // ADDED: Fumaroles
   basaltColumns: Map<string, SpacetimeDBBasaltColumn>; // ADDED: Basalt columns
@@ -286,7 +283,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   plantedSeeds,
   playerDrinkingCooldowns,
   wildAnimals,
-  viperSpittles,
   animalCorpses,
   barrels,
   fumaroles, // ADDED: Fumaroles destructuring
@@ -481,25 +477,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     });
   }, []);
 
-  const { overlayRgba, maskCanvasRef } = useDayNightCycle({
-    worldState,
-    campfires,
-    lanterns,
-    furnaces, // Add furnaces for darkness cutouts
-    runeStones, // ADDED: RuneStones for night light cutouts
-    firePatches, // ADDED: Fire patches for night light cutouts
-    fumaroles, // ADDED: Fumaroles for heat glow at night
-    players, // Pass all players
-    activeEquipments, // Pass all active equipments
-    itemDefinitions, // Pass all item definitions
-    cameraOffsetX,
-    cameraOffsetY,
-    canvasSize,
-    // Add interpolation parameters for smooth torch light cutouts
-    localPlayerId,
-    predictedPosition,
-    remotePlayerInterpolation,
-  });
+  // useDayNightCycle hook moved after useEntityFiltering (needs buildingClusters)
 
   // useInteractionFinder moved after visibleWorldTiles definition
 
@@ -558,8 +536,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     visibleLanterns,
     visibleWildAnimals,
     visibleWildAnimalsMap,
-    visibleViperSpittles,
-    visibleViperSpittlesMap,
     visibleAnimalCorpses,
     visibleAnimalCorpsesMap,
     visibleBarrels,
@@ -603,7 +579,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     rainCollectors,
     brothPots,
     wildAnimals,
-    viperSpittles,
     animalCorpses,
     barrels,
     fumaroles, // ADDED: Fumaroles
@@ -616,6 +591,30 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     isTreeFalling, // NEW: Pass falling tree checker so falling trees stay visible
     connection?.db?.worldChunkData ? new Map(Array.from(connection.db.worldChunkData.iter()).map((chunk: any) => [`${chunk.chunkX},${chunk.chunkY}`, chunk])) : undefined, // ADDED: World chunk data for grass filtering
   );
+
+  // --- Day/Night Cycle with Indoor Light Containment ---
+  // Must be after useEntityFiltering since it uses buildingClusters
+  const { overlayRgba, maskCanvasRef } = useDayNightCycle({
+    worldState,
+    campfires,
+    lanterns,
+    furnaces, // Add furnaces for darkness cutouts
+    runeStones, // ADDED: RuneStones for night light cutouts
+    firePatches, // ADDED: Fire patches for night light cutouts
+    fumaroles, // ADDED: Fumaroles for heat glow at night
+    players, // Pass all players
+    activeEquipments, // Pass all active equipments
+    itemDefinitions, // Pass all item definitions
+    cameraOffsetX,
+    cameraOffsetY,
+    canvasSize,
+    // Add interpolation parameters for smooth torch light cutouts
+    localPlayerId,
+    predictedPosition,
+    remotePlayerInterpolation,
+    // Indoor light containment - clip light cutouts to building interiors
+    buildingClusters,
+  });
 
   // Sync ySortedEntities to ref (reduces renderGame dependency array churn)
   useEffect(() => { ySortedEntitiesRef.current = ySortedEntities; }, [ySortedEntities]);
@@ -2617,6 +2616,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         campfire: fire,
         cameraOffsetX: currentCameraOffsetX,
         cameraOffsetY: currentCameraOffsetY,
+        // Indoor light containment - clip light to building interior
+        buildingClusters,
       });
     });
 
@@ -2627,6 +2628,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         lantern: lantern,
         cameraOffsetX: currentCameraOffsetX,
         cameraOffsetY: currentCameraOffsetY,
+        // Indoor light containment - clip light to building interior
+        buildingClusters,
       });
     });
 
@@ -2637,6 +2640,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         furnace: furnace,
         cameraOffsetX: currentCameraOffsetX,
         cameraOffsetY: currentCameraOffsetY,
+        // Indoor light containment - clip light to building interior
+        buildingClusters,
       });
     });
 
@@ -2691,6 +2696,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         cameraOffsetY: currentCameraOffsetY,
         renderPositionX,
         renderPositionY,
+        // Indoor light containment - clip light to building interior
+        buildingClusters,
       });
     });
     // --- End Torch Light ---

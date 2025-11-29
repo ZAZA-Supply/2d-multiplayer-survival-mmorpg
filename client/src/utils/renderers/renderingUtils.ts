@@ -21,7 +21,6 @@ import {
     PlantedSeed as SpacetimeDBPlantedSeed,
     RainCollector as SpacetimeDBRainCollector,
     WildAnimal as SpacetimeDBWildAnimal,
-    ViperSpittle as SpacetimeDBViperSpittle,
     AnimalCorpse as SpacetimeDBAnimalCorpse,
     FoundationCell as SpacetimeDBFoundationCell, // ADDED: Building foundations
     WallCell as SpacetimeDBWallCell, // ADDED: Building walls
@@ -63,8 +62,6 @@ import { renderShelter } from './shelterRenderingUtils';
 import { renderRainCollector } from './rainCollectorRenderingUtils';
 // Import wild animal renderer
 import { renderWildAnimal, renderTamingThoughtBubbles } from './wildAnimalRenderingUtils';
-// Import viper spittle renderer
-import { renderViperSpittle } from './viperSpittleRenderingUtils';
 // Import animal corpse renderer
 import { renderAnimalCorpse } from './animalCorpseRenderingUtils';
 // Import player corpse renderer
@@ -1053,13 +1050,6 @@ export const renderYSortedEntities = ({
                 ctx,
                 animal: wildAnimal,
                 nowMs,
-            });
-        } else if (type === 'viper_spittle') {
-            const viperSpittle = entity as SpacetimeDBViperSpittle;
-            renderViperSpittle({
-                ctx,
-                spittle: viperSpittle,
-                currentTimeMs: nowMs,
             });
         } else if (type === 'animal_corpse') {
             const animalCorpse = entity as SpacetimeDBAnimalCorpse;

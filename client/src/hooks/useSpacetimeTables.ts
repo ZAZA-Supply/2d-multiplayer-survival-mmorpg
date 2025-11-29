@@ -4,7 +4,6 @@ import {
     DbConnection,
     RangedWeaponStats as SpacetimeDBRangedWeaponStats,
     Projectile as SpacetimeDBProjectile,
-    ViperSpittle as SpacetimeDBViperSpittle
 } from '../generated';
 import { Identity } from 'spacetimedb';
 import { getChunkIndicesForViewport, getChunkIndicesForViewportWithBuffer } from '../utils/chunkUtils';
@@ -139,7 +138,6 @@ export interface SpacetimeTableStates {
     localPlayerIdentity: Identity | null;
     playerDrinkingCooldowns: Map<string, SpacetimeDB.PlayerDrinkingCooldown>;
     wildAnimals: Map<string, SpacetimeDB.WildAnimal>;
-    viperSpittles: Map<string, SpacetimeDBViperSpittle>;
     animalCorpses: Map<string, SpacetimeDB.AnimalCorpse>;
     barrels: Map<string, SpacetimeDB.Barrel>; // ADDED barrels
     seaStacks: Map<string, SpacetimeDB.SeaStack>; // ADDED sea stacks
@@ -213,7 +211,6 @@ export const useSpacetimeTables = ({
     const [continuousSounds, setContinuousSounds] = useState<Map<string, SpacetimeDB.ContinuousSound>>(() => new Map());
     const [playerDrinkingCooldowns, setPlayerDrinkingCooldowns] = useState<Map<string, SpacetimeDB.PlayerDrinkingCooldown>>(() => new Map());
     const [wildAnimals, setWildAnimals] = useState<Map<string, SpacetimeDB.WildAnimal>>(() => new Map());
-    const [viperSpittles, setViperSpittles] = useState<Map<string, SpacetimeDBViperSpittle>>(() => new Map());
     const [animalCorpses, setAnimalCorpses] = useState<Map<string, SpacetimeDB.AnimalCorpse>>(() => new Map());
     const [barrels, setBarrels] = useState<Map<string, SpacetimeDB.Barrel>>(() => new Map()); // ADDED barrels
     const [seaStacks, setSeaStacks] = useState<Map<string, SpacetimeDB.SeaStack>>(() => new Map()); // ADDED sea stacks
@@ -1307,16 +1304,6 @@ export const useSpacetimeTables = ({
                 });
             };
 
-            const handleViperSpittleInsert = (ctx: any, spittle: SpacetimeDBViperSpittle) => {
-                setViperSpittles(prev => new Map(prev).set(spittle.id.toString(), spittle));
-            };
-            const handleViperSpittleUpdate = (ctx: any, oldSpittle: SpacetimeDBViperSpittle, newSpittle: SpacetimeDBViperSpittle) => {
-                setViperSpittles(prev => new Map(prev).set(newSpittle.id.toString(), newSpittle));
-            };
-            const handleViperSpittleDelete = (ctx: any, spittle: SpacetimeDBViperSpittle) => {
-                setViperSpittles(prev => { const newMap = new Map(prev); newMap.delete(spittle.id.toString()); return newMap; });
-            };
-
             const handleAnimalCorpseInsert = (ctx: any, corpse: SpacetimeDB.AnimalCorpse) => {
                 setAnimalCorpses(prev => new Map(prev).set(corpse.id.toString(), corpse));
             };
@@ -1644,11 +1631,6 @@ export const useSpacetimeTables = ({
             connection.db.wildAnimal.onUpdate(handleWildAnimalUpdate);
             connection.db.wildAnimal.onDelete(handleWildAnimalDelete);
 
-            // Register ViperSpittle callbacks - ADDED
-            connection.db.viperSpittle.onInsert(handleViperSpittleInsert);
-            connection.db.viperSpittle.onUpdate(handleViperSpittleUpdate);
-            connection.db.viperSpittle.onDelete(handleViperSpittleDelete);
-
             // Register AnimalCorpse callbacks - NON-SPATIAL
             connection.db.animalCorpse.onInsert(handleAnimalCorpseInsert);
             connection.db.animalCorpse.onUpdate(handleAnimalCorpseUpdate);
@@ -1785,10 +1767,6 @@ export const useSpacetimeTables = ({
                 connection.subscriptionBuilder()
                     .onError((err) => console.error("[PLAYER_DRINKING_COOLDOWN Sub Error]:", err))
                     .subscribe('SELECT * FROM player_drinking_cooldown'),
-                // ADDED ViperSpittle subscription for viper projectiles
-                connection.subscriptionBuilder()
-                    .onError((err) => console.error("[VIPER_SPITTLE Sub Error]:", err))
-                    .subscribe('SELECT * FROM viper_spittle'),
                 // ADDED AnimalCorpse subscription - NON-SPATIAL
                 connection.subscriptionBuilder()
                     .onError((err) => console.error("[ANIMAL_CORPSE Sub Error]:", err))
@@ -2039,7 +2017,6 @@ export const useSpacetimeTables = ({
                 setContinuousSounds(new Map());
                 setPlayerDrinkingCooldowns(new Map());
                 setWildAnimals(new Map());
-                setViperSpittles(new Map());
                 setAnimalCorpses(new Map());
                 setSeaStacks(new Map());
                 setChunkWeather(new Map());
@@ -2097,7 +2074,6 @@ export const useSpacetimeTables = ({
         localPlayerIdentity, // Add this to the return
         playerDrinkingCooldowns,
         wildAnimals,
-        viperSpittles,
         animalCorpses,
         barrels, // ADDED barrels
         seaStacks, // ADDED sea stacks

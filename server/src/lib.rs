@@ -359,8 +359,6 @@ use crate::rain_collector::rain_collector as RainCollectorTableTrait; // <<< ADD
 use crate::water_patch::water_patch as WaterPatchTableTrait; // <<< ADDED: Import WaterPatch table trait
 use crate::wild_animal_npc::wild_animal as WildAnimalTableTrait; // <<< ADDED: Import WildAnimal table trait
 use crate::wild_animal_npc::wild_animal_ai_schedule as WildAnimalAiScheduleTableTrait; // <<< ADDED: Import WildAnimalAiSchedule table trait
-use crate::wild_animal_npc::viper::viper_spittle as ViperSpittleTableTrait; // <<< ADDED: Import ViperSpittle table trait
-use crate::wild_animal_npc::viper::viper_spittle_update_schedule as ViperSpittleUpdateScheduleTableTrait; // <<< ADDED: Import ViperSpittleUpdateSchedule table trait
 use crate::wild_animal_npc::animal_corpse as AnimalCorpseTableTrait; // <<< ADDED: Import AnimalCorpse table trait
 use crate::barrel::barrel as BarrelTableTrait; // <<< ADDED: Import Barrel table trait
 use crate::barrel::barrel_respawn_schedule as BarrelRespawnScheduleTableTrait; // <<< ADDED: Import BarrelRespawnSchedule table trait
@@ -635,8 +633,6 @@ pub fn init_module(ctx: &ReducerContext) -> Result<(), String> {
     // ADD: Initialize wild animal AI system
     crate::wild_animal_npc::init_wild_animal_ai_schedule(ctx)?;
     
-    // ADD: Initialize viper spittle projectile system
-    crate::wild_animal_npc::viper::init_viper_spittle_system(ctx)?;
     
     // ADD: Initialize building privilege distance check system
     crate::homestead_hearth::init_building_privilege_check_schedule(ctx)?;

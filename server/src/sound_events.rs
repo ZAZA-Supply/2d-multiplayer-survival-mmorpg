@@ -60,6 +60,7 @@ pub enum SoundType {
     SoupBoiling,              // soup_boiling.mp3 (1 variation - looping sound while soup is brewing)
     ErrorJarPlacement,       // error_jar_placement.mp3 (1 variation - when trying to place jar back in output slot)
     ErrorBrothNotCompatible, // error_broth_not_compatible.mp3 (1 variation - when trying to place incompatible item in broth pot)
+    DoorOpening,             // door_opening.mp3 (1 variation - when a door is opened)
     // Thunder removed - system disabled for now
     // Add more as needed - extensible system
 }
@@ -121,6 +122,7 @@ impl SoundType {
             SoundType::SoupBoiling => "soup_boiling",
             SoundType::ErrorJarPlacement => "error_jar_placement",
             SoundType::ErrorBrothNotCompatible => "error_broth_not_compatible",
+            SoundType::DoorOpening => "door_opening",
         }
     }
 
@@ -180,6 +182,7 @@ impl SoundType {
             SoundType::SoupBoiling => 1, // soup_boiling.mp3 (single variation - looping sound)
             SoundType::ErrorJarPlacement => 1, // error_jar_placement.mp3 (single variation)
             SoundType::ErrorBrothNotCompatible => 1, // error_broth_not_compatible.mp3 (single variation)
+            SoundType::DoorOpening => 1, // door_opening.mp3 (single variation)
         }
     }
 
@@ -1017,6 +1020,13 @@ pub fn emit_error_broth_not_compatible_sound(ctx: &ReducerContext, pos_x: f32, p
 pub fn emit_done_cooking_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, player_id: Identity) {
     if let Err(e) = emit_sound_at_position_with_distance(ctx, SoundType::DoneCooking, pos_x, pos_y, 1.2, 700.0, player_id) {
         log::warn!("Failed to emit done cooking sound: {}", e);
+    }
+}
+
+/// Emit door opening sound (when a door is opened)
+pub fn emit_door_opening_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, player_id: Identity) {
+    if let Err(e) = emit_sound_at_position_with_distance(ctx, SoundType::DoorOpening, pos_x, pos_y, 1.0, 600.0, player_id) {
+        log::warn!("Failed to emit door opening sound: {}", e);
     }
 }
 

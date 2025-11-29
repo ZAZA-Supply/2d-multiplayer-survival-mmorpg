@@ -28,7 +28,7 @@ use crate::environment::apply_seasonal_respawn_multiplier;
 /// Base interaction radius for collectible resources
 pub const BASE_RESOURCE_RADIUS: f32 = 16.0;
 /// Standard distance players can interact with collectibles (increased for easier food pickup)
-pub const PLAYER_RESOURCE_INTERACTION_DISTANCE: f32 = 80.0;
+pub const PLAYER_RESOURCE_INTERACTION_DISTANCE: f32 = 120.0; // Balanced range: 50% increase from original 80px, consistent with dropped items
 /// Squared interaction distance for faster distance checks
 pub const PLAYER_RESOURCE_INTERACTION_DISTANCE_SQUARED: f32 = 
     PLAYER_RESOURCE_INTERACTION_DISTANCE * PLAYER_RESOURCE_INTERACTION_DISTANCE;

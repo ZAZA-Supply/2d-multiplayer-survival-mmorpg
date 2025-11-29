@@ -16,6 +16,8 @@ import { CAMPFIRE_HEIGHT } from '../utils/renderers/campfireRenderingUtils';
 import { LANTERN_HEIGHT } from '../utils/renderers/lanternRenderingUtils';
 import { FURNACE_HEIGHT, FURNACE_RENDER_Y_OFFSET } from '../utils/renderers/furnaceRenderingUtils';
 import { FIRE_PATCH_VISUAL_RADIUS } from '../utils/renderers/firePatchRenderingUtils';
+import { BuildingCluster } from '../utils/buildingVisibilityUtils';
+import { FOUNDATION_TILE_SIZE } from '../config/gameConfig';
 
 export interface ColorPoint {
   r: number; g: number; b: number; a: number;
@@ -164,6 +166,117 @@ const FULL_MOON_NIGHT_KEYFRAMES: ColorAlphaKeyframe[] = [
 // Server's full moon cycle interval
 const SERVER_FULL_MOON_INTERVAL = 3;
 
+// --- Indoor Light Containment Utilities ---
+
+/**
+ * Convert world position to foundation cell coordinates
+ */
+function worldToFoundationCell(worldX: number, worldY: number): { cellX: number; cellY: number } {
+    return {
+        cellX: Math.floor(worldX / FOUNDATION_TILE_SIZE),
+        cellY: Math.floor(worldY / FOUNDATION_TILE_SIZE),
+    };
+}
+
+/**
+ * Find which enclosed building cluster contains the given world position
+ * Returns the cluster and its ID if found, null otherwise
+ */
+function findEnclosingCluster(
+    worldX: number,
+    worldY: number,
+    buildingClusters: Map<string, BuildingCluster>
+): { clusterId: string; cluster: BuildingCluster } | null {
+    const { cellX, cellY } = worldToFoundationCell(worldX, worldY);
+    const cellKey = `${cellX},${cellY}`;
+    
+    for (const [clusterId, cluster] of buildingClusters) {
+        if (cluster.isEnclosed && cluster.cellCoords.has(cellKey)) {
+            return { clusterId, cluster };
+        }
+    }
+    return null;
+}
+
+/**
+ * Create a Path2D clip path from a building cluster's foundation cells
+ * This allows light cutouts to be contained within the building interior
+ * 
+ * IMPORTANT: North walls/doors render with a vertical offset ABOVE the foundation,
+ * so we extend the clip area upward by one foundation tile size to include
+ * the north wall rendering area.
+ */
+function createClusterClipPath(
+    cluster: BuildingCluster,
+    cameraOffsetX: number,
+    cameraOffsetY: number
+): Path2D {
+    const path = new Path2D();
+    
+    // Add each foundation cell as a rectangle to the path
+    // Also extend upward by one tile to cover north wall rendering area
+    cluster.cellCoords.forEach((cellKey) => {
+        const [cellXStr, cellYStr] = cellKey.split(',');
+        const cellX = parseInt(cellXStr, 10);
+        const cellY = parseInt(cellYStr, 10);
+        
+        // Convert cell coordinates to screen pixels
+        const screenX = cellX * FOUNDATION_TILE_SIZE + cameraOffsetX;
+        const screenY = cellY * FOUNDATION_TILE_SIZE + cameraOffsetY;
+        
+        // Add the foundation cell itself
+        path.rect(screenX, screenY, FOUNDATION_TILE_SIZE, FOUNDATION_TILE_SIZE);
+        
+        // Add a rectangle ABOVE this cell to cover north wall/door rendering area
+        // North walls render with vertical offset above the foundation
+        path.rect(screenX, screenY - FOUNDATION_TILE_SIZE, FOUNDATION_TILE_SIZE, FOUNDATION_TILE_SIZE);
+    });
+    
+    return path;
+}
+
+/**
+ * Render a light cutout, optionally clipped to a building interior
+ * This prevents light from spilling outside of enclosed structures
+ */
+function renderClippedLightCutout(
+    ctx: CanvasRenderingContext2D,
+    screenX: number,
+    screenY: number,
+    lightRadius: number,
+    gradientStops: Array<{ stop: number; alpha: number }>,
+    enclosingCluster: { clusterId: string; cluster: BuildingCluster } | null,
+    cameraOffsetX: number,
+    cameraOffsetY: number
+): void {
+    // Save context before potentially applying clip
+    if (enclosingCluster) {
+        ctx.save();
+        const clipPath = createClusterClipPath(enclosingCluster.cluster, cameraOffsetX, cameraOffsetY);
+        ctx.clip(clipPath);
+    }
+    
+    // Create and apply the radial gradient for the light cutout
+    const innerRadius = lightRadius * (gradientStops[0]?.stop || 0.08);
+    const maskGradient = ctx.createRadialGradient(screenX, screenY, innerRadius, screenX, screenY, lightRadius);
+    
+    for (const { stop, alpha } of gradientStops) {
+        maskGradient.addColorStop(stop, `rgba(0,0,0,${alpha})`);
+    }
+    
+    ctx.fillStyle = maskGradient;
+    ctx.beginPath();
+    ctx.arc(screenX, screenY, lightRadius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Restore context if we applied a clip
+    if (enclosingCluster) {
+        ctx.restore();
+    }
+}
+
+// --- End Indoor Light Containment Utilities ---
+
 function calculateOverlayRgbaString(
     cycleProgress: number,
     worldState: SpacetimeDBWorldState | null // Pass the whole worldState or null
@@ -286,6 +399,8 @@ interface UseDayNightCycleProps {
     localPlayerId?: string;
     predictedPosition: { x: number; y: number } | null;
     remotePlayerInterpolation?: any; // Type matches GameCanvas
+    // Indoor light containment - prevents light from spilling outside enclosed buildings
+    buildingClusters?: Map<string, BuildingCluster>;
 }
 
 interface UseDayNightCycleResult {
@@ -310,6 +425,7 @@ export function useDayNightCycle({
     localPlayerId,
     predictedPosition,
     remotePlayerInterpolation,
+    buildingClusters, // Indoor light containment
 }: UseDayNightCycleProps): UseDayNightCycleResult {
     const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const [overlayRgba, setOverlayRgba] = useState<string>('transparent');
@@ -412,17 +528,30 @@ export function useDayNightCycle({
                 const screenX = campfire.posX + cameraOffsetX;
                 const screenY = adjustedGradientCenterWorldY + cameraOffsetY; // Use adjusted Y
                 
+                // Check if campfire is inside an enclosed building
+                const enclosingCluster = buildingClusters 
+                    ? findEnclosingCluster(campfire.posX, campfire.posY, buildingClusters)
+                    : null;
+                
                 // SUBSTANTIAL CAMPFIRE CUTOUT - 2x larger inner bright area with natural gradient
                 const lightRadius = CAMPFIRE_LIGHT_RADIUS_BASE * 2.0; // Double the cutout size
-                const maskGradient = maskCtx.createRadialGradient(screenX, screenY, lightRadius * 0.08, screenX, screenY, lightRadius);
-                maskGradient.addColorStop(0, 'rgba(0,0,0,1)'); // Full cutout at center
-                maskGradient.addColorStop(0.4, 'rgba(0,0,0,0.7)'); // Natural transition zone
-                maskGradient.addColorStop(0.8, 'rgba(0,0,0,0.3)'); // Gentle fade
-                maskGradient.addColorStop(1, 'rgba(0,0,0,0)'); // Complete fade to darkness
-                maskCtx.fillStyle = maskGradient;
-                maskCtx.beginPath();
-                maskCtx.arc(screenX, screenY, lightRadius, 0, Math.PI * 2);
-                maskCtx.fill();
+                
+                // Use clipped rendering if inside a building
+                renderClippedLightCutout(
+                    maskCtx,
+                    screenX,
+                    screenY,
+                    lightRadius,
+                    [
+                        { stop: 0.08, alpha: 1 },    // Full cutout at center
+                        { stop: 0.4, alpha: 0.7 },   // Natural transition zone
+                        { stop: 0.8, alpha: 0.3 },   // Gentle fade
+                        { stop: 1, alpha: 0 },       // Complete fade to darkness
+                    ],
+                    enclosingCluster,
+                    cameraOffsetX,
+                    cameraOffsetY
+                );
             }
         });
 
@@ -436,19 +565,32 @@ export function useDayNightCycle({
                 const screenX = lantern.posX + cameraOffsetX;
                 const screenY = adjustedGradientCenterWorldY + cameraOffsetY;
                 
+                // Check if lantern is inside an enclosed building
+                const enclosingCluster = buildingClusters 
+                    ? findEnclosingCluster(lantern.posX, lantern.posY, buildingClusters)
+                    : null;
+                
                 // LANTERN CUTOUT - Larger and more stable than torch, but more contained than campfire
                 const flicker = (Math.random() - 0.5) * 2 * LANTERN_FLICKER_AMOUNT;
                 const lightRadius = Math.max(0, (LANTERN_LIGHT_RADIUS_BASE * 1.8) + flicker); // 1.8x radius for good coverage
-                const maskGradient = maskCtx.createRadialGradient(screenX, screenY, lightRadius * 0.05, screenX, screenY, lightRadius);
-                maskGradient.addColorStop(0, 'rgba(0,0,0,1)'); // Full cutout at center
-                maskGradient.addColorStop(0.3, 'rgba(0,0,0,0.85)'); // Strong cutout zone
-                maskGradient.addColorStop(0.6, 'rgba(0,0,0,0.5)'); // Gradual transition
-                maskGradient.addColorStop(0.85, 'rgba(0,0,0,0.2)'); // Gentle fade
-                maskGradient.addColorStop(1, 'rgba(0,0,0,0)'); // Complete fade to darkness
-                maskCtx.fillStyle = maskGradient;
-                maskCtx.beginPath();
-                maskCtx.arc(screenX, screenY, lightRadius, 0, Math.PI * 2);
-                maskCtx.fill();
+                
+                // Use clipped rendering if inside a building
+                renderClippedLightCutout(
+                    maskCtx,
+                    screenX,
+                    screenY,
+                    lightRadius,
+                    [
+                        { stop: 0.05, alpha: 1 },    // Full cutout at center
+                        { stop: 0.3, alpha: 0.85 },  // Strong cutout zone
+                        { stop: 0.6, alpha: 0.5 },   // Gradual transition
+                        { stop: 0.85, alpha: 0.2 },  // Gentle fade
+                        { stop: 1, alpha: 0 },       // Complete fade to darkness
+                    ],
+                    enclosingCluster,
+                    cameraOffsetX,
+                    cameraOffsetY
+                );
             }
         });
 
@@ -462,8 +604,21 @@ export function useDayNightCycle({
                 const screenX = furnace.posX + cameraOffsetX;
                 const screenY = adjustedGradientCenterWorldY + cameraOffsetY; // Use adjusted Y
                 
-                // FIRST: Create the transparent cutout hole
+                // Check if furnace is inside an enclosed building
+                const enclosingCluster = buildingClusters 
+                    ? findEnclosingCluster(furnace.posX, furnace.posY, buildingClusters)
+                    : null;
+                
                 const lightRadius = FURNACE_LIGHT_RADIUS_BASE * 2.0; // Double the cutout size
+                
+                // Apply clip if inside a building (clip affects both cutout and red fill)
+                if (enclosingCluster) {
+                    maskCtx.save();
+                    const clipPath = createClusterClipPath(enclosingCluster.cluster, cameraOffsetX, cameraOffsetY);
+                    maskCtx.clip(clipPath);
+                }
+                
+                // FIRST: Create the transparent cutout hole
                 const maskGradient = maskCtx.createRadialGradient(screenX, screenY, lightRadius * 0.08, screenX, screenY, lightRadius);
                 maskGradient.addColorStop(0, 'rgba(0,0,0,1)'); // Full cutout at center
                 maskGradient.addColorStop(0.4, 'rgba(0,0,0,0.7)'); // Natural transition zone
@@ -489,6 +644,12 @@ export function useDayNightCycle({
                 maskCtx.beginPath();
                 maskCtx.arc(screenX, screenY, redFillRadius, 0, Math.PI * 2);
                 maskCtx.fill();
+                
+                // Restore context if we applied a clip
+                if (enclosingCluster) {
+                    maskCtx.restore();
+                }
+                
                 // Switch back to cutout mode for other lights
                 maskCtx.globalCompositeOperation = 'destination-out';
             }
@@ -525,6 +686,11 @@ export function useDayNightCycle({
                     }
                 }
                 
+                // Check if player with torch is inside an enclosed building
+                const enclosingCluster = buildingClusters 
+                    ? findEnclosingCluster(renderPositionX, renderPositionY, buildingClusters)
+                    : null;
+                
                 const lightScreenX = renderPositionX + cameraOffsetX;
                 const lightScreenY = renderPositionY + cameraOffsetY;
 
@@ -532,15 +698,22 @@ export function useDayNightCycle({
                 const flicker = (Math.random() - 0.5) * 2 * TORCH_FLICKER_AMOUNT;
                 const currentLightRadius = Math.max(0, (TORCH_LIGHT_RADIUS_BASE * 1.25) + flicker);
 
-                const maskGradient = maskCtx.createRadialGradient(lightScreenX, lightScreenY, currentLightRadius * 0.12, lightScreenX, lightScreenY, currentLightRadius);
-                maskGradient.addColorStop(0, 'rgba(0,0,0,1)'); // Full cutout at center
-                maskGradient.addColorStop(0.35, 'rgba(0,0,0,0.8)'); // Natural transition zone
-                maskGradient.addColorStop(0.75, 'rgba(0,0,0,0.4)'); // Gentle fade
-                maskGradient.addColorStop(1, 'rgba(0,0,0,0)'); // Complete fade to darkness
-                maskCtx.fillStyle = maskGradient;
-                maskCtx.beginPath();
-                maskCtx.arc(lightScreenX, lightScreenY, currentLightRadius, 0, Math.PI * 2);
-                maskCtx.fill();
+                // Use clipped rendering if inside a building
+                renderClippedLightCutout(
+                    maskCtx,
+                    lightScreenX,
+                    lightScreenY,
+                    currentLightRadius,
+                    [
+                        { stop: 0.12, alpha: 1 },    // Full cutout at center
+                        { stop: 0.35, alpha: 0.8 },  // Natural transition zone
+                        { stop: 0.75, alpha: 0.4 },  // Gentle fade
+                        { stop: 1, alpha: 0 },       // Complete fade to darkness
+                    ],
+                    enclosingCluster,
+                    cameraOffsetX,
+                    cameraOffsetY
+                );
             }
         });
 
@@ -726,7 +899,7 @@ export function useDayNightCycle({
         
         maskCtx.globalCompositeOperation = 'source-over';
 
-    }, [worldState, campfires, lanterns, furnaces, runeStones, firePatches, fumaroles, players, activeEquipments, itemDefinitions, cameraOffsetX, cameraOffsetY, canvasSize.width, canvasSize.height, torchLitStatesKey, lanternBurningStatesKey, localPlayerId, predictedPosition, remotePlayerInterpolation]);
+    }, [worldState, campfires, lanterns, furnaces, runeStones, firePatches, fumaroles, players, activeEquipments, itemDefinitions, cameraOffsetX, cameraOffsetY, canvasSize.width, canvasSize.height, torchLitStatesKey, lanternBurningStatesKey, localPlayerId, predictedPosition, remotePlayerInterpolation, buildingClusters]);
 
     return { overlayRgba, maskCanvasRef };
 } 

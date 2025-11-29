@@ -4,6 +4,99 @@ import { Player as SpacetimeDBPlayer, ItemDefinition as SpacetimeDBItemDefinitio
 import { CAMPFIRE_RENDER_Y_OFFSET, CAMPFIRE_HEIGHT } from '../renderers/campfireRenderingUtils';
 import { LANTERN_RENDER_Y_OFFSET, LANTERN_HEIGHT } from '../renderers/lanternRenderingUtils';
 import { FURNACE_RENDER_Y_OFFSET, FURNACE_HEIGHT } from '../renderers/furnaceRenderingUtils';
+import { BuildingCluster } from '../buildingVisibilityUtils';
+import { FOUNDATION_TILE_SIZE } from '../../config/gameConfig';
+
+// --- Indoor Light Containment Utilities ---
+
+/**
+ * Convert world position to foundation cell coordinates
+ */
+function worldToFoundationCell(worldX: number, worldY: number): { cellX: number; cellY: number } {
+    return {
+        cellX: Math.floor(worldX / FOUNDATION_TILE_SIZE),
+        cellY: Math.floor(worldY / FOUNDATION_TILE_SIZE),
+    };
+}
+
+/**
+ * Find which enclosed building cluster contains the given world position
+ * Returns the cluster if found, null otherwise
+ */
+function findEnclosingCluster(
+    worldX: number,
+    worldY: number,
+    buildingClusters: Map<string, BuildingCluster>
+): BuildingCluster | null {
+    const { cellX, cellY } = worldToFoundationCell(worldX, worldY);
+    const cellKey = `${cellX},${cellY}`;
+    
+    for (const [_, cluster] of buildingClusters) {
+        if (cluster.isEnclosed && cluster.cellCoords.has(cellKey)) {
+            return cluster;
+        }
+    }
+    return null;
+}
+
+/**
+ * Create a Path2D clip path from a building cluster's foundation cells
+ * 
+ * IMPORTANT: North walls/doors render with a vertical offset ABOVE the foundation,
+ * so we extend the clip area upward by one foundation tile size to include
+ * the north wall rendering area.
+ */
+function createClusterClipPath(
+    cluster: BuildingCluster,
+    cameraOffsetX: number,
+    cameraOffsetY: number
+): Path2D {
+    const path = new Path2D();
+    
+    cluster.cellCoords.forEach((cellKey) => {
+        const [cellXStr, cellYStr] = cellKey.split(',');
+        const cellX = parseInt(cellXStr, 10);
+        const cellY = parseInt(cellYStr, 10);
+        
+        const screenX = cellX * FOUNDATION_TILE_SIZE + cameraOffsetX;
+        const screenY = cellY * FOUNDATION_TILE_SIZE + cameraOffsetY;
+        
+        // Add the foundation cell itself
+        path.rect(screenX, screenY, FOUNDATION_TILE_SIZE, FOUNDATION_TILE_SIZE);
+        
+        // Add a rectangle ABOVE this cell to cover north wall/door rendering area
+        // North walls render with vertical offset above the foundation
+        path.rect(screenX, screenY - FOUNDATION_TILE_SIZE, FOUNDATION_TILE_SIZE, FOUNDATION_TILE_SIZE);
+    });
+    
+    return path;
+}
+
+/**
+ * Apply building interior clipping if needed
+ * Returns a function to restore the context, or null if no clipping was applied
+ */
+function applyIndoorClip(
+    ctx: CanvasRenderingContext2D,
+    worldX: number,
+    worldY: number,
+    cameraOffsetX: number,
+    cameraOffsetY: number,
+    buildingClusters?: Map<string, BuildingCluster>
+): (() => void) | null {
+    if (!buildingClusters) return null;
+    
+    const enclosingCluster = findEnclosingCluster(worldX, worldY, buildingClusters);
+    if (!enclosingCluster) return null;
+    
+    ctx.save();
+    const clipPath = createClusterClipPath(enclosingCluster, cameraOffsetX, cameraOffsetY);
+    ctx.clip(clipPath);
+    
+    return () => ctx.restore();
+}
+
+// --- End Indoor Light Containment Utilities ---
 
 // --- Campfire Light Constants (defined locally now) ---
 export const CAMPFIRE_LIGHT_RADIUS_BASE = 150;
@@ -38,6 +131,8 @@ interface RenderPlayerTorchLightProps {
     cameraOffsetY: number;
     renderPositionX?: number;
     renderPositionY?: number;
+    // Indoor light containment - prevents light from spilling outside enclosed buildings
+    buildingClusters?: Map<string, BuildingCluster>;
 }
 
 export const renderPlayerTorchLight = ({
@@ -49,6 +144,7 @@ export const renderPlayerTorchLight = ({
     cameraOffsetY,
     renderPositionX,
     renderPositionY,
+    buildingClusters,
 }: RenderPlayerTorchLightProps) => {
     if (!player.isTorchLit || !player.identity) {
         return; // Not lit or no identity, nothing to render
@@ -62,6 +158,9 @@ export const renderPlayerTorchLight = ({
         if (itemDef && itemDef.name === "Torch") {
             const lightCenterX = renderPositionX ?? player.positionX;
             const lightCenterY = renderPositionY ?? player.positionY;
+            
+            // Apply indoor clipping if player is inside an enclosed building
+            const restoreClip = applyIndoorClip(ctx, lightCenterX, lightCenterY, cameraOffsetX, cameraOffsetY, buildingClusters);
             
             const lightScreenX = lightCenterX + cameraOffsetX;
             const lightScreenY = lightCenterY + cameraOffsetY;
@@ -119,6 +218,9 @@ export const renderPlayerTorchLight = ({
             ctx.beginPath();
             ctx.arc(lightScreenX, lightScreenY, coreRadius, 0, Math.PI * 2);
             ctx.fill();
+            
+            // Restore context if we applied a clip
+            if (restoreClip) restoreClip();
         }
     }
 }; 
@@ -129,6 +231,8 @@ interface RenderCampfireLightProps {
     campfire: SpacetimeDBCampfire;
     cameraOffsetX: number;
     cameraOffsetY: number;
+    // Indoor light containment - prevents light from spilling outside enclosed buildings
+    buildingClusters?: Map<string, BuildingCluster>;
 }
 
 export const renderCampfireLight = ({
@@ -136,10 +240,14 @@ export const renderCampfireLight = ({
     campfire,
     cameraOffsetX,
     cameraOffsetY,
+    buildingClusters,
 }: RenderCampfireLightProps) => {
     if (!campfire.isBurning) {
         return; // Not burning, no light
     }
+
+    // Apply indoor clipping if campfire is inside an enclosed building
+    const restoreClip = applyIndoorClip(ctx, campfire.posX, campfire.posY, cameraOffsetX, cameraOffsetY, buildingClusters);
 
     const visualCenterX = campfire.posX;
     const visualCenterY = campfire.posY - (CAMPFIRE_HEIGHT / 2) - CAMPFIRE_RENDER_Y_OFFSET;
@@ -206,6 +314,9 @@ export const renderCampfireLight = ({
     ctx.beginPath();
     ctx.arc(lightScreenX, lightScreenY, coreRadius, 0, Math.PI * 2);
     ctx.fill();
+    
+    // Restore context if we applied a clip
+    if (restoreClip) restoreClip();
 };
 
 // --- Lantern Light Rendering ---
@@ -214,6 +325,8 @@ interface RenderLanternLightProps {
     lantern: SpacetimeDBLantern;
     cameraOffsetX: number;
     cameraOffsetY: number;
+    // Indoor light containment - prevents light from spilling outside enclosed buildings
+    buildingClusters?: Map<string, BuildingCluster>;
 }
 
 export const renderLanternLight = ({
@@ -221,10 +334,14 @@ export const renderLanternLight = ({
     lantern,
     cameraOffsetX,
     cameraOffsetY,
+    buildingClusters,
 }: RenderLanternLightProps) => {
     if (!lantern.isBurning) {
         return; // Not burning, no light
     }
+
+    // Apply indoor clipping if lantern is inside an enclosed building
+    const restoreClip = applyIndoorClip(ctx, lantern.posX, lantern.posY, cameraOffsetX, cameraOffsetY, buildingClusters);
 
     const visualCenterX = lantern.posX;
     const visualCenterY = lantern.posY - (LANTERN_HEIGHT / 2) - LANTERN_RENDER_Y_OFFSET;
@@ -299,6 +416,9 @@ export const renderLanternLight = ({
     ctx.beginPath();
     ctx.arc(lightScreenX, lightScreenY, coreRadius, 0, Math.PI * 2);
     ctx.fill();
+    
+    // Restore context if we applied a clip
+    if (restoreClip) restoreClip();
 };
 
 // --- Furnace Light Rendering ---
@@ -307,6 +427,8 @@ interface RenderFurnaceLightProps {
     furnace: SpacetimeDBFurnace;
     cameraOffsetX: number;
     cameraOffsetY: number;
+    // Indoor light containment - prevents light from spilling outside enclosed buildings
+    buildingClusters?: Map<string, BuildingCluster>;
 }
 
 export const renderFurnaceLight = ({
@@ -314,10 +436,14 @@ export const renderFurnaceLight = ({
     furnace,
     cameraOffsetX,
     cameraOffsetY,
+    buildingClusters,
 }: RenderFurnaceLightProps) => {
     if (!furnace.isBurning) {
         return; // Not burning, no light
     }
+
+    // Apply indoor clipping if furnace is inside an enclosed building
+    const restoreClip = applyIndoorClip(ctx, furnace.posX, furnace.posY, cameraOffsetX, cameraOffsetY, buildingClusters);
 
     const visualCenterX = furnace.posX;
     const visualCenterY = furnace.posY - (FURNACE_HEIGHT / 2) - FURNACE_RENDER_Y_OFFSET;
@@ -372,5 +498,6 @@ export const renderFurnaceLight = ({
     ctx.arc(industrialFurnaceX, industrialFurnaceY, mainRadius, 0, Math.PI * 2);
     ctx.fill();
 
-
+    // Restore context if we applied a clip
+    if (restoreClip) restoreClip();
 };

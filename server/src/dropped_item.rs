@@ -57,7 +57,7 @@ pub struct DroppedItemDespawnSchedule {
 }
 
 // Constants
-const PICKUP_RADIUS: f32 = 64.0; // How close the player needs to be to pick up (adjust as needed)
+const PICKUP_RADIUS: f32 = 120.0; // Balanced range: 87% increase from original 64px, won't override nearby placeables
 const PICKUP_RADIUS_SQUARED: f32 = PICKUP_RADIUS * PICKUP_RADIUS;
 pub(crate) const DROP_OFFSET: f32 = 40.0; // How far in front of the player to drop the item
 const DESPAWN_CHECK_INTERVAL_SECS: u64 = 60; // Check every 1 minute

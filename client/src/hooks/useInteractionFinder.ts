@@ -54,7 +54,7 @@ import { PLAYER_DOOR_INTERACTION_DISTANCE_SQUARED, DOOR_RENDER_Y_OFFSET } from '
 import { getResourceConfig } from '../utils/renderers/resourceConfigurations';
 import type { ResourceType } from '../types/resourceTypes';
 
-// Generic harvestable resource interaction distance
+// Generic harvestable resource interaction distance (balanced: 50% increase from original 80px)
 const PLAYER_HARVESTABLE_RESOURCE_INTERACTION_DISTANCE_SQUARED = 120.0 * 120.0;
 const PLAYER_SLEEPING_BAG_INTERACTION_DISTANCE_SQUARED = PLAYER_CAMPFIRE_INTERACTION_DISTANCE_SQUARED;
 const PLAYER_KNOCKED_OUT_REVIVE_INTERACTION_DISTANCE_SQUARED = 128.0 * 128.0; // Doubled distance for easier revive access
@@ -126,7 +126,7 @@ const INTERACTION_CHECK_INTERVAL = 16; // ms - Reduced for immediate responsiven
 
 // --- Locally Defined Interaction Distance Constants (formerly in gameConfig.ts) ---
 // PLAYER_BOX_INTERACTION_DISTANCE_SQUARED is now imported from woodenStorageBoxRenderingUtils
-export const PLAYER_DROPPED_ITEM_INTERACTION_DISTANCE_SQUARED = 100.0 * 100.0;
+export const PLAYER_DROPPED_ITEM_INTERACTION_DISTANCE_SQUARED = 120.0 * 120.0; // Balanced: 87% increase from original 64px, consistent with harvestable resources
 // PLAYER_CORPSE_INTERACTION_DISTANCE_SQUARED is now imported from playerCorpseRenderingUtils
 export const PLAYER_STASH_INTERACTION_DISTANCE_SQUARED = 64.0 * 64.0;
 export const PLAYER_STASH_SURFACE_INTERACTION_DISTANCE_SQUARED = 32.0 * 32.0;

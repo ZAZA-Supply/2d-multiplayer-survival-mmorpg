@@ -104,13 +104,23 @@ impl AnimalBehavior for CrowBehavior {
         rng: &mut impl Rng,
     ) -> Result<(), String> {
         match animal.state {
-            AnimalState::Patrolling | AnimalState::Flying => {
-                // Crows can be either flying or grounded - decide based on is_flying flag
-                // Don't force takeoff - let the grounded behavior work
+            AnimalState::Patrolling | AnimalState::Flying | AnimalState::Grounded => {
+                // Crows use Grounded state for walking and Flying for flying
+                // Patrolling is also valid and defers to is_flying flag for behavior
                 
                 // Check for players with food to follow
                 if let Some(player) = detected_player {
                     let distance = get_player_distance(animal, player);
+                    
+                    // Check for nearby players - flee if too close
+                    if distance < 120.0 {
+                        // Too close! Take off and flee
+                        animal.is_flying = true;
+                        set_flee_destination_away_from_threat(animal, player.position_x, player.position_y, 300.0, rng);
+                        transition_to_state(animal, AnimalState::Fleeing, current_time, None, "flee from nearby player");
+                        log::debug!("Crow {} fleeing from nearby player", animal.id);
+                        return Ok(());
+                    }
                     
                     if player_has_food(ctx, player.identity) && distance < stats.perception_range {
                         // Follow the player - take off if needed
@@ -134,29 +144,7 @@ impl AnimalBehavior for CrowBehavior {
                         }
                     }
                 }
-            },
-            
-            AnimalState::Grounded => {
-                // Check for nearby players - flee if too close
-                if let Some(player) = detected_player {
-                    let distance = get_player_distance(animal, player);
-                    if distance < 120.0 {
-                        // Too close! Take off and flee
-                        animal.is_flying = true;
-                        set_flee_destination_away_from_threat(animal, player.position_x, player.position_y, 300.0, rng);
-                        transition_to_state(animal, AnimalState::Fleeing, current_time, None, "flee from nearby player");
-                        log::debug!("Crow {} fleeing from nearby player", animal.id);
-                    } else if player_has_food(ctx, player.identity) && distance < stats.perception_range {
-                        // Take off to steal
-                        animal.is_flying = true;
-                        animal.target_player_id = Some(player.identity);
-                        animal.investigation_x = Some(player.position_x);
-                        animal.investigation_y = Some(player.position_y);
-                        animal.last_food_check = Some(current_time);
-                        transition_to_state(animal, AnimalState::Stealing, current_time, Some(player.identity), "takeoff to steal food");
-                    }
-                }
-                // Normal grounded behavior handled by core movement system
+                // Normal walking/flying behavior handled by core movement system based on is_flying flag
             },
             
             AnimalState::Stealing => {
@@ -277,10 +265,12 @@ impl AnimalBehavior for CrowBehavior {
         dt: f32,
         rng: &mut impl Rng,
     ) {
-        // Crows can patrol both flying and grounded
+        // Crows use is_flying flag to determine animation/movement type
+        // This flag is the source of truth for sprite selection on client
         if animal.is_flying {
             execute_flying_patrol(ctx, animal, stats, dt, rng);
         } else {
+            // Grounded - use direction-based walking patrol like crabs
             execute_grounded_idle(ctx, animal, stats, dt, rng);
         }
     }

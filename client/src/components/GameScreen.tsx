@@ -72,7 +72,6 @@ import {
     PlantedSeed as SpacetimeDBPlantedSeed,
     PlayerDrinkingCooldown as SpacetimeDBPlayerDrinkingCooldown,
     WildAnimal as SpacetimeDBWildAnimal,
-    ViperSpittle as SpacetimeDBViperSpittle,
     AnimalCorpse as SpacetimeDBAnimalCorpse,
     Barrel as SpacetimeDBBarrel, // ADDED Barrel import
     HomesteadHearth as SpacetimeDBHomesteadHearth, // ADDED HomesteadHearth import
@@ -122,7 +121,6 @@ interface GameScreenProps {
     // worldTiles removed – world background now derived client-side from compressed chunk data
     minimapCache: SpacetimeDBMinimapCache | null;
     wildAnimals: Map<string, SpacetimeDBWildAnimal>;
-    viperSpittles: Map<string, SpacetimeDBViperSpittle>;
     animalCorpses: Map<string, SpacetimeDBAnimalCorpse>;
     barrels: Map<string, SpacetimeDBBarrel>; // ADDED barrels
     seaStacks: Map<string, any>; // ADDED sea stacks
@@ -292,7 +290,6 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
 
         minimapCache,
         wildAnimals,
-        viperSpittles,
         animalCorpses,
         inventoryItems, itemDefinitions, worldState, activeEquipments, recipes, craftingQueueItems,
         messages,
@@ -729,7 +726,6 @@ const GameScreen: React.FC<GameScreenProps> = (props) => {
                 stashes={stashes}
                 plantedSeeds={plantedSeeds}
                 wildAnimals={wildAnimals}
-                viperSpittles={viperSpittles}
                 animalCorpses={animalCorpses}
                 barrels={props.barrels}
                 seaStacks={props.seaStacks}

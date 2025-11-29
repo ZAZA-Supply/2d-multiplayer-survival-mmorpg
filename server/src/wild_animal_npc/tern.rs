@@ -93,8 +93,9 @@ impl AnimalBehavior for TernBehavior {
         rng: &mut impl Rng,
     ) -> Result<(), String> {
         match animal.state {
-            AnimalState::Patrolling | AnimalState::Flying => {
-                // Terns can be either flying or grounded - don't force takeoff
+            AnimalState::Patrolling | AnimalState::Flying | AnimalState::Grounded => {
+                // Terns use Grounded state for walking and Flying for flying
+                // Patrolling is also valid and defers to is_flying flag for behavior
                 
                 // Check for dropped items to scavenge (only if not already carrying)
                 if animal.held_item_name.is_none() {
@@ -104,6 +105,7 @@ impl AnimalBehavior for TernBehavior {
                         animal.investigation_y = Some(item_y);
                         transition_to_state(animal, AnimalState::Scavenging, current_time, None, "found dropped item");
                         log::info!("Tern {} found dropped item at ({:.0}, {:.0})", animal.id, item_x, item_y);
+                        return Ok(());
                     }
                 }
                 
@@ -123,31 +125,7 @@ impl AnimalBehavior for TernBehavior {
                         alert_nearby_animals(ctx, animal, player, current_time);
                     }
                 }
-            },
-            
-            AnimalState::Grounded => {
-                // Check for nearby dropped items while grounded
-                if animal.held_item_name.is_none() {
-                    if let Some((_item_id, item_x, item_y)) = find_nearby_dropped_item(ctx, animal.pos_x, animal.pos_y) {
-                        animal.investigation_x = Some(item_x);
-                        animal.investigation_y = Some(item_y);
-                        transition_to_state(animal, AnimalState::Scavenging, current_time, None, "found dropped item grounded");
-                    }
-                }
-                
-                // Check for nearby players - flee if too close
-                if let Some(player) = detected_player {
-                    let distance = get_player_distance(animal, player);
-                    if distance < 150.0 {
-                        // Too close! Take off and flee
-                        animal.is_flying = true;
-                        set_flee_destination_away_from_threat(animal, player.position_x, player.position_y, 400.0, rng);
-                        transition_to_state(animal, AnimalState::Fleeing, current_time, None, "flee from player");
-                    } else {
-                        alert_nearby_animals(ctx, animal, player, current_time);
-                    }
-                }
-                // Normal grounded behavior handled by core movement system
+                // Normal walking/flying behavior handled by core movement system based on is_flying flag
             },
             
             AnimalState::Scavenging => {
@@ -247,10 +225,12 @@ impl AnimalBehavior for TernBehavior {
         dt: f32,
         rng: &mut impl Rng,
     ) {
-        // Terns can patrol both flying and grounded
+        // Terns use is_flying flag to determine animation/movement type
+        // This flag is the source of truth for sprite selection on client
         if animal.is_flying {
             execute_flying_patrol(ctx, animal, stats, dt, rng);
         } else {
+            // Grounded - use direction-based walking patrol like crabs
             execute_grounded_idle(ctx, animal, stats, dt, rng);
         }
     }

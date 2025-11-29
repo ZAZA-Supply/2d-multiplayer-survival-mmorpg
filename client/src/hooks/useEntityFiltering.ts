@@ -22,7 +22,6 @@ import {
   RainCollector as SpacetimeDBRainCollector,
   BrothPot as SpacetimeDBBrothPot,
   WildAnimal as SpacetimeDBWildAnimal,
-  ViperSpittle as SpacetimeDBViperSpittle,
   AnimalCorpse as SpacetimeDBAnimalCorpse,
   Barrel as SpacetimeDBBarrel, // ADDED Barrel type
   FoundationCell as SpacetimeDBFoundationCell, // ADDED: Building foundations
@@ -102,8 +101,6 @@ interface EntityFilteringResult {
   visibleBrothPotsMap: Map<string, SpacetimeDBBrothPot>;
   visibleWildAnimals: SpacetimeDBWildAnimal[]; // ADDED
   visibleWildAnimalsMap: Map<string, SpacetimeDBWildAnimal>; // ADDED
-  visibleViperSpittles: SpacetimeDBViperSpittle[]; // ADDED
-  visibleViperSpittlesMap: Map<string, SpacetimeDBViperSpittle>; // ADDED
   visibleAnimalCorpses: SpacetimeDBAnimalCorpse[]; // ADDED
   visibleAnimalCorpsesMap: Map<string, SpacetimeDBAnimalCorpse>; // ADDED
   visibleBarrels: SpacetimeDBBarrel[]; // ADDED
@@ -146,7 +143,6 @@ export type YSortedEntityType =
   | { type: 'rain_collector'; entity: SpacetimeDBRainCollector }
   | { type: 'broth_pot'; entity: SpacetimeDBBrothPot }
   | { type: 'wild_animal'; entity: SpacetimeDBWildAnimal }
-  | { type: 'viper_spittle'; entity: SpacetimeDBViperSpittle }
   | { type: 'animal_corpse'; entity: SpacetimeDBAnimalCorpse }
   | { type: 'barrel'; entity: SpacetimeDBBarrel }
   | { type: 'sea_stack'; entity: any } // Server-provided sea stack entities
@@ -268,11 +264,6 @@ const getEntityY = (item: YSortedEntityType, timestamp: number): number => {
       const elapsedSeconds = (timestamp - startTime) / 1000.0;
       return entity.startPosY + entity.velocityY * elapsedSeconds;
     }
-    case 'viper_spittle': {
-      const startTime = Number(entity.startTime.microsSinceUnixEpoch / 1000n);
-      const elapsedSeconds = (timestamp - startTime) / 1000.0;
-      return entity.startPosY + entity.velocityY * elapsedSeconds;
-    }
     case 'sea_stack':
       return entity.posY;
     case 'shelter':
@@ -309,7 +300,6 @@ const getEntityPriority = (item: YSortedEntityType): number => {
     case 'broth_pot': return 18; // Same as rain collector (similar placeable container)
     case 'foundation_cell': return 0.5; // ADDED: Foundations render early (ground level)
     case 'projectile': return 19;
-    case 'viper_spittle': return 19;
     case 'animal_corpse': return 20;
     case 'player_corpse': return 20;
     case 'player': return 21; // Players render before fog overlays (below ceiling tiles)
@@ -575,7 +565,6 @@ export function useEntityFiltering(
   rainCollectors: Map<string, SpacetimeDBRainCollector>,
   brothPots: Map<string, SpacetimeDBBrothPot>,
   wildAnimals: Map<string, SpacetimeDBWildAnimal>, // ADDED wildAnimals argument
-  viperSpittles: Map<string, SpacetimeDBViperSpittle>, // ADDED viperSpittles argument
   animalCorpses: Map<string, SpacetimeDBAnimalCorpse>, // ADDED animalCorpses argument
   barrels: Map<string, SpacetimeDBBarrel>, // ADDED barrels argument
   fumaroles: Map<string, SpacetimeDBFumarole>, // ADDED fumaroles argument
@@ -724,15 +713,6 @@ export function useEntityFiltering(
       // All wild animals now use the same square dimensions for consistency
       width = 96;
       height = 96;
-    } else if ((entity as any).viperId !== undefined && (entity as any).startPosX !== undefined) {
-      // Handle viper spittles - calculate current position based on time
-      const spittle = entity as any;
-      const startTime = Number(spittle.startTime.microsSinceUnixEpoch / 1000n);
-      const elapsedSeconds = (timestamp - startTime) / 1000.0;
-      x = spittle.startPosX + spittle.velocityX * elapsedSeconds;
-      y = spittle.startPosY + spittle.velocityY * elapsedSeconds;
-      width = 24; // Small spittle size
-      height = 24;
     } else if (isAnimalCorpse(entity)) {
       // Handle animal corpses
       x = entity.posX;
@@ -1057,12 +1037,6 @@ export function useEntityFiltering(
     });
   }, [wildAnimals, isEntityInView, viewBounds, stableTimestamp]);
 
-  const visibleViperSpittles = useMemo(() => 
-    viperSpittles ? Array.from(viperSpittles.values()).filter(e => isEntityInView(e, viewBounds, stableTimestamp))
-    : [],
-    [viperSpittles, isEntityInView, viewBounds, stableTimestamp]
-  );
-
   const visibleAnimalCorpses = useMemo(() => {
     const result = animalCorpses ? Array.from(animalCorpses.values()).filter(e => {
       const inView = isEntityInView(e, viewBounds, stableTimestamp);
@@ -1320,12 +1294,6 @@ export function useEntityFiltering(
     [visibleShelters]
   );
 
-  // ADDED: Map for visible viper spittles
-  const visibleViperSpittlesMap = useMemo(() =>
-    new Map(visibleViperSpittles.map(v => [v.id.toString(), v])),
-    [visibleViperSpittles]
-  );
-
   // ADDED: Map for visible animal corpses
   const visibleAnimalCorpsesMap = useMemo(() =>
     new Map(visibleAnimalCorpses.map(a => [a.id.toString(), a])),
@@ -1418,7 +1386,6 @@ export function useEntityFiltering(
       rainCollectors: visibleRainCollectors.length,
       brothPots: visibleBrothPots.length,
       wildAnimals: visibleWildAnimals.length,
-      viperSpittles: visibleViperSpittles.length,
       animalCorpses: visibleAnimalCorpses.length,
       barrels: visibleBarrels.length,
       fumaroles: visibleFumaroles.length,
@@ -1543,7 +1510,6 @@ export function useEntityFiltering(
     visibleRainCollectors.forEach(e => allEntities[index++] = { type: 'rain_collector', entity: e });
     visibleBrothPots.forEach(e => allEntities[index++] = { type: 'broth_pot', entity: e });
     visibleProjectiles.forEach(e => allEntities[index++] = { type: 'projectile', entity: e });
-    visibleViperSpittles.forEach(e => allEntities[index++] = { type: 'viper_spittle', entity: e });
     visibleAnimalCorpses.forEach(e => allEntities[index++] = { type: 'animal_corpse', entity: e });
     visiblePlayerCorpses.forEach(e => allEntities[index++] = { type: 'player_corpse', entity: e });
     visibleWildAnimals.forEach(e => allEntities[index++] = { type: 'wild_animal', entity: e });
@@ -2045,7 +2011,6 @@ export function useEntityFiltering(
     visibleRainCollectors,
     visibleBrothPots,
     visibleWildAnimals,
-    visibleViperSpittles,
     visibleAnimalCorpses,
     visibleBarrels,
     visibleFumaroles,
@@ -2113,8 +2078,6 @@ export function useEntityFiltering(
     visibleBrothPotsMap,
     visibleWildAnimals,
     visibleWildAnimalsMap,
-    visibleViperSpittles,
-    visibleViperSpittlesMap,
     visibleAnimalCorpses,
     visibleAnimalCorpsesMap,
     visibleBarrels,
