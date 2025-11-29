@@ -186,7 +186,7 @@ pub fn seed_ranged_weapon_stats(ctx: &ReducerContext) -> Result<(), String> {
     let initial_ranged_stats = vec![
         RangedWeaponStats {
             item_name: "Hunting Bow".to_string(),
-            weapon_range: 550.0,      // Increased from 300 to 400 world units
+            weapon_range: 800.0,      // Increased from 300 to 400 world units
             projectile_speed: 800.0,  // Fast projectile
             accuracy: 0.8,            // 80% accuracy base
             reload_time_secs: 1.0,    // 1 second between shots
@@ -194,7 +194,7 @@ pub fn seed_ranged_weapon_stats(ctx: &ReducerContext) -> Result<(), String> {
         },
         RangedWeaponStats {
             item_name: "Crossbow".to_string(),
-            weapon_range: 650.0,      // Longer range than hunting bow
+            weapon_range: 800.0,      // Longer range than hunting bow
             projectile_speed: 1200.0, // Much faster projectile - travels in straight line
             accuracy: 0.95,           // 95% accuracy - very precise
             reload_time_secs: 2.0,    // Slower reload time (2 seconds)
@@ -202,7 +202,7 @@ pub fn seed_ranged_weapon_stats(ctx: &ReducerContext) -> Result<(), String> {
         },
         RangedWeaponStats {
             item_name: "Makarov PM".to_string(),
-            weapon_range: 800.0,      // Long range - pistol is effective at distance
+            weapon_range: 1200.0,      // Long range - pistol is effective at distance
             projectile_speed: 1500.0, // Very fast projectile (faster than crossbow)
             accuracy: 0.85,           // Good base accuracy, decays on rapid fire
             reload_time_secs: 0.3,    // Time between shots (fire rate, not reload time)

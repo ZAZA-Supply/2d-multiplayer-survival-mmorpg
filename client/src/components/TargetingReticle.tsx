@@ -50,9 +50,9 @@ const TargetingReticle: React.FC<TargetingReticleProps> = ({
   const reticleCenterColor = isReadyToFire ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 50, 50, 0.8)';
   const reticleSecondaryColor = isReadyToFire ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 100, 100, 0.7)';
   
-  // Get weapon stats
+  // Get weapon stats - use actual weapon range from stats
   const weaponStats = activeItemDef ? rangedWeaponStats.get(activeItemDef.name || '') : null;
-  const weaponRange = 500; // Default ranged weapon range 500
+  const weaponRange = weaponStats?.weaponRange ?? 0; // Use actual weapon range, default 500
 
   // Update rotation continuously for animation
   useEffect(() => {
