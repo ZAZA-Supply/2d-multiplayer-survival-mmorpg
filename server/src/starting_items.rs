@@ -24,22 +24,22 @@ pub(crate) fn grant_starting_items(ctx: &ReducerContext, player_id: Identity, us
     // Format: (item_name: &str, quantity: u32, hotbar_slot: Option<u8>, inventory_slot: Option<u16>)
     let starting_inv_items = [
         // Hotbar (Slots 0-5)
-        ("Makarov PM", 1, Some(0u8), None),
-        ("Hunting Bow", 1, Some(1u8), None),
-        ("Crossbow", 1, None, Some(2u8)),
-        ("Combat Ladle", 1, Some(3u8), None),
-        ("Torch", 1, Some(4u8), None),
-        ("Cerametal Field Cauldron Mk. II", 1, Some(5u8), None),
+        ("Combat Ladle", 1, Some(0u8), None),
+        ("Torch", 1, Some(1u8), None),
+        ("Cerametal Field Cauldron Mk. II", 1, Some(2u8), None),
+        ("Reed Water Bottle", 1, Some(3u8), None),
+        ("Makarov PM", 1, Some(4u8), None),
+        ("Hunting Bow", 1, Some(5u8), None),
 
         // Starting materials in Inventory (Slots 0-23)
-       
-        ("9x18mm Round", 500, None, Some(1u16)),
-        ("Wood Arrow", 100, None, Some(2u16)),
-        ("Reed Water Bottle", 4, None, Some(3u16)),
-        ("Blueprint", 1, None, Some(4u16)),
-        ("Repair Hammer", 1, None, Some(5u16)),
-        ("Wood Door", 2, None, Some(6u16)),
-        ("Wood", 5000, None, Some(7u16)),
+        ("Crossbow", 1, None, Some(0u16)),
+        ("9x18mm Round", 100, None, Some(1u16)),
+        ("Wooden Arrow", 500, None, Some(2u16)),
+        ("Wood Door", 2, None, Some(3u16)),
+        ("Wood", 5000, None, Some(4u16)),
+        // ("Bone Knife", 1, None, Some(5u16)),
+        // ("Hunting Bow", 1, None, Some(6u16)),
+        // ("Wooden Arrow", 20, None, Some(7u16)),
         // Armor sets (commented out by default)
         // ("Wolf Fur Hood", 1, None, Some(12u16)),
         // ("Wolf Fur Coat", 1, None, Some(13u16)),
