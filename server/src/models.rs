@@ -179,6 +179,13 @@ pub enum ImmunityType {
     Bleed,     // Immunity to bleed effects
 }
 
+/// Enum to differentiate between ammunition types for weapon compatibility
+#[derive(SpacetimeType, Serialize, Deserialize, Copy, Clone, Debug, PartialEq)]
+pub enum AmmoType {
+    Arrow,     // Arrows for bows and crossbows
+    Bullet,    // Bullets for pistols and firearms
+}
+
 /// Struct containing all armor resistance values for different damage types
 #[derive(SpacetimeType, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ArmorResistances {

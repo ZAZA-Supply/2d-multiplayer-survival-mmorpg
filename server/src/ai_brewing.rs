@@ -332,6 +332,9 @@ pub fn create_generated_brew(
             noise_on_sprint: false,
             silences_movement: false,
             intimidates_animals: false,
+            
+            // Ammunition type (not applicable for consumables)
+            ammo_type: None,
         };
         
         let inserted = item_defs.insert(new_item_def);

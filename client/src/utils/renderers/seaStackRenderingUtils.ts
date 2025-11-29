@@ -290,7 +290,8 @@ function drawWaterLineEffects(
   currentTimeMs: number
 ): void {
   // Position water line at the exact split between base and tower
-  const BASE_PORTION = 0.22; // Must match the BASE_PORTION in renderSeaStack
+  // WAY WAY LOWER - most of the sea stack should be underwater
+  const BASE_PORTION = 0.12; // Only 12% above water - 88% underwater!
   const baseHeight = height * BASE_PORTION;
   const waterLineY = -baseHeight; // Negative because we're measuring from stack.y (anchor point)
   const time = currentTimeMs;
@@ -366,7 +367,7 @@ function renderSeaStack(
   // Draw dynamic ground shadow first (before the sea stack)
   if (!skipDrawingShadow && cycleProgress !== undefined) {
     // Position shadow at the base of the sea stack (where base and tower split)
-    const BASE_PORTION = 0.22; // Must match the BASE_PORTION below
+    const BASE_PORTION = 0.12; // Must match the BASE_PORTION below - water line is WAY LOWER
     const baseHeight = height * BASE_PORTION;
     const shadowBaseY = stack.y - baseHeight; // Shadow at the actual base level
     
@@ -400,41 +401,65 @@ function renderSeaStack(
   
   // The "base" is the underwater portion - needs to cover the sea stack base graphics
   // This value must be consistent with BASE_PORTION in drawWaterLineEffects
-  const BASE_PORTION = 0.22; // Bottom 22% is the underwater base - covers the wide base
+  // WATER LINE IS WAY WAY LOWER - most of sea stack underwater
+  const BASE_PORTION = 0.12; // Only 12% above water - 88% underwater!
   
   if (halfMode === 'bottom') {
-    // Render only the small underwater base (bottom ~15% of sea stack)
-    // Use gradient transparency: fully transparent at water line, opaque halfway down
+    // Render the underwater base portion with gradient transparency
+    // The base extends BELOW the anchor point (into positive Y) for the underwater reflection
     const baseHeight = height * BASE_PORTION;
     const sourceBaseHeight = image.naturalHeight * BASE_PORTION;
     const savedAlpha = ctx.globalAlpha;
     
+    // EXTENSION: How much further down past the anchor point to draw (for underwater depth)
+    // MASSIVE extension to cover the entire base of the sea stack image
+    const UNDERWATER_EXTENSION = 6.0; // Extend 600% of baseHeight further down (covers entire base!)
+    const extensionHeight = baseHeight * UNDERWATER_EXTENSION;
+    const totalDrawHeight = baseHeight + extensionHeight;
+    
     // Draw the base in horizontal slices with gradient transparency
-    // Top of base (at water line) = fully transparent, halfway down = fully opaque
-    const numSlices = 16; // More slices for smoother gradient
-    const sliceHeight = baseHeight / numSlices;
+    // FULLY OPAQUE at water line, fading to TRANSPARENT as it goes DOWN
+    const numSlices = 48; // More slices for smoother gradient over larger area
+    const sliceHeight = totalDrawHeight / numSlices;
     const sourceSliceHeight = sourceBaseHeight / numSlices;
     
     for (let i = 0; i < numSlices; i++) {
-      // Calculate opacity: 0.0 at top (water line), 1.0 at halfway (slice 8), stay at 1.0 after
-      // Use easeIn curve for more natural underwater look
-      const normalizedPos = i / (numSlices / 2); // 0 to 2 over full height
-      const clampedPos = Math.min(1.0, normalizedPos); // Clamp at 1.0 after halfway
-      // Ease-in quadratic for smooth transition
-      const sliceOpacity = clampedPos * clampedPos; // 0.0 -> 1.0 with ease-in
+      // Calculate opacity: OPAQUE at top (water line), fading to transparent as we go DOWN
+      // Fade over the entire draw height
+      const fadeProgress = i / numSlices; // 0 at top, 1 at bottom
+      // Underwater portion should be SEMI-TRANSPARENT so water tiles show through
+      // Start at ~50% opacity at water line, fade to fully transparent at bottom
+      const baseOpacity = 0.1; // Base opacity for underwater portion (water shows through)
+      let sliceOpacity: number;
+      if (fadeProgress < 0.5) {
+        // First 50%: semi-transparent (water shows through)
+        sliceOpacity = baseOpacity;
+      } else {
+        // Last 50%: fade from semi-transparent to fully transparent
+        const localFade = (fadeProgress - 0.5) / 0.5; // 0 to 1 over remaining portion
+        sliceOpacity = baseOpacity * (1.0 - localFade); // Linear fade to transparent
+      }
       
       ctx.globalAlpha = savedAlpha * sliceOpacity;
       
-      // Source Y: starts from top of base portion in source image
-      const sourceY = image.naturalHeight - sourceBaseHeight + (i * sourceSliceHeight);
-      // Destination Y: starts from top of base (negative, going down toward 0)
+      // Source Y: sample from the base portion of the source image
+      // For the extended portion, we repeat/stretch the bottom of the source
+      const sourceProgress = Math.min(1.0, i / 30); // Clamp to source range, stretch more
+      const sourceY = image.naturalHeight - sourceBaseHeight + (sourceProgress * sourceBaseHeight);
+      
+      // Destination Y: starts at -baseHeight (water line, UP from anchor)
+      // and goes DOWN past 0 (anchor point) into positive Y (below anchor)
+      // destY = -baseHeight + (i * sliceHeight)
+      // When i=0: destY = -baseHeight (water line, above anchor)
+      // When i reaches baseHeight/sliceHeight: destY = 0 (anchor point)
+      // When i continues: destY becomes positive (below anchor, extending down)
       const destY = -baseHeight + (i * sliceHeight);
       
       ctx.drawImage(
         image,
         0, sourceY, // Source position
         image.naturalWidth, sourceSliceHeight + 1, // Source size (+1 to avoid gaps)
-        -width / 2, destY, // Destination position
+        -width / 2, destY, // Destination position (extends into positive Y = DOWN)
         width, sliceHeight + 1 // Destination size (+1 to avoid gaps)
       );
     }
@@ -653,8 +678,9 @@ function drawWaterLineOnly(
   height: number,
   currentTimeMs: number
 ): void {
-  // Position water line at the exact split between base and tower (11% from bottom)
-  const BASE_PORTION = 0.22; // Must match the BASE_PORTION in renderSeaStack
+  // Position water line at the exact split between base and tower
+  // WAY WAY LOWER - most of the sea stack should be underwater
+  const BASE_PORTION = 0.12; // Only 12% above water - 88% underwater!
   const baseHeight = height * BASE_PORTION;
   const waterLineY = -baseHeight;
   const time = currentTimeMs;

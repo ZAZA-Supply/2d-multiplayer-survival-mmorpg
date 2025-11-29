@@ -1734,13 +1734,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     });
     // --- END SEA STACK WATER EFFECTS ---
 
-    // --- STEP 0.7: Render sea stack water lines (animated lines BELOW players) ---
-    visibleSeaStacks.forEach(seaStack => {
-      renderSeaStackWaterLineOnly(ctx, seaStack, doodadImagesRef.current, now_ms);
-    });
-    // --- END SEA STACK WATER LINES ---
+    // MOVED: Water line now renders AFTER sea stack tops (see below after Y-sorted entities)
 
-    // Now players render OVER the rock, water gradient, and water line
+    // Now players render OVER the rock, water gradient
 
     // --- STEP 1: Render ONLY swimming player bottom halves ---
     // Filter out swimming players and render them manually with exact same logic as renderYSortedEntities
@@ -1933,7 +1929,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     });
     // --- END UNDERWATER SHADOWS ---
 
-    // --- STEP 2: Render water overlay (appears over underwater shadows and below visible sprites) ---
+    // --- Render water overlay (ABOVE underwater shadows and sea stack bottoms, BELOW sea stack tops and player heads) ---
     renderWaterOverlay(
       ctx,
       -currentCameraOffsetX, // Convert camera offset to world camera position
@@ -2189,6 +2185,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     // Flush remaining batch
     flushBatch();
     // --- END Y-SORTED ENTITIES AND SWIMMING PLAYER TOP HALVES ---
+
+    // --- Render sea stack water lines (ABOVE sea stacks) ---
+    visibleSeaStacks.forEach(seaStack => {
+      renderSeaStackWaterLineOnly(ctx, seaStack, doodadImagesRef.current, now_ms);
+    });
+    // --- END SEA STACK WATER LINES ---
 
     // --- Render Hot Springs (ABOVE players for steam/bubbles to show on top) ---
     renderHotSprings(

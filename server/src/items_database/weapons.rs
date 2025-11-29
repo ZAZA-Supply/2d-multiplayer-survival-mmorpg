@@ -147,5 +147,24 @@ pub fn get_weapon_definitions() -> Vec<ItemDefinition> {
             .crafting_output(1, 120)
             .respawn_time(1200)
             .build(),
+
+        // === FIREARMS ===
+        // Soviet-era firearms that use bullet ammunition
+
+        // Makarov PM - Classic Soviet pistol
+        ItemBuilder::new("Makarov PM", "A reliable Soviet-era semi-automatic pistol. Compact, accurate at medium range, but requires time to re-aim between shots. Uses 9x18mm ammunition.", ItemCategory::RangedWeapon)
+            .icon("makarov_pm.png")
+            .stackable(1)
+            .weapon(40, 45, 0.0) // Mid-range damage, no melee speed (ranged only)
+            .damage_type(DamageType::Projectile) // Projectile weapon
+            .equippable(None) // RangedWeapons are equippable
+            .crafting_cost(vec![
+                CostIngredient { item_name: "Metal Fragments".to_string(), quantity: 300 },
+                CostIngredient { item_name: "Wood".to_string(), quantity: 100 },
+                CostIngredient { item_name: "Cloth".to_string(), quantity: 20 },
+            ])
+            .crafting_output(1, 90)
+            .respawn_time(1200)
+            .build(),
     ]
 }

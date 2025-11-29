@@ -124,6 +124,9 @@ pub struct ItemDefinition {
     pub noise_on_sprint: bool, // Bone armor makes noise when sprinting
     pub silences_movement: bool, // Fox fur boots silence footsteps
     pub intimidates_animals: bool, // Wolf fur intimidates animals
+    
+    // AMMUNITION TYPE (for distinguishing arrows from bullets)
+    pub ammo_type: Option<crate::models::AmmoType>, // Arrow for bows/crossbows, Bullet for pistols
 }
 
 // --- Inventory Table ---
@@ -194,6 +197,13 @@ pub fn seed_ranged_weapon_stats(ctx: &ReducerContext) -> Result<(), String> {
             projectile_speed: 1200.0, // Much faster projectile - travels in straight line
             accuracy: 0.95,           // 95% accuracy - very precise
             reload_time_secs: 2.0,    // Slower reload time (2 seconds)
+        },
+        RangedWeaponStats {
+            item_name: "Makarov PM".to_string(),
+            weapon_range: 450.0,      // Shorter range than bow/crossbow
+            projectile_speed: 1500.0, // Very fast projectile (faster than crossbow)
+            accuracy: 0.85,           // Good base accuracy, decays on rapid fire
+            reload_time_secs: 1.8,    // Longer reload (recoil recovery time)
         },
     ];
 

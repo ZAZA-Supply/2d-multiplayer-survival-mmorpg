@@ -36,6 +36,7 @@ pub enum SoundType {
     ArrowHit,       // arrow_hit.mp3 (1 variation - when arrows hit players/corpses)
     ShootBow,       // shoot_bow.mp3 (1 variation - when hunting bow is fired)
     ShootCrossbow,  // shoot_crossbow.mp3 (1 variation - when crossbow is fired)
+    ShootPistol,    // shoot_pistol.mp3 (1 variation - when pistol is fired)
     Bandaging,      // bandaging.mp3 (1 variation - when player starts bandaging, stops if interrupted)
     StopBandaging,  // Special signal to stop bandaging sound
     BarrelHit,      // barrel_hit.mp3 (1 variation - when barrels are hit but not destroyed)
@@ -99,6 +100,7 @@ impl SoundType {
             SoundType::ArrowHit => "arrow_hit",
             SoundType::ShootBow => "shoot_bow",
             SoundType::ShootCrossbow => "shoot_crossbow",
+            SoundType::ShootPistol => "shoot_pistol",
             SoundType::Bandaging => "bandaging",
             SoundType::StopBandaging => "stop_bandaging",
             SoundType::BarrelHit => "barrel_hit",
@@ -159,6 +161,7 @@ impl SoundType {
             SoundType::ArrowHit => 1,
             SoundType::ShootBow => 1,
             SoundType::ShootCrossbow => 1,
+            SoundType::ShootPistol => 1,
             SoundType::Bandaging => 1,
             SoundType::StopBandaging => 1,
             SoundType::BarrelHit => 1,
@@ -556,6 +559,11 @@ pub fn emit_shoot_bow_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, player
 /// Emit a crossbow shooting sound (when crossbow is fired)
 pub fn emit_shoot_crossbow_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, player_id: Identity) {
     let _ = emit_sound_at_position_with_distance(ctx, SoundType::ShootCrossbow, pos_x, pos_y, 1.1, 850.0, player_id);
+}
+
+/// Emit a pistol shooting sound (when pistol is fired)
+pub fn emit_shoot_pistol_sound(ctx: &ReducerContext, pos_x: f32, pos_y: f32, player_id: Identity) {
+    let _ = emit_sound_at_position_with_distance(ctx, SoundType::ShootPistol, pos_x, pos_y, 1.2, 900.0, player_id);
 }
 
 /// Emit a bandaging sound (when player starts bandaging)

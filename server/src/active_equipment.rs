@@ -315,11 +315,12 @@ pub fn clear_active_item_reducer(ctx: &ReducerContext, player_identity: Identity
     Ok(())
 }
 
-/// Loads a ranged weapon with ammunition or cycles through available arrow types
+/// Loads a ranged weapon with ammunition or cycles through available ammo types
 ///
-/// If the weapon is not loaded, loads it with the player's preferred arrow type (or first available).
-/// If the weapon is already loaded, cycles to the next available arrow type.
-/// Remembers the player's preferred arrow type for future loading.
+/// If the weapon is not loaded, loads it with the player's preferred ammo type (or first available).
+/// If the weapon is already loaded, cycles to the next available ammo type.
+/// Remembers the player's preferred ammo type for future loading.
+/// Filters ammunition by compatible type (arrows for bows/crossbows, bullets for pistols).
 #[spacetimedb::reducer]
 pub fn load_ranged_weapon(ctx: &ReducerContext) -> Result<(), String> {
     let sender_id = ctx.sender;
@@ -356,76 +357,86 @@ pub fn load_ranged_weapon(ctx: &ReducerContext) -> Result<(), String> {
         return Err("Equipped item is not a ranged weapon.".to_string());
     }
 
-    // Define all available arrow types in order
-            let arrow_types = vec!["Wooden Arrow", "Bone Arrow", "Fire Arrow", "Hollow Reed Arrow"];
+    // Determine the compatible ammo type based on weapon
+    // Bows and Crossbows use Arrow ammunition, Pistols/Firearms use Bullet ammunition
+    let is_firearm = item_def.name == "Makarov PM"; // Add more firearms here as they're added
+    let required_ammo_type = if is_firearm {
+        crate::models::AmmoType::Bullet
+    } else {
+        crate::models::AmmoType::Arrow
+    };
     
-    // Find all available arrow types in player's inventory/hotbar
-    let mut available_arrows: Vec<(String, u64)> = Vec::new(); // (name, def_id)
+    let ammo_type_name = if is_firearm { "ammunition" } else { "arrows" };
     
-    for arrow_name in &arrow_types {
-        if let Some(ammo_def) = item_defs.iter().find(|def| def.name == *arrow_name) {
-            // Check if player has at least 1 of this ammo in inventory/hotbar
-            let has_ammo = inventory_items.iter().any(|item| {
-                item.item_def_id == ammo_def.id 
-                && item.quantity > 0
-                && match &item.location {
-                    crate::models::ItemLocation::Inventory(data) => data.owner_id == sender_id,
-                    crate::models::ItemLocation::Hotbar(data) => data.owner_id == sender_id,
-                    _ => false,
-                }
-            });
-            
-            if has_ammo {
-                available_arrows.push((arrow_name.to_string(), ammo_def.id));
+    // Find all available compatible ammo types in player's inventory/hotbar
+    let mut available_ammo: Vec<(String, u64)> = Vec::new(); // (name, def_id)
+    
+    // Iterate through all ammunition item definitions that match the required type
+    for ammo_def in item_defs.iter().filter(|def| {
+        def.category == crate::items::ItemCategory::Ammunition
+            && def.ammo_type == Some(required_ammo_type)
+    }) {
+        // Check if player has at least 1 of this ammo in inventory/hotbar
+        let has_ammo = inventory_items.iter().any(|item| {
+            item.item_def_id == ammo_def.id 
+            && item.quantity > 0
+            && match &item.location {
+                crate::models::ItemLocation::Inventory(data) => data.owner_id == sender_id,
+                crate::models::ItemLocation::Hotbar(data) => data.owner_id == sender_id,
+                _ => false,
             }
+        });
+        
+        if has_ammo {
+            available_ammo.push((ammo_def.name.clone(), ammo_def.id));
         }
     }
 
-    if available_arrows.is_empty() {
-        return Err("You need at least 1 arrow to load the weapon.".to_string());
+    if available_ammo.is_empty() {
+        return Err(format!("You need at least 1 {} to load the weapon.", ammo_type_name));
     }
 
-    let selected_arrow = if current_equipment.is_ready_to_fire {
-        // Weapon is already loaded - cycle to next arrow type
+    let selected_ammo = if current_equipment.is_ready_to_fire {
+        // Weapon is already loaded - cycle to next ammo type
         if let Some(current_ammo_id) = current_equipment.loaded_ammo_def_id {
-            // Find current arrow in available list
-            let current_index = available_arrows.iter()
+            // Find current ammo in available list
+            let current_index = available_ammo.iter()
                 .position(|(_, id)| *id == current_ammo_id);
             
             if let Some(index) = current_index {
-                // Cycle to next arrow type (wrap around to beginning if at end)
-                let next_index = (index + 1) % available_arrows.len();
-                available_arrows[next_index].clone()
+                // Cycle to next ammo type (wrap around to beginning if at end)
+                let next_index = (index + 1) % available_ammo.len();
+                available_ammo[next_index].clone()
             } else {
-                // Current arrow not in available list, use first available
-                available_arrows[0].clone()
+                // Current ammo not in available list, use first available
+                available_ammo[0].clone()
             }
         } else {
             // Somehow ready to fire but no ammo loaded, use first available
-            available_arrows[0].clone()
+            available_ammo[0].clone()
         }
     } else {
-        // Weapon is not loaded - use preferred arrow type if available, otherwise first available
+        // Weapon is not loaded - use preferred ammo type if available, otherwise first available
         if let Some(preferred_type) = &current_equipment.preferred_arrow_type {
-            // Try to find preferred arrow type in available arrows
-            available_arrows.iter()
+            // Try to find preferred ammo type in available ammo
+            available_ammo.iter()
                 .find(|(name, _)| name == preferred_type)
                 .cloned()
-                .unwrap_or_else(|| available_arrows[0].clone()) // Fall back to first available
+                .unwrap_or_else(|| available_ammo[0].clone()) // Fall back to first available
         } else {
             // No preference set, use first available
-            available_arrows[0].clone()
+            available_ammo[0].clone()
         }
     };
 
-    // Load the weapon with selected arrow
-    current_equipment.loaded_ammo_def_id = Some(selected_arrow.1);
+    // Load the weapon with selected ammo
+    current_equipment.loaded_ammo_def_id = Some(selected_ammo.1);
     current_equipment.is_ready_to_fire = true;
-    current_equipment.preferred_arrow_type = Some(selected_arrow.0.clone());
+    current_equipment.preferred_arrow_type = Some(selected_ammo.0.clone());
     active_equipments.player_identity().update(current_equipment);
 
     log::info!("[LoadRangedWeapon] Player {:?} loaded {} with {} (ready to fire).", 
-        sender_id, item_def.name, selected_arrow.0);
+        sender_id, item_def.name, selected_ammo.0);
     Ok(())
 }
 

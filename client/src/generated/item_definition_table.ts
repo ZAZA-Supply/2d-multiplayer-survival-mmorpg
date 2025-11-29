@@ -46,6 +46,9 @@ declare type __keep_DamageType = DamageType;
 import { ArmorResistances } from "./armor_resistances_type";
 // Mark import as potentially unused
 declare type __keep_ArmorResistances = ArmorResistances;
+import { AmmoType } from "./ammo_type_type";
+// Mark import as potentially unused
+declare type __keep_AmmoType = AmmoType;
 
 import { type EventContext, type Reducer, RemoteReducers, RemoteTables } from ".";
 declare type __keep = [EventContext, Reducer, RemoteReducers, RemoteTables];

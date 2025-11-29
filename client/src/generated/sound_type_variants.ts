@@ -58,6 +58,7 @@ export type WeaponSwing = { tag: "WeaponSwing" };
 export type ArrowHit = { tag: "ArrowHit" };
 export type ShootBow = { tag: "ShootBow" };
 export type ShootCrossbow = { tag: "ShootCrossbow" };
+export type ShootPistol = { tag: "ShootPistol" };
 export type Bandaging = { tag: "Bandaging" };
 export type StopBandaging = { tag: "StopBandaging" };
 export type BarrelHit = { tag: "BarrelHit" };
@@ -81,4 +82,5 @@ export type DoneCooking = { tag: "DoneCooking" };
 export type SoupBoiling = { tag: "SoupBoiling" };
 export type ErrorJarPlacement = { tag: "ErrorJarPlacement" };
 export type ErrorBrothNotCompatible = { tag: "ErrorBrothNotCompatible" };
+export type DoorOpening = { tag: "DoorOpening" };
 

@@ -390,6 +390,22 @@ pub fn fire_projectile(ctx: &ReducerContext, target_world_x: f32, target_world_y
         final_vy = delta_y / time_to_target; // Simple straight-line trajectory
         
         log::info!("Crossbow fired: straight-line trajectory. Distance: {:.1}, Time: {:.3}s", distance, time_to_target);
+    } else if item_def.name == "Makarov PM" {
+        // Pistols use fast arc physics - very fast projectile with reduced gravity (0.15 multiplier)
+        let pistol_gravity = g * 0.15; // 15% of normal gravity for fast arc
+        let distance = distance_sq.sqrt();
+        
+        // For pistols, use simplified arc calculation with reduced gravity
+        // This creates a very fast, nearly-straight trajectory with slight drop
+        let time_to_target = distance / v0;
+        
+        // Calculate velocity with pre-compensation for reduced gravity drop
+        final_vx = delta_x / time_to_target;
+        // Compensate for the small amount of gravity that will be applied during flight
+        final_vy = (delta_y / time_to_target) - 0.5 * pistol_gravity * time_to_target;
+        
+        log::info!("Makarov PM fired: fast-arc trajectory. Distance: {:.1}, Time: {:.3}s, Gravity: {:.1}", 
+            distance, time_to_target, pistol_gravity);
     } else {
         // Existing bow physics with full gravity arc
         if delta_x.abs() < 1e-6 { // Target is (almost) vertically aligned
@@ -496,6 +512,8 @@ pub fn fire_projectile(ctx: &ReducerContext, target_world_x: f32, target_world_y
         sound_events::emit_shoot_crossbow_sound(ctx, player.position_x, player.position_y, player_id);
     } else if item_def.name == "Hunting Bow" {
         sound_events::emit_shoot_bow_sound(ctx, player.position_x, player.position_y, player_id);
+    } else if item_def.name == "Makarov PM" {
+        sound_events::emit_shoot_pistol_sound(ctx, player.position_x, player.position_y, player_id);
     }
 
     // Update last attack timestamp
@@ -786,6 +804,8 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
         let gravity_multiplier = if let Some(weapon_def) = weapon_item_def {
             if weapon_def.name == "Crossbow" {
                 0.0 // Crossbow projectiles have NO gravity effect (straight line)
+            } else if weapon_def.name == "Makarov PM" {
+                0.15 // Pistol projectiles have minimal gravity effect (fast arc)
             } else {
                 1.0 // Bow projectiles have full gravity effect
             }
@@ -2038,8 +2058,22 @@ pub fn update_projectiles(ctx: &ReducerContext, _args: ProjectileUpdateSchedule)
         // Get the ammunition definition for break chance calculation
         let ammo_item_def = item_defs_table.id().find(ammo_def_id);
         let ammo_name = ammo_item_def
+            .as_ref()
             .map(|def| def.name.clone())
             .unwrap_or_else(|| format!("Unknown (ID: {})", ammo_def_id));
+        
+        // Check if this is a bullet (bullets always break on impact, never become dropped items)
+        let is_bullet = ammo_item_def
+            .as_ref()
+            .map(|def| def.ammo_type == Some(crate::models::AmmoType::Bullet))
+            .unwrap_or(false);
+        
+        if is_bullet {
+            // Bullets always break on impact - no dropped item created
+            log::debug!("[ProjectileMiss] Bullet '{}' (def_id: {}) broke on impact at ({:.1}, {:.1})", 
+                ammo_name, ammo_def_id, pos_x, pos_y);
+            continue; // Skip creating dropped item - bullet is destroyed
+        }
         
         // Check if this is a thrown weapon (ammo_def_id == item_def_id)
         let projectile_record = ctx.db.projectile().id().find(&projectile_id);

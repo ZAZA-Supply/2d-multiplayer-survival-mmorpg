@@ -1,5 +1,5 @@
 use crate::items::{ItemDefinition, ItemCategory, CostIngredient};
-use crate::models::{EquipmentSlotType, TargetType, DamageType, ArmorResistances};
+use crate::models::{EquipmentSlotType, TargetType, DamageType, ArmorResistances, AmmoType};
 
 pub struct ItemBuilder {
     inner: ItemDefinition,
@@ -60,6 +60,7 @@ impl ItemBuilder {
                 noise_on_sprint: false,
                 silences_movement: false,
                 intimidates_animals: false,
+                ammo_type: None,
             }
         }
     }
@@ -286,6 +287,12 @@ impl ItemBuilder {
     
     pub fn intimidates_animals(mut self, value: bool) -> Self {
         self.inner.intimidates_animals = value;
+        self
+    }
+    
+    /// Set the ammunition type for this item (Arrow for bows/crossbows, Bullet for pistols)
+    pub fn ammo_type(mut self, ammo_type: AmmoType) -> Self {
+        self.inner.ammo_type = Some(ammo_type);
         self
     }
 

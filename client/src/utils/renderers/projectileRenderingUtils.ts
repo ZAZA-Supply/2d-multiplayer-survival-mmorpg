@@ -1,6 +1,7 @@
 import { Projectile as SpacetimeDBProjectile } from '../../generated';
 
 const ARROW_SCALE = 0.04; // Small size for arrows
+const BULLET_SCALE = 0.025; // Even smaller size for bullets
 const THROWN_ITEM_SCALE = 0.06; // Moderately larger size for thrown weapons (1.5x arrow size)
 const ARROW_SPRITE_OFFSET_X = 0; // Pixels to offset drawing from calculated center, if sprite isn't centered
 const ARROW_SPRITE_OFFSET_Y = 0; // Pixels to offset drawing from calculated center, if sprite isn't centered
@@ -81,10 +82,16 @@ export const renderProjectile = ({
   
   // FIXED: Determine gravity multiplier based on weapon type (matching server physics)
   let gravityMultiplier = 1.0; // Default for bows
+  let isBullet = false; // Track if this is a bullet for smaller rendering
   if (itemDefinitions) {
     const weaponDef = itemDefinitions.get(projectile.itemDefId.toString());
-    if (weaponDef && weaponDef.name === "Crossbow") {
-      gravityMultiplier = 0.0; // Crossbow projectiles have NO gravity effect (straight line)
+    if (weaponDef) {
+      if (weaponDef.name === "Crossbow") {
+        gravityMultiplier = 0.0; // Crossbow projectiles have NO gravity effect (straight line)
+      } else if (weaponDef.name === "Makarov PM") {
+        gravityMultiplier = 0.15; // Pistol projectiles have minimal gravity effect (fast arc)
+        isBullet = true;
+      }
     }
   }
   
@@ -109,8 +116,8 @@ export const renderProjectile = ({
     angle = Math.atan2(instantaneousVelocityY, projectile.velocityX) + (Math.PI / 4);
   }
 
-  // Determine scale - thrown items are larger than arrows
-  const scale = isThrown ? THROWN_ITEM_SCALE : ARROW_SCALE;
+  // Determine scale - thrown items are larger, bullets are smaller than arrows
+  const scale = isThrown ? THROWN_ITEM_SCALE : (isBullet ? BULLET_SCALE : ARROW_SCALE);
   
   const drawWidth = arrowImage.naturalWidth * scale;
   const drawHeight = arrowImage.naturalHeight * scale;

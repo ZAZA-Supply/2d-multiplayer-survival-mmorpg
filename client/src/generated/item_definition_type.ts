@@ -45,6 +45,9 @@ declare type __keep_DamageType = DamageType;
 import { ArmorResistances } from "./armor_resistances_type";
 // Mark import as potentially unused
 declare type __keep_ArmorResistances = ArmorResistances;
+import { AmmoType } from "./ammo_type_type";
+// Mark import as potentially unused
+declare type __keep_AmmoType = AmmoType;
 
 
 export type ItemDefinition = {
@@ -98,6 +101,7 @@ export type ItemDefinition = {
   noiseOnSprint: boolean,
   silencesMovement: boolean,
   intimidatesAnimals: boolean,
+  ammoType: AmmoType | undefined,
 };
 let _cached_ItemDefinition_type_value: __AlgebraicTypeType | null = null;
 
@@ -163,6 +167,7 @@ export const ItemDefinition = {
       { name: "noiseOnSprint", algebraicType: __AlgebraicTypeValue.Bool },
       { name: "silencesMovement", algebraicType: __AlgebraicTypeValue.Bool },
       { name: "intimidatesAnimals", algebraicType: __AlgebraicTypeValue.Bool },
+      { name: "ammoType", algebraicType: __AlgebraicTypeValue.createOptionType(AmmoType.getTypeScriptAlgebraicType()) },
     );
     return _cached_ItemDefinition_type_value;
   },

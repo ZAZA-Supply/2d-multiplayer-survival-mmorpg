@@ -85,6 +85,7 @@ import sovietBayonetIcon from '../assets/items/soviet_bayonet.png';
 import navalCutlassIcon from '../assets/items/naval_cutlass.png';
 import engineersMaulIcon from '../assets/items/engineers_maul.png';
 import militaryCrowbarIcon from '../assets/items/military_crowbar.png';
+import makarovPmIcon from '../assets/items/makarov_pm.png';
 
 // Skull weapons
 import skullIcon from '../assets/items/skull.png';
@@ -100,6 +101,9 @@ import woodenArrowIcon from '../assets/items/wooden_arrow.png';
 import boneArrowIcon from '../assets/items/bone_arrow.png';
 import fireArrowIcon from '../assets/items/fire_arrow.png';
 import hollowReedArrowIcon from '../assets/items/hollow_reed_arrow.png';
+
+// Bullets
+import pistolRoundIcon from '../assets/items/9x18mm_round.png';
 
 // === ARMOR ===
 // Protective equipment and clothing
@@ -425,6 +429,7 @@ const iconMap: { [key: string]: string | undefined } = {
   'naval_cutlass.png': navalCutlassIcon,
   'engineers_maul.png': engineersMaulIcon,
   'military_crowbar.png': militaryCrowbarIcon,
+  'makarov_pm.png': makarovPmIcon,
   
   // Skull weapons
   'skull.png': skullIcon,
@@ -438,6 +443,7 @@ const iconMap: { [key: string]: string | undefined } = {
   'bone_arrow.png': boneArrowIcon,
   'fire_arrow.png': fireArrowIcon,
   'hollow_reed_arrow.png': hollowReedArrowIcon,
+  '9x18mm_round.png': pistolRoundIcon,
 
   // === ARMOR ===
   // Cloth armor

@@ -763,6 +763,8 @@ import { ActiveEquipment } from "./active_equipment_type.ts";
 export { ActiveEquipment };
 import { AgrarianEffectConfig } from "./agrarian_effect_config_type.ts";
 export { AgrarianEffectConfig };
+import { AmmoType } from "./ammo_type_type.ts";
+export { AmmoType };
 import { AnimalCorpse } from "./animal_corpse_type.ts";
 export { AnimalCorpse };
 import { AnimalSpecies } from "./animal_species_type.ts";

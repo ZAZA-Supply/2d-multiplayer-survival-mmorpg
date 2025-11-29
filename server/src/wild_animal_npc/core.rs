@@ -3720,12 +3720,12 @@ pub fn calculate_escape_angle_from_threats(
     combined_y.atan2(combined_x)
 }
 
-/// **COMMON RANGED WEAPON DETECTION** - Check if player has bow/crossbow equipped
+/// **COMMON RANGED WEAPON DETECTION** - Check if player has bow/crossbow/pistol equipped
 pub fn player_has_ranged_weapon(ctx: &ReducerContext, player_id: Identity) -> bool {
     if let Some(equipment) = ctx.db.active_equipment().player_identity().find(&player_id) {
         if let Some(item_def_id) = equipment.equipped_item_def_id {
             if let Some(item_def) = ctx.db.item_definition().id().find(item_def_id) {
-                let has_ranged = item_def.name == "Hunting Bow" || item_def.name == "Crossbow";
+                let has_ranged = item_def.name == "Hunting Bow" || item_def.name == "Crossbow" || item_def.name == "Makarov PM";
                 if has_ranged {
                     log::debug!("Player {:?} has ranged weapon: {}", player_id, item_def.name);
                 }
