@@ -229,8 +229,9 @@ pub fn set_active_item_reducer(ctx: &ReducerContext, item_instance_id: u64) -> R
     equipment.equipped_item_instance_id = Some(item_instance_id);
     equipment.swing_start_time_ms = 0;
     equipment.icon_asset_name = Some(item_def.icon_asset_name.clone());
-    // Reset ammunition state when switching items
+    // Reset ALL ammunition state when switching items (must reload after switching)
     equipment.loaded_ammo_def_id = None;
+    equipment.loaded_ammo_count = 0;
     equipment.is_ready_to_fire = false;
 
     // --- Handle Torch Specific State on Equip ---
@@ -289,6 +290,7 @@ pub fn clear_active_item_reducer(ctx: &ReducerContext, player_identity: Identity
             equipment.swing_start_time_ms = 0;
             equipment.icon_asset_name = None; // <<< CLEAR icon name
             equipment.loaded_ammo_def_id = None;
+            equipment.loaded_ammo_count = 0; // Clear magazine when unequipping
             equipment.is_ready_to_fire = false;
             active_equipments.player_identity().update(equipment);
 
@@ -446,8 +448,9 @@ pub fn load_ranged_weapon(ctx: &ReducerContext) -> Result<(), String> {
         let space_available = magazine_capacity.saturating_sub(current_loaded);
         
         if space_available == 0 {
-            // Magazine is full - just cycle ammo type
+            // Magazine is full - just cycle ammo type, but ensure weapon is ready to fire
             current_equipment.loaded_ammo_def_id = Some(selected_ammo.1);
+            current_equipment.is_ready_to_fire = true; // Ensure ready to fire even when cycling
             current_equipment.preferred_arrow_type = Some(selected_ammo.0.clone());
             active_equipments.player_identity().update(current_equipment);
             log::info!("[LoadRangedWeapon] Player {:?} cycled {} ammo to {} (magazine full at {}).", 

@@ -276,11 +276,17 @@ pub fn process_player_stats(ctx: &ReducerContext, _schedule: PlayerStatSchedule)
 
         // Calculate Warmth
         // NEW WARMTH LOGIC: Base warmth change per second based on TimeOfDay
-        // Base warmth decay values are halved from original values
+        // Rust-like pacing: ~5 min to reach 0 warmth, ~8-15 min total exposure to death
+        // Timeline at midnight (worst case):
+        //   0-30 sec: warmth 100→91 (fine, just UI hint "getting cold")
+        //   30-90 sec: warmth 91→73 (chilled, slow drain visible)
+        //   90-240 sec: warmth 73→28 (cold, noticeable drain, approaching danger)
+        //   240-310 sec: warmth 28→0 (freezing, HP damage starts at ~280 sec / 4.7 min)
+        //   310-500+ sec: HP draining, death around 500-600 sec (~8-10 min total)
         let base_warmth_change_per_sec = match world_state.time_of_day {
-            TimeOfDay::Midnight => -1.0,  // Was -2.0
-            TimeOfDay::Night => -0.75,    // Was -1.5
-            TimeOfDay::TwilightEvening => -0.25,  // Was -0.5
+            TimeOfDay::Midnight => -0.30,  // ~5.5 min to 0 warmth (was -1.0)
+            TimeOfDay::Night => -0.22,     // ~7.5 min to 0 warmth (was -0.75)
+            TimeOfDay::TwilightEvening => -0.08,  // ~21 min to 0 warmth (was -0.25)
             TimeOfDay::Dusk => 0.0,
             TimeOfDay::Afternoon => 1.0, 
             TimeOfDay::Noon => 2.0,
